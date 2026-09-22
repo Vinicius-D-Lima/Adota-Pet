@@ -16,14 +16,14 @@ Protótipo funcional em React do fluxo principal de adoção responsável do Ado
 ## Executar
 
 ```bash
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 Para gerar o build de produção:
 
 ```bash
-pnpm build
+npm run build
 ```
 
 ## Organização

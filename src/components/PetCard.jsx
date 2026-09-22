@@ -2,6 +2,8 @@ import { Heart, MapPin } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 export function PetCard({ pet, favorite, onFavorite }) {
+  const idPet = pet.id;
+  console.log("id do pet",idPet);
   return (
     <article className="pet-card">
       <div className="pet-image-wrap">
