@@ -7,6 +7,8 @@ export function PetDetailPage({ pets, favorites, onFavorite }) {
   const pet = pets.find((item) => item.id === petId)
   if (!pet) return <Navigate to="/pets" replace />
   const isFavorite = favorites.includes(pet.id)
+  const gallery = pet.gallery?.length ? pet.gallery : [pet.image, pet.image, pet.image]
+
 
   return (
     <div className="page-surface">
@@ -16,9 +18,9 @@ export function PetDetailPage({ pets, favorites, onFavorite }) {
         <div className="detail-grid">
           <div>
             <div className="gallery">
-              <img className="gallery-main" src={pet.gallery[0]} alt={`${pet.name} em destaque`} />
-              <img src={pet.gallery[1]} alt={`${pet.name} em outro momento`} />
-              <img src={pet.gallery[2]} alt={`${pet.name} brincando`} />
+              <img className="gallery-main" src={gallery[0]} alt={`${pet.name} em destaque`} />
+              <img src={gallery[1]} alt={`${pet.name} em outro momento`} />
+              <img src={gallery[2]} alt={`${pet.name} brincando`} />
             </div>
             <div className="detail-content">
               <div className="detail-title-row">

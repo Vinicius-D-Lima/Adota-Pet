@@ -41,6 +41,7 @@ export const pets = [
     city: 'Osasco, SP',
     distance: '8,6 km',
     image: 'https://images.unsplash.com/photo-1505628346881-b72b27e84530?auto=format&fit=crop&w=900&q=85',
+    gallery: [],
     summary: 'Companheiro animado, com energia para boas aventuras.',
     description: 'Bento é alegre, curioso e muito apegado às pessoas. Precisa de passeios diários e de uma casa disposta a manter uma rotina ativa.',
     traits: ['Ativo', 'Companheiro', 'Curioso'],
