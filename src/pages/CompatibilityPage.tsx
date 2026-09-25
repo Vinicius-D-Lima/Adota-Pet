@@ -1,9 +1,29 @@
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } from 'lucide-react'
+import type { CSSProperties } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
+import type { Pet, Profile } from '../types'
 
-function calculateCompatibility(pet, profile) {
-  const checks = [
+interface CompatibilityPageProps {
+  pets: Pet[]
+  profile: Profile
+}
+
+interface CompatibilityCheck {
+  ok: boolean
+  good: string
+  attention: string
+}
+
+interface CompatibilityResult {
+  score: number
+  level: 'Alta' | 'Média' | 'Baixa'
+  good: CompatibilityCheck[]
+  attention: CompatibilityCheck[]
+}
+
+function calculateCompatibility(pet: Pet, profile: Profile): CompatibilityResult {
+  const checks: CompatibilityCheck[] = [
     { ok: pet.energy !== 'Alta' || profile.activityLevel === 'Ativo', good: `Sua rotina ${profile.activityLevel.toLowerCase()} combina com o nível de energia de ${pet.name}.`, attention: `${pet.name} tem energia alta e pode precisar de mais atividade do que a sua rotina atual.` },
     { ok: !pet.space.toLowerCase().includes('quintal') || profile.hasOutdoorArea, good: `Sua moradia atende à necessidade de espaço de ${pet.name}.`, attention: `${pet.name} se beneficia de área externa; planeje passeios e atividades extras.` },
     { ok: pet.children || !profile.hasChildren, good: 'A composição da sua casa é adequada para este pet.', attention: `${pet.name} prefere uma casa sem crianças.` },
@@ -16,7 +36,7 @@ function calculateCompatibility(pet, profile) {
   return { score, level: score >= 80 ? 'Alta' : score >= 55 ? 'Média' : 'Baixa', good: checks.filter((item) => item.ok), attention: checks.filter((item) => !item.ok) }
 }
 
-export function CompatibilityPage({ pets, profile }) {
+export function CompatibilityPage({ pets, profile }: CompatibilityPageProps) {
   const { petId } = useParams()
   const pet = pets.find((item) => item.id === petId)
   if (!pet) return <Navigate to="/pets" replace />
@@ -30,7 +50,7 @@ export function CompatibilityPage({ pets, profile }) {
         <div className="flow-title"><span className="eyebrow"><Sparkles size={15} /> Avaliação orientativa</span><h1>Você e {pet.name} têm uma compatibilidade <em>{result.level.toLowerCase()}</em>.</h1><p>Comparamos as informações do seu perfil com as necessidades deste pet.</p></div>
         <div className="compatibility-layout">
           <aside className="score-card">
-            <div className="score-ring" style={{ '--score': `${result.score * 3.6}deg` }}><div><strong>{result.score}%</strong><span>compatível</span></div></div>
+            <div className="score-ring" style={{ '--score': `${result.score * 3.6}deg` } as CSSProperties}><div><strong>{result.score}%</strong><span>compatível</span></div></div>
             <span className={`level-badge level-${result.level.toLowerCase()}`}>Compatibilidade {result.level.toLowerCase()}</span>
             <div className="mini-pet"><img src={pet.image} alt={pet.name} /><span><strong>{pet.name}</strong><small>{pet.breed} · {pet.ageLabel}</small></span></div>
             <div className="profile-summary"><Home size={17} /><span><strong>Seu perfil</strong><small>{profile.housing} · rotina {profile.activityLevel.toLowerCase()}</small></span><Link to="/perfil">Editar</Link></div>

@@ -1,4 +1,6 @@
-export const pets = [
+import type { AdoptionRequest, Pet, Profile } from '../types'
+
+export const pets: Pet[] = [
   {
     id: 'luna',
     name: 'Luna',
@@ -157,7 +159,7 @@ export const pets = [
   },
 ]
 
-export const initialProfile = {
+export const initialProfile: Profile = {
   name: 'Marquinhos Silvestre',
   initials: 'MS',
   housing: 'Apartamento',
@@ -172,7 +174,7 @@ export const initialProfile = {
   preferredSize: 'Pequeno ou médio',
 }
 
-export const initialRequests = [
+export const initialRequests: AdoptionRequest[] = [
   {
     id: 'SOL-1042',
     petId: 'mimi',

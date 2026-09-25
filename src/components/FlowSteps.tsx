@@ -2,7 +2,11 @@ import { Check } from 'lucide-react'
 
 const steps = ['Conhecer o pet', 'Compatibilidade', 'Questionário', 'Solicitação']
 
-export function FlowSteps({ current }) {
+interface FlowStepsProps {
+  current: number
+}
+
+export function FlowSteps({ current }: FlowStepsProps) {
   return (
     <ol className="flow-steps" aria-label="Etapas da adoção">
       {steps.map((step, index) => (

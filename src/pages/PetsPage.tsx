@@ -2,11 +2,25 @@ import { Search, SlidersHorizontal, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { PetCard } from '../components/PetCard'
 import { PageIntro } from '../components/UI'
+import type { Pet } from '../types'
 
-const initialFilters = { search: '', species: 'Todos', size: 'Todos', sex: 'Todos' }
+interface PetsPageProps {
+  pets: Pet[]
+  favorites: string[]
+  onFavorite: (petId: string) => void
+}
 
-export function PetsPage({ pets, favorites, onFavorite }) {
-  const [filters, setFilters] = useState(initialFilters)
+interface Filters {
+  search: string
+  species: string
+  size: string
+  sex: string
+}
+
+const initialFilters: Filters = { search: '', species: 'Todos', size: 'Todos', sex: 'Todos' }
+
+export function PetsPage({ pets, favorites, onFavorite }: PetsPageProps) {
+  const [filters, setFilters] = useState<Filters>(initialFilters)
 
   const filteredPets = useMemo(() => pets.filter((pet) => {
     const search = filters.search.toLowerCase()
@@ -16,8 +30,8 @@ export function PetsPage({ pets, favorites, onFavorite }) {
       && (filters.sex === 'Todos' || pet.sex === filters.sex)
   }), [filters, pets])
 
-  const update = (key, value) => setFilters((current) => ({ ...current, [key]: value }))
-  const hasFilters = Object.entries(filters).some(([key, value]) => value !== initialFilters[key])
+  const update = <K extends keyof Filters>(key: K, value: Filters[K]) => setFilters((current) => ({ ...current, [key]: value }))
+  const hasFilters = (Object.entries(filters) as [keyof Filters, string][]).some(([key, value]) => value !== initialFilters[key])
 
   return (
     <div className="page-surface">

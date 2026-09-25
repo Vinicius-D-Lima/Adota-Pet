@@ -1,10 +1,16 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
-import { useState } from 'react'
+import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { Field } from '../components/UI'
+import type { AdoptionRequest, Pet, QuestionnaireAnswers } from '../types'
 
-const initialForm = {
+interface QuestionnairePageProps {
+  pets: Pet[]
+  onSubmit: (pet: Pet, answers: QuestionnaireAnswers) => AdoptionRequest
+}
+
+const initialForm: QuestionnaireAnswers = {
   motivation: '',
   routine: '',
   aloneTime: 'Até 4 horas',
@@ -13,17 +19,17 @@ const initialForm = {
   commitment: false,
 }
 
-export function QuestionnairePage({ pets, onSubmit }) {
+export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
   const { petId } = useParams()
   const pet = pets.find((item) => item.id === petId)
   const navigate = useNavigate()
-  const [form, setForm] = useState(initialForm)
+  const [form, setForm] = useState<QuestionnaireAnswers>(initialForm)
   const [attempted, setAttempted] = useState(false)
   if (!pet) return <Navigate to="/pets" replace />
 
-  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }))
+  const update = <K extends keyof QuestionnaireAnswers>(key: K, value: QuestionnaireAnswers[K]) => setForm((current) => ({ ...current, [key]: value }))
   const valid = form.motivation.trim().length >= 20 && form.routine.trim().length >= 20 && form.adaptation.trim().length >= 15 && form.costs && form.commitment
-  const submit = (event) => {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setAttempted(true)
     if (!valid) return
@@ -41,17 +47,17 @@ export function QuestionnairePage({ pets, onSubmit }) {
           <form className="questionnaire-card" onSubmit={submit} noValidate>
             <div className="form-section-heading"><span>1</span><div><h2>Sua motivação e rotina</h2><p>Responda com sinceridade. Não existe resposta perfeita.</p></div></div>
             <Field label={`Por que você quer adotar ${pet.name}?`} hint={`${form.motivation.length}/500 caracteres`} full>
-              <textarea maxLength="500" rows="5" value={form.motivation} onChange={(event) => update('motivation', event.target.value)} placeholder="Conte o que chamou sua atenção e o que espera dessa adoção..." />
+              <textarea maxLength={500} rows={5} value={form.motivation} onChange={(event) => update('motivation', event.target.value)} placeholder="Conte o que chamou sua atenção e o que espera dessa adoção..." />
             </Field>
             <Field label="Como é um dia comum na sua casa?" hint={`${form.routine.length}/500 caracteres`} full>
-              <textarea maxLength="500" rows="5" value={form.routine} onChange={(event) => update('routine', event.target.value)} placeholder="Fale sobre horários, pessoas em casa, passeios e atividades..." />
+              <textarea maxLength={500} rows={5} value={form.routine} onChange={(event) => update('routine', event.target.value)} placeholder="Fale sobre horários, pessoas em casa, passeios e atividades..." />
             </Field>
             <Field label="Por quanto tempo o pet ficaria sozinho?" full>
               <select value={form.aloneTime} onChange={(event) => update('aloneTime', event.target.value)}><option>Até 2 horas</option><option>Até 4 horas</option><option>De 4 a 8 horas</option><option>Mais de 8 horas</option></select>
             </Field>
             <div className="form-section-heading second"><span>2</span><div><h2>Adaptação e compromisso</h2><p>A adoção é um compromisso para toda a vida do animal.</p></div></div>
             <Field label="Como você pretende conduzir o período de adaptação?" hint={`${form.adaptation.length}/350 caracteres`} full>
-              <textarea maxLength="350" rows="4" value={form.adaptation} onChange={(event) => update('adaptation', event.target.value)} placeholder="Conte sobre o espaço, a rotina inicial e a adaptação com outros moradores..." />
+              <textarea maxLength={350} rows={4} value={form.adaptation} onChange={(event) => update('adaptation', event.target.value)} placeholder="Conte sobre o espaço, a rotina inicial e a adaptação com outros moradores..." />
             </Field>
             <label className="check-field"><input type="checkbox" checked={form.costs} onChange={(event) => update('costs', event.target.checked)} /><span><strong>Estou ciente dos custos recorrentes</strong><small>Alimentação, vacinas, consultas, medicamentos e outros cuidados.</small></span></label>
             <label className="check-field"><input type="checkbox" checked={form.commitment} onChange={(event) => update('commitment', event.target.checked)} /><span><strong>Assumo o compromisso com o bem-estar do pet</strong><small>Inclusive em mudanças de rotina, moradia ou composição familiar.</small></span></label>
