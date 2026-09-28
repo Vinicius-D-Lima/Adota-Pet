@@ -1,7 +1,14 @@
 import { Heart, MapPin } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import type { Pet } from '../types'
 
-export function PetCard({ pet, favorite, onFavorite }) {
+interface PetCardProps {
+  pet: Pet
+  favorite: boolean
+  onFavorite: (petId: string) => void
+}
+
+export function PetCard({ pet, favorite, onFavorite }: PetCardProps) {
   const idPet = pet.id;
   console.log("id do pet",idPet);
   return (

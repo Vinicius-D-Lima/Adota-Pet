@@ -1,8 +1,15 @@
-import { ArrowRight, CheckCircle2, HeartHandshake, Search, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowRight, CheckCircle2, HeartHandshake, type LucideIcon, Search, ShieldCheck, Sparkles } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PetCard } from '../components/PetCard'
+import type { Pet } from '../types'
 
-export function HomePage({ pets, favorites, onFavorite }) {
+interface HomePageProps {
+  pets: Pet[]
+  favorites: string[]
+  onFavorite: (petId: string) => void
+}
+
+export function HomePage({ pets, favorites, onFavorite }: HomePageProps) {
   return (
     <>
       <section className="hero">
@@ -41,11 +48,13 @@ export function HomePage({ pets, favorites, onFavorite }) {
             <h2>Um caminho simples para uma decisão consciente</h2>
           </div>
           <div className="how-grid">
-            {[
-              [Search, '01', 'Explore com calma', 'Use filtros para encontrar pets que fazem sentido para sua rotina.'],
-              [Sparkles, '02', 'Veja a compatibilidade', 'Comparamos seu perfil com as necessidades de cada animal.'],
-              [HeartHandshake, '03', 'Comece uma história', 'Responda ao questionário e envie sua solicitação à organização.'],
-            ].map(([Icon, number, title, text]) => (
+            {(
+              [
+                [Search, '01', 'Explore com calma', 'Use filtros para encontrar pets que fazem sentido para sua rotina.'],
+                [Sparkles, '02', 'Veja a compatibilidade', 'Comparamos seu perfil com as necessidades de cada animal.'],
+                [HeartHandshake, '03', 'Comece uma história', 'Responda ao questionário e envie sua solicitação à organização.'],
+              ] as [LucideIcon, string, string, string][]
+            ).map(([Icon, number, title, text]) => (
               <article className="how-card" key={number}>
                 <span className="how-number">{number}</span>
                 <span className="icon-tile"><Icon /></span>

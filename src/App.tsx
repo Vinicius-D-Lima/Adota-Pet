@@ -10,22 +10,23 @@ import { ProfilePage } from './pages/ProfilePage'
 import { QuestionnairePage } from './pages/QuestionnairePage'
 import { RequestsPage } from './pages/RequestsPage'
 import { RequestSuccessPage } from './pages/RequestSuccessPage'
+import type { AdoptionRequest, Pet, QuestionnaireAnswers } from './types'
 
 export default function App() {
   const [profile, setProfile] = useState(initialProfile)
-  const [favorites, setFavorites] = useState(['luna'])
-  const [requests, setRequests] = useState(initialRequests)
+  const [favorites, setFavorites] = useState<string[]>(['luna'])
+  const [requests, setRequests] = useState<AdoptionRequest[]>(initialRequests)
 
-  const toggleFavorite = (petId) => setFavorites((current) => current.includes(petId) ? current.filter((id) => id !== petId) : [...current, petId])
+  const toggleFavorite = (petId: string) => setFavorites((current) => current.includes(petId) ? current.filter((id) => id !== petId) : [...current, petId])
 
-  const createRequest = (pet, answers) => {
+  const createRequest = (pet: Pet, answers: QuestionnaireAnswers): AdoptionRequest => {
     const id = `SOL-${String(1042 + requests.length).padStart(4, '0')}`
-    const request = { id, petId: pet.id, status: 'Enviada', date: '14 set 2026', message: 'Sua solicitação foi enviada e aguarda o início da análise.', answers }
+    const request: AdoptionRequest = { id, petId: pet.id, status: 'Enviada', date: '14 set 2026', message: 'Sua solicitação foi enviada e aguarda o início da análise.', answers }
     setRequests((current) => [request, ...current])
     return request
   }
 
-  const cancelRequest = (requestId) => setRequests((current) => current.map((request) => request.id === requestId ? { ...request, status: 'Cancelada', message: 'Você cancelou esta solicitação.' } : request))
+  const cancelRequest = (requestId: string) => setRequests((current) => current.map((request) => request.id === requestId ? { ...request, status: 'Cancelada', message: 'Você cancelou esta solicitação.' } : request))
 
   return (
     <Layout requestCount={requests.filter((request) => !['Cancelada', 'Recusada'].includes(request.status)).length}>

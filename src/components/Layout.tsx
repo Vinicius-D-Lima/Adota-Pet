@@ -1,11 +1,16 @@
 import { Heart, Menu, PawPrint, UserRound, X } from 'lucide-react'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
-export function Layout({ children, requestCount }) {
+interface LayoutProps {
+  children: ReactNode
+  requestCount: number
+}
+
+export function Layout({ children, requestCount }: LayoutProps) {
   const [open, setOpen] = useState(false)
 
-  const nav = [
+  const nav: [string, string][] = [
     ['/', 'Início'],
     ['/pets', 'Encontrar pets'],
     ['/solicitacoes', 'Minhas solicitações'],

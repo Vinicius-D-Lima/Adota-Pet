@@ -1,12 +1,18 @@
 import { Check, Info, Save, UserRound } from 'lucide-react'
-import { useState } from 'react'
+import { type FormEvent, useState } from 'react'
 import { Field, PageIntro } from '../components/UI'
+import type { Profile } from '../types'
 
-export function ProfilePage({ profile, onSave }) {
-  const [draft, setDraft] = useState(profile)
+interface ProfilePageProps {
+  profile: Profile
+  onSave: (profile: Profile) => void
+}
+
+export function ProfilePage({ profile, onSave }: ProfilePageProps) {
+  const [draft, setDraft] = useState<Profile>(profile)
   const [saved, setSaved] = useState(false)
-  const update = (key, value) => { setDraft((current) => ({ ...current, [key]: value })); setSaved(false) }
-  const submit = (event) => { event.preventDefault(); onSave(draft); setSaved(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const update = <K extends keyof Profile>(key: K, value: Profile[K]) => { setDraft((current) => ({ ...current, [key]: value })); setSaved(false) }
+  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onSave(draft); setSaved(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }
 
   return (
     <div className="page-surface">

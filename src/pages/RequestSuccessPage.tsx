@@ -1,12 +1,19 @@
-import { ArrowRight, Check, ClipboardList, Heart, Home } from 'lucide-react'
+import { Check, ClipboardList, Heart, Home } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
+import type { AdoptionRequest, Pet } from '../types'
 
-export function RequestSuccessPage({ requests, pets }) {
+interface RequestSuccessPageProps {
+  requests: AdoptionRequest[]
+  pets: Pet[]
+}
+
+export function RequestSuccessPage({ requests, pets }: RequestSuccessPageProps) {
   const { requestId } = useParams()
   const request = requests.find((item) => item.id === requestId)
   if (!request) return <Navigate to="/solicitacoes" replace />
   const pet = pets.find((item) => item.id === request.petId)
+  if (!pet) return <Navigate to="/solicitacoes" replace />
 
   return (
     <div className="page-surface success-page">

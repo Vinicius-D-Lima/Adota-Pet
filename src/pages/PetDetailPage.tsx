@@ -1,8 +1,15 @@
 import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
+import type { Pet } from '../types'
 
-export function PetDetailPage({ pets, favorites, onFavorite }) {
+interface PetDetailPageProps {
+  pets: Pet[]
+  favorites: string[]
+  onFavorite: (petId: string) => void
+}
+
+export function PetDetailPage({ pets, favorites, onFavorite }: PetDetailPageProps) {
   const { petId } = useParams()
   const pet = pets.find((item) => item.id === petId)
   if (!pet) return <Navigate to="/pets" replace />
