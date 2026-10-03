@@ -6,7 +6,7 @@ import type { AdoptionRequest, Pet } from '../types'
 interface RequestsPageProps {
   requests: AdoptionRequest[]
   pets: Pet[]
-  onCancel: (requestId: string) => void
+  onCancel: (requestId: string) => Promise<AdoptionRequest>
 }
 
 export function RequestsPage({ requests, pets, onCancel }: RequestsPageProps) {
@@ -20,7 +20,7 @@ export function RequestsPage({ requests, pets, onCancel }: RequestsPageProps) {
           return <article className="request-card" key={request.id}>
             <img src={pet.image} alt={pet.name} />
             <div className="request-main"><div className="request-topline"><div><span className="request-code">{request.id}</span><h2>{pet.name}</h2></div><StatusPill status={request.status} /></div><p>{request.message}</p><div className="request-meta"><span><CalendarDays size={16} /> Enviada em {request.date}</span><span><MapPin size={16} /> {pet.organization}</span></div></div>
-            <div className="request-actions">{!['Cancelada', 'Recusada'].includes(request.status) && <button className="text-button danger" onClick={() => onCancel(request.id)}>Cancelar</button>}<Link className="icon-button" to={`/pets/${pet.id}`} aria-label={`Ver ${pet.name}`}><ChevronRight /></Link></div>
+            <div className="request-actions">{!['Cancelada', 'Recusada'].includes(request.status) && <button className="text-button danger" onClick={() => void onCancel(request.id)}>Cancelar</button>}<Link className="icon-button" to={`/pets/${pet.id}`} aria-label={`Ver ${pet.name}`}><ChevronRight /></Link></div>
           </article>
         })}</div> : <div className="empty-state"><ClipboardList size={36} /><h2>Nenhuma solicitação ainda</h2><p>Quando você enviar uma solicitação de adoção, ela aparecerá aqui.</p><Link className="button primary" to="/pets">Encontrar um pet</Link></div>}
       </section>

@@ -2,11 +2,11 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } fro
 import type { CSSProperties } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
-import type { Pet, Profile } from '../types'
+import type { Pet, ProfileDraft } from '../types'
 
 interface CompatibilityPageProps {
   pets: Pet[]
-  profile: Profile
+  profile: ProfileDraft
 }
 
 interface CompatibilityCheck {
@@ -22,13 +22,13 @@ interface CompatibilityResult {
   attention: CompatibilityCheck[]
 }
 
-function calculateCompatibility(pet: Pet, profile: Profile): CompatibilityResult {
+function calculateCompatibility(pet: Pet, profile: ProfileDraft): CompatibilityResult {
   const checks: CompatibilityCheck[] = [
     { ok: pet.energy !== 'Alta' || profile.activityLevel === 'Ativo', good: `Sua rotina ${profile.activityLevel.toLowerCase()} combina com o nível de energia de ${pet.name}.`, attention: `${pet.name} tem energia alta e pode precisar de mais atividade do que a sua rotina atual.` },
-    { ok: !pet.space.toLowerCase().includes('quintal') || profile.hasOutdoorArea, good: `Sua moradia atende à necessidade de espaço de ${pet.name}.`, attention: `${pet.name} se beneficia de área externa; planeje passeios e atividades extras.` },
+    { ok: !pet.space.toLowerCase().includes('quintal') || profile.hasOutdoorArea === true, good: `Sua moradia atende à necessidade de espaço de ${pet.name}.`, attention: `${pet.name} se beneficia de área externa; planeje passeios e atividades extras.` },
     { ok: pet.children || !profile.hasChildren, good: 'A composição da sua casa é adequada para este pet.', attention: `${pet.name} prefere uma casa sem crianças.` },
     { ok: pet.otherPets || !profile.hasOtherPets, good: 'A convivência com os animais da casa tende a ser positiva.', attention: `${pet.name} prefere ser o único pet; será necessária uma adaptação cuidadosa.` },
-    { ok: !pet.specialCare || profile.acceptsSpecialCare, good: pet.specialCare ? 'Você informou disponibilidade para os cuidados especiais necessários.' : `${pet.name} não possui cuidados especiais contínuos.`, attention: `${pet.name} precisa de cuidados especiais que ainda não constam como disponíveis no seu perfil.` },
+    { ok: !pet.specialCare || profile.acceptsSpecialCare === true, good: pet.specialCare ? 'Você informou disponibilidade para os cuidados especiais necessários.' : `${pet.name} não possui cuidados especiais contínuos.`, attention: `${pet.name} precisa de cuidados especiais que ainda não constam como disponíveis no seu perfil.` },
     { ok: profile.experience !== 'Primeiro pet', good: 'Sua experiência anterior ajuda na adaptação e nos cuidados.', attention: 'Como será seu primeiro pet, uma rede de apoio será importante no início.' },
   ]
   const matched = checks.filter((item) => item.ok).length

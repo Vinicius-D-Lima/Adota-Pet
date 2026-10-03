@@ -1,8 +1,10 @@
+const ignoredNameParts = new Set(['de', 'da', 'do', 'das', 'dos', 'e'])
+
 export function getInitials(name: string): string {
   const nameParts = name
     .trim()
     .split(/\s+/)
-    .filter(Boolean)
+    .filter((part) => part && !ignoredNameParts.has(part.toLocaleLowerCase('pt-BR')))
 
   if (nameParts.length === 0) return '?'
 
