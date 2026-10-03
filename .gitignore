@@ -8,3 +8,6 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Banco em uso do mock (copiado do seed na primeira execução)
+mock-server/db.json
