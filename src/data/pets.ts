@@ -160,8 +160,7 @@ export const pets: Pet[] = [
 ]
 
 export const initialProfile: Profile = {
-  name: 'Marquinhos Silvestre',
-  initials: 'MS',
+  name: 'Luquinhas Ferreira',
   housing: 'Apartamento',
   hasOutdoorArea: false,
   dailyTime: '2 a 3 horas',

@@ -27,7 +27,6 @@ export interface Pet {
 
 export interface Profile {
   name: string
-  initials: string
   housing: string
   hasOutdoorArea: boolean
   dailyTime: string
