@@ -13,14 +13,16 @@ const petsData = [
     sex: 'Fêmea',
     city: 'São Paulo, SP',
     distance: '3,2 km',
-    image: 'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=1200&q=85',
+    image:
+      'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=1200&q=85',
     gallery: [
       'https://images.unsplash.com/photo-1552053831-71594a27632d?auto=format&fit=crop&w=1200&q=85',
       'https://images.unsplash.com/photo-1518717758536-85ae29035b6d?auto=format&fit=crop&w=900&q=85',
       'https://images.unsplash.com/photo-1507146426996-ef05306b995a?auto=format&fit=crop&w=900&q=85',
     ],
     summary: 'Carinhosa, curiosa e sempre pronta para um passeio.',
-    description: 'Luna foi resgatada ainda filhote e cresceu cercada de cuidado. É muito carinhosa, aprende rápido e adora passeios tranquilos. Procura uma família presente, que queira dividir a rotina e o sofá com ela.',
+    description:
+      'Luna foi resgatada ainda filhote e cresceu cercada de cuidado. É muito carinhosa, aprende rápido e adora passeios tranquilos. Procura uma família presente, que queira dividir a rotina e o sofá com ela.',
     traits: ['Carinhosa', 'Sociável', 'Brincalhona'],
     energy: 'Média',
     space: 'Apartamento ou casa',
@@ -43,10 +45,12 @@ const petsData = [
     sex: 'Macho',
     city: 'Osasco, SP',
     distance: '8,6 km',
-    image: 'https://images.unsplash.com/photo-1505628346881-b72b27e84530?auto=format&fit=crop&w=900&q=85',
+    image:
+      'https://images.unsplash.com/photo-1505628346881-b72b27e84530?auto=format&fit=crop&w=900&q=85',
     gallery: [],
     summary: 'Companheiro animado, com energia para boas aventuras.',
-    description: 'Bento é alegre, curioso e muito apegado às pessoas. Precisa de passeios diários e de uma casa disposta a manter uma rotina ativa.',
+    description:
+      'Bento é alegre, curioso e muito apegado às pessoas. Precisa de passeios diários e de uma casa disposta a manter uma rotina ativa.',
     traits: ['Ativo', 'Companheiro', 'Curioso'],
     energy: 'Alta',
     space: 'Casa com quintal',
@@ -69,9 +73,11 @@ const petsData = [
     sex: 'Fêmea',
     city: 'São Paulo, SP',
     distance: '5,1 km',
-    image: 'https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=900&q=85',
+    image:
+      'https://images.unsplash.com/photo-1573865526739-10659fec78a5?auto=format&fit=crop&w=900&q=85',
     summary: 'Delicada, tranquila e especialista em cochilos ao sol.',
-    description: 'Mimi é uma gata jovem e tranquila. Gosta de observar a casa de um lugar alto e se aproxima no próprio tempo. Precisa de janelas teladas.',
+    description:
+      'Mimi é uma gata jovem e tranquila. Gosta de observar a casa de um lugar alto e se aproxima no próprio tempo. Precisa de janelas teladas.',
     traits: ['Tranquila', 'Independente', 'Carinhosa'],
     energy: 'Baixa',
     space: 'Apartamento telado',
@@ -94,9 +100,11 @@ const petsData = [
     sex: 'Macho',
     city: 'Santo André, SP',
     distance: '12 km',
-    image: 'https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?auto=format&fit=crop&w=900&q=85',
+    image:
+      'https://images.unsplash.com/photo-1530281700549-e82e7bf110d6?auto=format&fit=crop&w=900&q=85',
     summary: 'Gentil, maduro e feliz perto de quem ama.',
-    description: 'Fred é um cão adulto de temperamento gentil. Curte caminhadas leves, companhia e um cantinho confortável para descansar.',
+    description:
+      'Fred é um cão adulto de temperamento gentil. Curte caminhadas leves, companhia e um cantinho confortável para descansar.',
     traits: ['Gentil', 'Calmo', 'Leal'],
     energy: 'Baixa',
     space: 'Casa',
@@ -119,9 +127,11 @@ const petsData = [
     sex: 'Fêmea',
     city: 'Guarulhos, SP',
     distance: '14 km',
-    image: 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=900&q=85',
+    image:
+      'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?auto=format&fit=crop&w=900&q=85',
     summary: 'Falante, inteligente e muito ligada à família.',
-    description: 'Nina gosta de interação e enriquecimento ambiental. É uma companheira presente e cheia de personalidade.',
+    description:
+      'Nina gosta de interação e enriquecimento ambiental. É uma companheira presente e cheia de personalidade.',
     traits: ['Inteligente', 'Comunicativa', 'Afetuosa'],
     energy: 'Média',
     space: 'Apartamento telado',
@@ -144,9 +154,11 @@ const petsData = [
     sex: 'Macho',
     city: 'São Paulo, SP',
     distance: '6,8 km',
-    image: 'https://images.unsplash.com/photo-1591160690555-5debfba289f0?auto=format&fit=crop&w=900&q=85',
+    image:
+      'https://images.unsplash.com/photo-1591160690555-5debfba289f0?auto=format&fit=crop&w=900&q=85',
     summary: 'Um pequeno companheiro que ama colo e rotina.',
-    description: 'Tobias é dócil e gosta de ficar perto das pessoas. Precisa de escovação frequente e acompanhamento dos olhos.',
+    description:
+      'Tobias é dócil e gosta de ficar perto das pessoas. Precisa de escovação frequente e acompanhamento dos olhos.',
     traits: ['Dócil', 'Caseiro', 'Companheiro'],
     energy: 'Baixa',
     space: 'Apartamento ou casa',

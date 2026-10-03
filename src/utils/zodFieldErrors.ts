@@ -2,9 +2,7 @@ import type { ZodError } from 'zod'
 
 export type FieldErrors<T extends string> = Partial<Record<T, string>>
 
-export function getZodFieldErrors<T extends string>(
-  error: ZodError,
-): FieldErrors<T> {
+export function getZodFieldErrors<T extends string>(error: ZodError): FieldErrors<T> {
   return error.issues.reduce<FieldErrors<T>>((errors, issue) => {
     const field = issue.path[0]
 

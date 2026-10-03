@@ -33,9 +33,7 @@ export async function createAdoptionRequest(
   return { ...request }
 }
 
-export async function cancelAdoptionRequest(
-  requestId: string,
-): Promise<AdoptionRequest> {
+export async function cancelAdoptionRequest(requestId: string): Promise<AdoptionRequest> {
   const currentRequest = requestsStore.find((request) => request.id === requestId)
 
   if (!currentRequest) {
