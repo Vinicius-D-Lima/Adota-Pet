@@ -11,7 +11,9 @@ interface LayoutProps {
 
 export function Layout({ children, profileName, requestCount }: LayoutProps) {
   const [open, setOpen] = useState(false)
-  const initials = getInitials(profileName)
+  const savedName = profileName.trim()
+  const initials = savedName ? getInitials(savedName) : ''
+  const firstName = savedName.split(/\s+/)[0]
 
   const nav: [string, string][] = [
     ['/', 'Início'],
@@ -25,8 +27,12 @@ export function Layout({ children, profileName, requestCount }: LayoutProps) {
       <header className="site-header">
         <div className="container header-inner">
           <Link to="/" className="brand" aria-label="AdotaPet — início">
-            <span className="brand-mark"><PawPrint size={21} strokeWidth={2.5} /></span>
-            <span>Adota<span>Pet</span></span>
+            <span className="brand-mark">
+              <PawPrint size={21} strokeWidth={2.5} />
+            </span>
+            <span>
+              Adota<span>Pet</span>
+            </span>
           </Link>
 
           <button className="menu-button" onClick={() => setOpen(!open)} aria-label="Abrir menu">
@@ -35,16 +41,37 @@ export function Layout({ children, profileName, requestCount }: LayoutProps) {
 
           <nav className={open ? 'main-nav is-open' : 'main-nav'} aria-label="Navegação principal">
             {nav.map(([to, label]) => (
-              <NavLink key={to} to={to} onClick={() => setOpen(false)} className={({ isActive }) => isActive ? 'active' : ''}>
+              <NavLink
+                key={to}
+                to={to}
+                onClick={() => setOpen(false)}
+                className={({ isActive }) => (isActive ? 'active' : '')}
+              >
                 {label}
-                {to === '/solicitacoes' && requestCount > 0 && <span className="nav-count">{requestCount}</span>}
+                {to === '/solicitacoes' && requestCount > 0 && (
+                  <span className="nav-count">{requestCount}</span>
+                )}
               </NavLink>
             ))}
           </nav>
 
-          <Link className="user-chip" to="/perfil" aria-label={`Abrir perfil de ${profileName}`} title={profileName}>
-            <span aria-hidden="true">{initials}</span>
-          </Link>
+          {savedName && (
+            <Link
+              className="user-chip"
+              to="/perfil"
+              aria-label={`Abrir perfil de ${savedName}`}
+              title={savedName}
+            >
+              <span className="user-avatar" aria-hidden="true">
+                {initials}
+              </span>
+              <span className="user-greeting">
+                Olá,
+                <br />
+                bem-vindo {firstName}
+              </span>
+            </Link>
+          )}
         </div>
       </header>
       <main>{children}</main>
@@ -52,12 +79,18 @@ export function Layout({ children, profileName, requestCount }: LayoutProps) {
         <div className="container footer-inner">
           <div>
             <Link to="/" className="brand brand-footer">
-              <span className="brand-mark"><PawPrint size={20} /></span>
-              <span>Adota<span>Pet</span></span>
+              <span className="brand-mark">
+                <PawPrint size={20} />
+              </span>
+              <span>
+                Adota<span>Pet</span>
+              </span>
             </Link>
             <p>Adoção responsável começa com um bom encontro.</p>
           </div>
-          <p className="footer-note"><Heart size={15} fill="currentColor" /> Feito para aproximar famílias e pets.</p>
+          <p className="footer-note">
+            <Heart size={15} fill="currentColor" /> Feito para aproximar famílias e pets.
+          </p>
         </div>
       </footer>
     </div>
