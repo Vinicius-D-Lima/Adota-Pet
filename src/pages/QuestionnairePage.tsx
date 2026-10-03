@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { Field } from '../components/UI'
 import {
@@ -9,16 +9,13 @@ import {
   fetchAdoptionRequests,
   useCreateAdoptionRequest,
 } from '../hooks/useAdoptionRequests'
+import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
 import { questionnaireSchema } from '../schemas/questionnaireSchema'
-import type { Pet, QuestionnaireAnswers } from '../types'
+import type { QuestionnaireAnswers } from '../types'
 import { profileFieldLabels } from '../utils/profileFieldLabels'
 import { isActiveRequest } from '../utils/requestStatus'
 import { getZodFieldErrors, type FieldErrors } from '../utils/zodFieldErrors'
-
-interface QuestionnairePageProps {
-  pets: Pet[]
-}
 
 type FieldName = keyof QuestionnaireAnswers
 
@@ -58,9 +55,9 @@ function toMissingProfileFields(error: ApiError): string[] {
   })
 }
 
-export function QuestionnairePage({ pets }: QuestionnairePageProps) {
+export function QuestionnairePage() {
   const { petId } = useParams()
-  const pet = pets.find((item) => item.id === petId)
+  const petQuery = usePet(petId)
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createRequest = useCreateAdoptionRequest()
@@ -69,7 +66,24 @@ export function QuestionnairePage({ pets }: QuestionnairePageProps) {
   const [submitError, setSubmitError] = useState<ReactNode>('')
   const isSubmitting = createRequest.isPending
 
-  if (!pet) return <Navigate to="/pets" replace />
+  if (petQuery.isPending) return <div className="app-feedback">Carregando questionário...</div>
+  if (petQuery.isError) {
+    const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
+    return (
+      <div className="app-feedback error" role="alert">
+        <div>
+          <p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>
+          {!notFound && (
+            <button className="button ghost" onClick={() => void petQuery.refetch()}>
+              Tentar novamente
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  const pet = petQuery.data
 
   const update = <K extends FieldName>(key: K, value: QuestionnaireAnswers[K]) => {
     setForm((current) => ({ ...current, [key]: value }))

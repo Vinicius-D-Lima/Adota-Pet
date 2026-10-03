@@ -1,8 +1,8 @@
-import { pets } from '../../data/pets'
 import { requestPetSchema } from '../../schemas/requestSchema'
 import type { AdoptionRequest, RequestPet } from '../../types'
+import { petFixture } from '../petFixture'
 
-export const requestPet: RequestPet = requestPetSchema.parse(pets[0])
+export const requestPet: RequestPet = requestPetSchema.parse(petFixture)
 
 export const makeRequest = (overrides: Partial<AdoptionRequest> = {}): AdoptionRequest => ({
   id: 'SOL-1042',

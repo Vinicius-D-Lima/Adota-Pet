@@ -1,11 +1,11 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { pets } from '../data/pets'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../lib/api'
 import { ApiError } from '../lib/ApiError'
 import { makeRequest } from '../test/fixtures/requests'
+import { petFixture } from '../test/petFixture'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { QuestionnairePage } from './QuestionnairePage'
 
@@ -13,16 +13,23 @@ vi.mock('../lib/api', () => ({
   api: { get: vi.fn(), post: vi.fn() },
 }))
 
+const mocks = vi.hoisted(() => ({ usePet: vi.fn() }))
+vi.mock('../hooks/usePets', () => ({ usePet: mocks.usePet }))
+
 const getMock = vi.mocked(api.get)
 const postMock = vi.mocked(api.post)
 
+beforeEach(() => {
+  mocks.usePet.mockReturnValue({ data: petFixture, isPending: false, isError: false })
+})
+
 const longText = 'Texto com mais de vinte caracteres para validar.'
-const pet = pets[0]
+const pet = petFixture
 
 function setup() {
   renderWithProviders(
     <Routes>
-      <Route path="/pets/:petId/questionario" element={<QuestionnairePage pets={pets} />} />
+      <Route path="/pets/:petId/questionario" element={<QuestionnairePage />} />
       <Route path="/solicitacoes/:id/enviada" element={<p>Solicitação enviada</p>} />
     </Routes>,
     { route: `/pets/${pet.id}/questionario` },

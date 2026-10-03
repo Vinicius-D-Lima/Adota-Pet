@@ -1,19 +1,51 @@
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } from 'lucide-react'
 import type { CSSProperties } from 'react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
-import type { Pet, ProfileDraft } from '../types'
+import { useAdopterProfile } from '../hooks/useAdopterProfile'
+import { usePet } from '../hooks/usePets'
+import { ApiError } from '../lib/ApiError'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
 
-interface CompatibilityPageProps {
-  pets: Pet[]
-  profile: ProfileDraft
-}
-
-export function CompatibilityPage({ pets, profile }: CompatibilityPageProps) {
+export function CompatibilityPage() {
   const { petId } = useParams()
-  const pet = pets.find((item) => item.id === petId)
-  if (!pet) return <Navigate to="/pets" replace />
+  const petQuery = usePet(petId)
+  const profileQuery = useAdopterProfile()
+
+  if (petQuery.isPending || profileQuery.isPending) {
+    return <div className="app-feedback">Carregando compatibilidade...</div>
+  }
+  if (petQuery.isError) {
+    const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
+    return (
+      <div className="app-feedback error" role="alert">
+        <div>
+          <p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>
+          {!notFound && (
+            <button className="button ghost" onClick={() => void petQuery.refetch()}>
+              Tentar novamente
+            </button>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  if (profileQuery.isError) {
+    return (
+      <div className="app-feedback error" role="alert">
+        <div>
+          <p>Não foi possível carregar seu perfil.</p>
+          <button className="button ghost" onClick={() => void profileQuery.refetch()}>
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const pet = petQuery.data
+  const { profile } = profileQuery.data
   const result = calculateCompatibility(pet, profile)
 
   return (

@@ -1,14 +1,17 @@
-import { Check, Info, Save } from 'lucide-react'
+import { AlertTriangle, Check, Info, Save } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { Field, PageIntro } from '../components/UI'
+import {
+  type AdopterProfile,
+  useAdopterProfile,
+  useSaveAdopterProfile,
+} from '../hooks/useAdopterProfile'
+import { ApiError } from '../lib/ApiError'
 import { profileSchema } from '../schemas/profileSchema'
-import type { Profile, ProfileDraft } from '../types'
+import type { ProfileDraft } from '../types'
 import { getZodFieldErrors, type FieldErrors } from '../utils/zodFieldErrors'
 
-interface ProfilePageProps {
-  profile: ProfileDraft
-  onSave: (profile: Profile) => void
-}
+const SAVE_ERROR_MESSAGE = 'Não foi possível salvar. Seus dados foram mantidos.'
 
 const profileFieldLabels: Record<keyof ProfileDraft, string> = {
   name: 'Nome completo',
@@ -30,9 +33,35 @@ const profileFieldLabels: Record<keyof ProfileDraft, string> = {
   preferredSize: 'Porte desejado',
 }
 
-export function ProfilePage({ profile, onSave }: ProfilePageProps) {
-  const [draft, setDraft] = useState<ProfileDraft>(profile)
+const isProfileField = (field: string): field is keyof ProfileDraft => field in profileFieldLabels
+
+export function ProfilePage() {
+  const profileQuery = useAdopterProfile()
+
+  if (profileQuery.isPending) {
+    return <div className="app-feedback">Carregando seu perfil...</div>
+  }
+
+  if (profileQuery.isError) {
+    return (
+      <div className="app-feedback error" role="alert">
+        Não foi possível carregar seu perfil. Tente novamente.
+      </div>
+    )
+  }
+
+  return <ProfileForm savedProfile={profileQuery.data} />
+}
+
+interface ProfileFormProps {
+  savedProfile: AdopterProfile
+}
+
+function ProfileForm({ savedProfile }: ProfileFormProps) {
+  const saveProfile = useSaveAdopterProfile()
+  const [draft, setDraft] = useState<ProfileDraft>(savedProfile.profile)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [errors, setErrors] = useState<FieldErrors<keyof ProfileDraft>>({})
 
   const update = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => {
@@ -41,20 +70,35 @@ export function ProfilePage({ profile, onSave }: ProfilePageProps) {
     setSaved(false)
   }
 
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (saveProfile.isPending) return
     const result = profileSchema.safeParse(draft)
+    setSaved(false)
+    setSaveError(null)
 
     if (!result.success) {
       setErrors(getZodFieldErrors<keyof ProfileDraft>(result.error))
-      setSaved(false)
       return
     }
 
     setErrors({})
-    onSave(result.data)
-    setSaved(true)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    try {
+      await saveProfile.mutateAsync(result.data)
+      setSaved(true)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 400) {
+        const fieldErrors = Object.entries(error.toFieldErrors()).filter(([field]) =>
+          isProfileField(field),
+        )
+        if (fieldErrors.length > 0) {
+          setErrors(Object.fromEntries(fieldErrors))
+          return
+        }
+      }
+      setSaveError(SAVE_ERROR_MESSAGE)
+    }
   }
 
   const profileEntries = Object.entries(profileFieldLabels) as Array<[keyof ProfileDraft, string]>
@@ -64,6 +108,9 @@ export function ProfilePage({ profile, onSave }: ProfilePageProps) {
   })
   const completedFields = profileEntries.length - missingFields.length
   const completionPercentage = Math.round((completedFields / profileEntries.length) * 100)
+  const savedMissingFields = savedProfile.missingFields.map((field) =>
+    isProfileField(field) ? profileFieldLabels[field] : field,
+  )
 
   return (
     <div className="page-surface">
@@ -76,6 +123,20 @@ export function ProfilePage({ profile, onSave }: ProfilePageProps) {
         {saved && (
           <div className="save-message">
             <Check size={18} /> Perfil atualizado. As próximas compatibilidades usarão estes dados.
+          </div>
+        )}
+        {saveError && (
+          <div className="save-message save-error" role="alert">
+            <AlertTriangle size={18} /> {saveError}
+          </div>
+        )}
+        {!savedProfile.isComplete && (
+          <div className="save-message profile-incomplete" role="status">
+            <AlertTriangle size={18} />
+            <div>
+              <strong>Seu perfil salvo está incompleto.</strong>
+              {savedMissingFields.length > 0 && <> Complete: {savedMissingFields.join(', ')}.</>}
+            </div>
           </div>
         )}
         <form className="profile-form" onSubmit={submit} noValidate>
@@ -438,8 +499,8 @@ export function ProfilePage({ profile, onSave }: ProfilePageProps) {
 
             <div className="profile-submit">
               <p>Alterações relevantes podem mudar os resultados de compatibilidade.</p>
-              <button className="button primary" type="submit">
-                <Save size={18} /> Salvar perfil
+              <button className="button primary" type="submit" disabled={saveProfile.isPending}>
+                <Save size={18} /> {saveProfile.isPending ? 'Salvando…' : 'Salvar perfil'}
               </button>
             </div>
           </div>

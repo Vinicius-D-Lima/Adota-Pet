@@ -1,21 +1,36 @@
+/* eslint-disable react-refresh/only-export-components */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, type RenderOptions } from '@testing-library/react'
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
 
-interface ProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
+export function createTestQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  })
+}
+
+export function TestProviders({ children, route = '/' }: { children: ReactNode; route?: string }) {
+  const queryClient = createTestQueryClient()
+  return (
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+    </QueryClientProvider>
+  )
+}
+
+interface ProviderOptions extends Omit<RenderOptions, 'wrapper'> {
   route?: string
 }
 
-/** Renderiza com QueryClient isolado (sem retry) e MemoryRouter. */
 export function renderWithProviders(
   ui: ReactElement,
-  { route = '/', ...options }: ProvidersOptions = {},
+  { route = '/', ...options }: ProviderOptions = {},
 ) {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  })
-
+  const queryClient = createTestQueryClient()
   return {
     queryClient,
     ...render(

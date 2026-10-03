@@ -9,8 +9,8 @@ export const requestStatuses = [
   'Cancelada',
 ] as const
 
-/** O pet embutido na solicitação não traz `distance` (calculado só em /pets). */
-export const requestPetSchema = petSchema.omit({ distance: true })
+/** O pet embutido na solicitação não traz `distance` nem `distanceKm` (calculados só em /pets). */
+export const requestPetSchema = petSchema.omit({ distance: true, distanceKm: true })
 
 export const adoptionRequestSchema = z.object({
   id: z.string().min(1),

@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
-import { initialProfile } from './data/pets'
-import { usePets } from './hooks/usePets'
+import { useAdopterProfile } from './hooks/useAdopterProfile'
 import { CompatibilityPage } from './pages/CompatibilityPage'
 import { HomePage } from './pages/HomePage'
 import { PetDetailPage } from './pages/PetDetailPage'
@@ -13,57 +12,31 @@ import { RequestsPage } from './pages/RequestsPage'
 import { RequestSuccessPage } from './pages/RequestSuccessPage'
 
 export default function App() {
-  const [profile, setProfile] = useState(initialProfile)
   const [favorites, setFavorites] = useState<string[]>(['luna'])
-  const petsQuery = usePets()
-
-  const pets = petsQuery.data ?? []
+  const profileQuery = useAdopterProfile()
 
   const toggleFavorite = (petId: string) =>
     setFavorites((current) =>
       current.includes(petId) ? current.filter((id) => id !== petId) : [...current, petId],
     )
 
-  if (petsQuery.isPending) {
-    return <div className="app-feedback">Carregando dados...</div>
-  }
-
-  if (petsQuery.isError) {
-    return (
-      <div className="app-feedback error" role="alert">
-        Não foi possível carregar os dados. Tente novamente.
-      </div>
-    )
-  }
-
   return (
-    <Layout profileName={profile.name}>
+    <Layout profileName={profileQuery.data?.profile.name ?? ''}>
       <Routes>
-        <Route
-          path="/"
-          element={<HomePage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
-        />
+        <Route path="/" element={<HomePage favorites={favorites} onFavorite={toggleFavorite} />} />
         <Route
           path="/pets"
-          element={<PetsPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
+          element={<PetsPage favorites={favorites} onFavorite={toggleFavorite} />}
         />
         <Route
           path="/pets/:petId"
-          element={<PetDetailPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
+          element={<PetDetailPage favorites={favorites} onFavorite={toggleFavorite} />}
         />
-        <Route
-          path="/pets/:petId/compatibilidade"
-          element={<CompatibilityPage pets={pets} profile={profile} />}
-        />
-        <Route path="/pets/:petId/questionario" element={<QuestionnairePage pets={pets} />} />
+        <Route path="/pets/:petId/compatibilidade" element={<CompatibilityPage />} />
+        <Route path="/pets/:petId/questionario" element={<QuestionnairePage />} />
         <Route path="/solicitacoes" element={<RequestsPage />} />
         <Route path="/solicitacoes/:requestId/enviada" element={<RequestSuccessPage />} />
-        <Route
-          path="/perfil"
-          element={
-            <ProfilePage profile={profile} onSave={(savedProfile) => setProfile(savedProfile)} />
-          }
-        />
+        <Route path="/perfil" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
