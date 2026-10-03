@@ -15,10 +15,50 @@ Protótipo funcional em React + TypeScript do fluxo principal de adoção respon
 
 ## Executar
 
+O app consome uma API REST simulada com [json-server](https://github.com/typicode/json-server) 0.17 (`mock-server/`). Um único comando sobe o frontend (Vite) e o mock:
+
 ```bash
 npm install
-npm run dev
+npm run dev:mock
 ```
+
+- Frontend: http://localhost:5173 · API simulada: http://localhost:3001 (o Vite faz proxy de `/api` → `http://localhost:3001`, sem CORS).
+- `VITE_API_URL=/api` (veja `.env.example`). Para apontar para outra API, basta trocar essa variável.
+- `npm run mock` sobe só o mock; `npm run dev` sobe só o Vite.
+- `MOCK_DELAY_MS` (padrão `300`) controla a latência simulada; `MOCK_PORT` (padrão `3001`) muda a porta.
+
+### Dados do mock
+
+- `mock-server/db.seed.json` é o seed versionado. Na primeira execução ele é copiado para `mock-server/db.json` (ignorado pelo git), que guarda favoritos, perfil e solicitações entre recarregamentos e reinícios.
+- `npm run mock:reset` copia o seed sobre o `db.json`, voltando aos dados originais.
+
+### Contrato da API simulada
+
+| Rota                                                | Descrição                                                    |
+| --------------------------------------------------- | ------------------------------------------------------------ |
+| `GET /pets?search&species&size&sex&sort&page&limit` | `{ data, total }`; `sort` = `recent` \| `name` \| `distance` |
+| `GET /pets/:id`                                     | Pet (404 se não existir)                                     |
+| `GET /me`                                           | Usuário de demonstração fixo                                 |
+| `GET/PUT /me/adopter-profile`                       | Perfil com o campo calculado `isComplete`                    |
+| `POST /requests`                                    | Cria solicitação (ID e data gerados pelo servidor)           |
+| `GET /me/requests`, `GET /requests/:id`             | Solicitações do usuário                                      |
+| `POST /requests/:id/transitions`                    | `{ "to": "CANCELADA" }`                                      |
+| `GET /me/favorites`, `GET /me/favorites/ids`        | Favoritos (pets completos / só IDs)                          |
+| `PUT/DELETE /me/favorites/:petId`                   | Adiciona / remove favorito (204)                             |
+
+Erros seguem `{ statusCode, error, message, details }`: **400** validação (com `details` por campo), **404** pet/solicitação inexistente, **409** solicitação ativa duplicada para o pet (ou cancelamento inválido), **422** perfil incompleto.
+
+### Limitação de hospedagem
+
+O json-server é um processo Node separado. `npm run build && npm run preview` também precisa do `npm run mock` rodando. Hospedagens estáticas (Vercel, Netlify, GitHub Pages) **não executam** o json-server: para entregar por link publicado, hospede o mock à parte (ex.: Render ou Railway) e aponte `VITE_API_URL` para ele; caso contrário, a entrega deve ser feita rodando localmente.
+
+### Testes
+
+```bash
+npm test
+```
+
+Cobre as regras de negócio do `mock-server/server.js` (Vitest + supertest).
 
 Para gerar o build de produção (checagem de tipos + build do Vite):
 
