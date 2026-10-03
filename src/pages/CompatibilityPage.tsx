@@ -2,12 +2,12 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } fro
 import type { CSSProperties } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
-import type { Pet, Profile } from '../types'
+import type { Pet, ProfileDraft } from '../types'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
 
 interface CompatibilityPageProps {
   pets: Pet[]
-  profile: Profile
+  profile: ProfileDraft
 }
 
 export function CompatibilityPage({ pets, profile }: CompatibilityPageProps) {

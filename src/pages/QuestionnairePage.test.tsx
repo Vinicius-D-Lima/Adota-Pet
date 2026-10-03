@@ -16,7 +16,7 @@ function setup() {
     date: '01 jan 2026',
     message: '',
   }
-  const onSubmit = vi.fn(() => request)
+  const onSubmit = vi.fn(() => Promise.resolve(request))
   render(
     <MemoryRouter initialEntries={[`/pets/${pets[0].id}/questionario`]}>
       <Routes>
@@ -38,7 +38,11 @@ describe('QuestionnairePage - validação', () => {
     const { onSubmit, user } = setup()
     await user.click(submitButton())
     expect(onSubmit).not.toHaveBeenCalled()
-    expect(screen.getByText(/preencha as respostas com mais detalhes/i)).toBeInTheDocument()
+    expect(screen.getByText(/explique sua motivação usando pelo menos 20/i)).toBeInTheDocument()
+    expect(screen.getByText(/descreva sua rotina usando pelo menos 20/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/explique como será a adaptação usando pelo menos 15/i),
+    ).toBeInTheDocument()
   })
 
   it('bloqueia o envio quando os compromissos não foram marcados', async () => {
@@ -49,7 +53,10 @@ describe('QuestionnairePage - validação', () => {
     await user.type(adaptation, longText)
     await user.click(submitButton())
     expect(onSubmit).not.toHaveBeenCalled()
-    expect(screen.getByText(/confirme os dois/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/ciente dos custos recorrentes/i, { selector: 'small' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/confirme o compromisso com o bem-estar/i)).toBeInTheDocument()
   })
 
   it('envia quando todos os critérios são atendidos', async () => {

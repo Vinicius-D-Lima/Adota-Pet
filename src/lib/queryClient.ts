@@ -12,6 +12,6 @@ export function shouldRetry(failureCount: number, error: unknown): boolean {
 
 export const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: shouldRetry, staleTime: STALE_TIME_MS },
+    queries: { retry: shouldRetry, staleTime: STALE_TIME_MS, refetchOnWindowFocus: false },
   },
 })

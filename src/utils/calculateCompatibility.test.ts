@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { initialProfile, pets } from '../data/pets'
-import type { Pet, Profile } from '../types'
+import type { Pet, ProfileDraft } from '../types'
 import { calculateCompatibility } from './calculateCompatibility'
 
 const pet: Pet = {
@@ -13,7 +13,7 @@ const pet: Pet = {
   specialCare: false,
 }
 
-const profile: Profile = {
+const profile: ProfileDraft = {
   ...initialProfile,
   activityLevel: 'Moderado',
   hasOutdoorArea: false,
@@ -46,7 +46,7 @@ describe('calculateCompatibility', () => {
     // 4 critérios falham (2 de 6 ≈ 33%)
     const result = calculateCompatibility(
       { ...pet, energy: 'Alta', space: 'Casa com quintal', children: false, otherPets: false },
-      { ...profile, activityLevel: 'Leve', hasChildren: true, hasOtherPets: true },
+      { ...profile, activityLevel: 'Tranquilo', hasChildren: true, hasOtherPets: true },
     )
     expect(result.score).toBe(33)
     expect(result.level).toBe('Baixa')

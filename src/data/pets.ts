@@ -1,6 +1,7 @@
-import type { AdoptionRequest, Pet, Profile } from '../types'
+import { petsSchema } from '../schemas/petSchema'
+import type { AdoptionRequest, ProfileDraft } from '../types'
 
-export const pets: Pet[] = [
+const petsData = [
   {
     id: 'luna',
     name: 'Luna',
@@ -171,18 +172,26 @@ export const pets: Pet[] = [
   },
 ]
 
-export const initialProfile: Profile = {
-  name: 'Luquinhas Ferreira',
-  housing: 'Apartamento',
-  hasOutdoorArea: false,
-  dailyTime: '2 a 3 horas',
-  activityLevel: 'Moderado',
-  hasChildren: false,
-  hasOtherPets: true,
-  experience: 'Já tive pets',
-  acceptsSpecialCare: true,
-  preferredSpecies: 'Sem preferência',
-  preferredSize: 'Pequeno ou médio',
+export const pets = petsSchema.parse(petsData)
+
+export const initialProfile: ProfileDraft = {
+  name: '',
+  cpf: '',
+  birthDate: '',
+  email: '',
+  phone: '',
+  zipCode: '',
+  address: '',
+  housing: '',
+  hasOutdoorArea: '',
+  dailyTime: '',
+  activityLevel: '',
+  hasChildren: '',
+  hasOtherPets: '',
+  experience: '',
+  acceptsSpecialCare: '',
+  preferredSpecies: '',
+  preferredSize: '',
 }
 
 export const initialRequests: AdoptionRequest[] = [

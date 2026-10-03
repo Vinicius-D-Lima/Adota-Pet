@@ -6,7 +6,7 @@ import type { AdoptionRequest, Pet } from '../types'
 interface RequestsPageProps {
   requests: AdoptionRequest[]
   pets: Pet[]
-  onCancel: (requestId: string) => void
+  onCancel: (requestId: string) => Promise<AdoptionRequest>
 }
 
 export function RequestsPage({ requests, pets, onCancel }: RequestsPageProps) {
@@ -46,7 +46,10 @@ export function RequestsPage({ requests, pets, onCancel }: RequestsPageProps) {
                   </div>
                   <div className="request-actions">
                     {!['Cancelada', 'Recusada'].includes(request.status) && (
-                      <button className="text-button danger" onClick={() => onCancel(request.id)}>
+                      <button
+                        className="text-button danger"
+                        onClick={() => void onCancel(request.id)}
+                      >
                         Cancelar
                       </button>
                     )}

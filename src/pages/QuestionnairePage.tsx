@@ -3,11 +3,13 @@ import { type FormEvent, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { Field } from '../components/UI'
+import { questionnaireSchema } from '../schemas/questionnaireSchema'
 import type { AdoptionRequest, Pet, QuestionnaireAnswers } from '../types'
+import { getZodFieldErrors, type FieldErrors } from '../utils/zodFieldErrors'
 
 interface QuestionnairePageProps {
   pets: Pet[]
-  onSubmit: (pet: Pet, answers: QuestionnaireAnswers) => AdoptionRequest
+  onSubmit: (pet: Pet, answers: QuestionnaireAnswers) => Promise<AdoptionRequest>
 }
 
 const initialForm: QuestionnaireAnswers = {
@@ -24,23 +26,38 @@ export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
   const pet = pets.find((item) => item.id === petId)
   const navigate = useNavigate()
   const [form, setForm] = useState<QuestionnaireAnswers>(initialForm)
-  const [attempted, setAttempted] = useState(false)
+  const [errors, setErrors] = useState<FieldErrors<keyof QuestionnaireAnswers>>({})
+  const [submitError, setSubmitError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   if (!pet) return <Navigate to="/pets" replace />
 
-  const update = <K extends keyof QuestionnaireAnswers>(key: K, value: QuestionnaireAnswers[K]) =>
+  const update = <K extends keyof QuestionnaireAnswers>(key: K, value: QuestionnaireAnswers[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
-  const valid =
-    form.motivation.trim().length >= 20 &&
-    form.routine.trim().length >= 20 &&
-    form.adaptation.trim().length >= 15 &&
-    form.costs &&
-    form.commitment
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+    setErrors((current) => ({ ...current, [key]: undefined }))
+    setSubmitError('')
+  }
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setAttempted(true)
-    if (!valid) return
-    const request = onSubmit(pet, form)
-    navigate(`/solicitacoes/${request.id}/enviada`)
+    const result = questionnaireSchema.safeParse(form)
+
+    if (!result.success) {
+      setErrors(getZodFieldErrors<keyof QuestionnaireAnswers>(result.error))
+      return
+    }
+
+    setErrors({})
+    setIsSubmitting(true)
+
+    try {
+      const request = await onSubmit(pet, result.data)
+      navigate(`/solicitacoes/${request.id}/enviada`)
+    } catch {
+      setSubmitError('Não foi possível enviar a solicitação. Tente novamente.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -70,6 +87,7 @@ export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
             <Field
               label={`Por que você quer adotar ${pet.name}?`}
               hint={`${form.motivation.length}/500 caracteres`}
+              error={errors.motivation}
               full
             >
               <textarea
@@ -77,12 +95,14 @@ export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
                 rows={5}
                 value={form.motivation}
                 onChange={(event) => update('motivation', event.target.value)}
+                aria-invalid={Boolean(errors.motivation)}
                 placeholder="Conte o que chamou sua atenção e o que espera dessa adoção..."
               />
             </Field>
             <Field
               label="Como é um dia comum na sua casa?"
               hint={`${form.routine.length}/500 caracteres`}
+              error={errors.routine}
               full
             >
               <textarea
@@ -90,13 +110,17 @@ export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
                 rows={5}
                 value={form.routine}
                 onChange={(event) => update('routine', event.target.value)}
+                aria-invalid={Boolean(errors.routine)}
                 placeholder="Fale sobre horários, pessoas em casa, passeios e atividades..."
               />
             </Field>
-            <Field label="Por quanto tempo o pet ficaria sozinho?" full>
+            <Field label="Por quanto tempo o pet ficaria sozinho?" error={errors.aloneTime} full>
               <select
                 value={form.aloneTime}
-                onChange={(event) => update('aloneTime', event.target.value)}
+                onChange={(event) =>
+                  update('aloneTime', event.target.value as QuestionnaireAnswers['aloneTime'])
+                }
+                aria-invalid={Boolean(errors.aloneTime)}
               >
                 <option>Até 2 horas</option>
                 <option>Até 4 horas</option>
@@ -114,6 +138,7 @@ export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
             <Field
               label="Como você pretende conduzir o período de adaptação?"
               hint={`${form.adaptation.length}/350 caracteres`}
+              error={errors.adaptation}
               full
             >
               <textarea
@@ -121,6 +146,7 @@ export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
                 rows={4}
                 value={form.adaptation}
                 onChange={(event) => update('adaptation', event.target.value)}
+                aria-invalid={Boolean(errors.adaptation)}
                 placeholder="Conte sobre o espaço, a rotina inicial e a adaptação com outros moradores..."
               />
             </Field>
@@ -129,10 +155,12 @@ export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
                 type="checkbox"
                 checked={form.costs}
                 onChange={(event) => update('costs', event.target.checked)}
+                aria-invalid={Boolean(errors.costs)}
               />
               <span>
                 <strong>Estou ciente dos custos recorrentes</strong>
                 <small>Alimentação, vacinas, consultas, medicamentos e outros cuidados.</small>
+                {errors.costs && <small className="check-error">{errors.costs}</small>}
               </span>
             </label>
             <label className="check-field">
@@ -140,22 +168,24 @@ export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
                 type="checkbox"
                 checked={form.commitment}
                 onChange={(event) => update('commitment', event.target.checked)}
+                aria-invalid={Boolean(errors.commitment)}
               />
               <span>
                 <strong>Assumo o compromisso com o bem-estar do pet</strong>
                 <small>Inclusive em mudanças de rotina, moradia ou composição familiar.</small>
+                {errors.commitment && <small className="check-error">{errors.commitment}</small>}
               </span>
             </label>
-            {attempted && !valid && (
-              <div className="form-error">
-                <Info size={17} /> Preencha as respostas com mais detalhes e confirme os dois
-                compromissos.
+            {submitError && (
+              <div className="form-error" role="alert">
+                <Info size={17} /> {submitError}
               </div>
             )}
             <div className="questionnaire-actions">
               <span>Suas respostas ficam salvas apenas nesta simulação.</span>
-              <button className="button primary" type="submit">
-                Revisar e enviar solicitação <ArrowRight size={18} />
+              <button className="button primary" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? 'Enviando...' : 'Revisar e enviar solicitação'}{' '}
+                {!isSubmitting && <ArrowRight size={18} />}
               </button>
             </div>
           </form>

@@ -1,54 +1,10 @@
-export interface Pet {
-  id: string
-  name: string
-  species: string
-  breed: string
-  age: number
-  ageLabel: string
-  size: string
-  sex: string
-  city: string
-  distance: string
-  image: string
-  gallery?: string[]
-  summary: string
-  description: string
-  traits: string[]
-  energy: string
-  space: string
-  children: boolean
-  otherPets: boolean
-  specialCare: boolean
-  vaccinated: boolean
-  neutered: boolean
-  organization: string
-  organizationInitials: string
-}
-
-export interface Profile {
-  name: string
-  housing: string
-  hasOutdoorArea: boolean
-  dailyTime: string
-  activityLevel: string
-  hasChildren: boolean
-  hasOtherPets: boolean
-  experience: string
-  acceptsSpecialCare: boolean
-  preferredSpecies: string
-  preferredSize: string
-}
+import type { QuestionnaireAnswers } from './schemas/questionnaireSchema'
 
 export type RequestStatus = 'Em análise' | 'Aprovada' | 'Enviada' | 'Recusada' | 'Cancelada'
 
-export interface QuestionnaireAnswers {
-  motivation: string
-  routine: string
-  aloneTime: string
-  adaptation: string
-  costs: boolean
-  commitment: boolean
-}
+export type { Pet } from './schemas/petSchema'
+export type { Profile, ProfileDraft } from './schemas/profileSchema'
+export type { QuestionnaireAnswers } from './schemas/questionnaireSchema'
 
 export interface AdoptionRequest {
   id: string

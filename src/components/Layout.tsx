@@ -11,7 +11,9 @@ interface LayoutProps {
 
 export function Layout({ children, profileName, requestCount }: LayoutProps) {
   const [open, setOpen] = useState(false)
-  const initials = getInitials(profileName)
+  const savedName = profileName.trim()
+  const initials = savedName ? getInitials(savedName) : ''
+  const firstName = savedName.split(/\s+/)[0]
 
   const nav: [string, string][] = [
     ['/', 'Início'],
@@ -53,14 +55,23 @@ export function Layout({ children, profileName, requestCount }: LayoutProps) {
             ))}
           </nav>
 
-          <Link
-            className="user-chip"
-            to="/perfil"
-            aria-label={`Abrir perfil de ${profileName}`}
-            title={profileName}
-          >
-            <span aria-hidden="true">{initials}</span>
-          </Link>
+          {savedName && (
+            <Link
+              className="user-chip"
+              to="/perfil"
+              aria-label={`Abrir perfil de ${savedName}`}
+              title={savedName}
+            >
+              <span className="user-avatar" aria-hidden="true">
+                {initials}
+              </span>
+              <span className="user-greeting">
+                Olá,
+                <br />
+                bem-vindo {firstName}
+              </span>
+            </Link>
+          )}
         </div>
       </header>
       <main>{children}</main>

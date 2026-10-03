@@ -1,4 +1,4 @@
-import type { Pet, Profile } from '../types'
+import type { Pet, ProfileDraft } from '../types'
 
 interface CompatibilityCheck {
   ok: boolean
@@ -13,7 +13,7 @@ interface CompatibilityResult {
   attention: CompatibilityCheck[]
 }
 
-export function calculateCompatibility(pet: Pet, profile: Profile): CompatibilityResult {
+export function calculateCompatibility(pet: Pet, profile: ProfileDraft): CompatibilityResult {
   const checks: CompatibilityCheck[] = [
     {
       ok: pet.energy !== 'Alta' || profile.activityLevel === 'Ativo',
@@ -21,7 +21,7 @@ export function calculateCompatibility(pet: Pet, profile: Profile): Compatibilit
       attention: `${pet.name} tem energia alta e pode precisar de mais atividade do que a sua rotina atual.`,
     },
     {
-      ok: !pet.space.toLowerCase().includes('quintal') || profile.hasOutdoorArea,
+      ok: !pet.space.toLowerCase().includes('quintal') || profile.hasOutdoorArea === true,
       good: `Sua moradia atende à necessidade de espaço de ${pet.name}.`,
       attention: `${pet.name} se beneficia de área externa; planeje passeios e atividades extras.`,
     },
@@ -36,7 +36,7 @@ export function calculateCompatibility(pet: Pet, profile: Profile): Compatibilit
       attention: `${pet.name} prefere ser o único pet; será necessária uma adaptação cuidadosa.`,
     },
     {
-      ok: !pet.specialCare || profile.acceptsSpecialCare,
+      ok: !pet.specialCare || profile.acceptsSpecialCare === true,
       good: pet.specialCare
         ? 'Você informou disponibilidade para os cuidados especiais necessários.'
         : `${pet.name} não possui cuidados especiais contínuos.`,

@@ -44,16 +44,17 @@ export function StatusPill({ status }: StatusPillProps) {
 interface FieldProps {
   label: ReactNode
   hint?: ReactNode
+  error?: ReactNode
   children: ReactNode
   full?: boolean
 }
 
-export function Field({ label, hint, children, full = false }: FieldProps) {
+export function Field({ label, hint, error, children, full = false }: FieldProps) {
   return (
     <label className={full ? 'field full' : 'field'}>
       <span>{label}</span>
       {children}
-      {hint && <small>{hint}</small>}
+      {error ? <small className="field-error">{error}</small> : hint && <small>{hint}</small>}
     </label>
   )
 }

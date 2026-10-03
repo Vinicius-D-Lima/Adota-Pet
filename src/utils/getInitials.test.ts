@@ -3,7 +3,11 @@ import { getInitials } from './getInitials'
 
 describe('getInitials', () => {
   it('usa as iniciais das duas primeiras palavras', () => {
-    expect(getInitials('maria da silva')).toBe('MD')
+    expect(getInitials('ana souza costa')).toBe('AS')
+  })
+
+  it('ignora conectivos como de, da, do, das, dos e e', () => {
+    expect(getInitials('maria da silva')).toBe('MS')
   })
 
   it('ignora espaços extras', () => {
