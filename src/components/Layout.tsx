@@ -1,14 +1,17 @@
-import { Heart, Menu, PawPrint, UserRound, X } from 'lucide-react'
+import { Heart, Menu, PawPrint, X } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { getInitials } from '../utils/getInitials'
 
 interface LayoutProps {
   children: ReactNode
+  profileName: string
   requestCount: number
 }
 
-export function Layout({ children, requestCount }: LayoutProps) {
+export function Layout({ children, profileName, requestCount }: LayoutProps) {
   const [open, setOpen] = useState(false)
+  const initials = getInitials(profileName)
 
   const nav: [string, string][] = [
     ['/', 'Início'],
@@ -39,9 +42,8 @@ export function Layout({ children, requestCount }: LayoutProps) {
             ))}
           </nav>
 
-          <Link className="user-chip" to="/perfil" aria-label="Abrir perfil de Marina Costa">
-            <span>MC</span>
-            <UserRound size={18} />
+          <Link className="user-chip" to="/perfil" aria-label={`Abrir perfil de ${profileName}`} title={profileName}>
+            <span aria-hidden="true">{initials}</span>
           </Link>
         </div>
       </header>

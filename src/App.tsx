@@ -29,7 +29,7 @@ export default function App() {
   const cancelRequest = (requestId: string) => setRequests((current) => current.map((request) => request.id === requestId ? { ...request, status: 'Cancelada', message: 'Você cancelou esta solicitação.' } : request))
 
   return (
-    <Layout requestCount={requests.filter((request) => !['Cancelada', 'Recusada'].includes(request.status)).length}>
+    <Layout profileName={profile.name} requestCount={requests.filter((request) => !['Cancelada', 'Recusada'].includes(request.status)).length}>
       <Routes>
         <Route path="/" element={<HomePage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />} />
         <Route path="/pets" element={<PetsPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />} />

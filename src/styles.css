@@ -297,7 +297,7 @@ select, textarea, input { color: var(--ink); }
 .save-message { max-width: 860px; margin-bottom: 18px; padding: 12px 15px; display: flex; align-items: center; gap: 8px; border-radius: 10px; background: var(--green-100); color: var(--green-700); font-size: 12px; font-weight: 700; }
 .profile-form { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 0; max-width: 990px; overflow: hidden; }
 .profile-aside { padding: 32px 24px; background: var(--cream); border-right: 1px solid var(--line); text-align: center; }
-.profile-avatar { width: 76px; height: 76px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 50%; background: var(--green-100); color: var(--green-700); }
+.profile-avatar { width: 76px; height: 76px; margin: 0 auto 14px; display: grid; place-items: center; border-radius: 50%; background: var(--green-100); color: var(--green-700); font-size: 22px; font-weight: 700; letter-spacing: .04em; }
 .profile-aside h2 { font-family: 'DM Sans', sans-serif; font-size: 17px; margin-bottom: 4px; }
 .profile-aside > p { color: var(--green-700); font-size: 11px; }
 .profile-progress { height: 5px; background: #dce4de; border-radius: 99px; overflow: hidden; margin: 12px 0 26px; }
