@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
-import { initialProfile } from './data/pets'
 import {
   useAdoptionRequests,
   useCancelAdoptionRequest,
   useCreateAdoptionRequest,
 } from './hooks/useAdoptionRequests'
+import { useAdopterProfile } from './hooks/useAdopterProfile'
 import { usePets } from './hooks/usePets'
 import { CompatibilityPage } from './pages/CompatibilityPage'
 import { HomePage } from './pages/HomePage'
@@ -19,9 +19,9 @@ import { RequestSuccessPage } from './pages/RequestSuccessPage'
 import type { Pet, QuestionnaireAnswers } from './types'
 
 export default function App() {
-  const [profile, setProfile] = useState(initialProfile)
   const [favorites, setFavorites] = useState<string[]>(['luna'])
   const petsQuery = usePets()
+  const profileQuery = useAdopterProfile()
   const requestsQuery = useAdoptionRequests()
   const createRequestMutation = useCreateAdoptionRequest()
   const cancelRequestMutation = useCancelAdoptionRequest()
@@ -53,7 +53,7 @@ export default function App() {
 
   return (
     <Layout
-      profileName={profile.name}
+      profileName={profileQuery.data?.profile.name ?? ''}
       requestCount={
         requests.filter((request) => !['Cancelada', 'Recusada'].includes(request.status)).length
       }
@@ -71,10 +71,7 @@ export default function App() {
           path="/pets/:petId"
           element={<PetDetailPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
         />
-        <Route
-          path="/pets/:petId/compatibilidade"
-          element={<CompatibilityPage pets={pets} profile={profile} />}
-        />
+        <Route path="/pets/:petId/compatibilidade" element={<CompatibilityPage pets={pets} />} />
         <Route
           path="/pets/:petId/questionario"
           element={<QuestionnairePage pets={pets} onSubmit={createRequest} />}
@@ -87,12 +84,7 @@ export default function App() {
           path="/solicitacoes/:requestId/enviada"
           element={<RequestSuccessPage requests={requests} pets={pets} />}
         />
-        <Route
-          path="/perfil"
-          element={
-            <ProfilePage profile={profile} onSave={(savedProfile) => setProfile(savedProfile)} />
-          }
-        />
+        <Route path="/perfil" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

@@ -1,5 +1,5 @@
 import { petsSchema } from '../schemas/petSchema'
-import type { AdoptionRequest, ProfileDraft } from '../types'
+import type { AdoptionRequest } from '../types'
 
 const petsData = [
   {
@@ -173,26 +173,6 @@ const petsData = [
 ]
 
 export const pets = petsSchema.parse(petsData)
-
-export const initialProfile: ProfileDraft = {
-  name: '',
-  cpf: '',
-  birthDate: '',
-  email: '',
-  phone: '',
-  zipCode: '',
-  address: '',
-  housing: '',
-  hasOutdoorArea: '',
-  dailyTime: '',
-  activityLevel: '',
-  hasChildren: '',
-  hasOtherPets: '',
-  experience: '',
-  acceptsSpecialCare: '',
-  preferredSpecies: '',
-  preferredSize: '',
-}
 
 export const initialRequests: AdoptionRequest[] = [
   {

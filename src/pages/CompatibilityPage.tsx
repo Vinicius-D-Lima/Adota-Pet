@@ -2,18 +2,33 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } fro
 import type { CSSProperties } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
-import type { Pet, ProfileDraft } from '../types'
+import { useAdopterProfile } from '../hooks/useAdopterProfile'
+import type { Pet } from '../types'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
 
 interface CompatibilityPageProps {
   pets: Pet[]
-  profile: ProfileDraft
 }
 
-export function CompatibilityPage({ pets, profile }: CompatibilityPageProps) {
+export function CompatibilityPage({ pets }: CompatibilityPageProps) {
   const { petId } = useParams()
+  const profileQuery = useAdopterProfile()
   const pet = pets.find((item) => item.id === petId)
   if (!pet) return <Navigate to="/pets" replace />
+
+  if (profileQuery.isPending) {
+    return <div className="app-feedback">Carregando seu perfil...</div>
+  }
+
+  if (profileQuery.isError) {
+    return (
+      <div className="app-feedback error" role="alert">
+        Não foi possível carregar seu perfil. Tente novamente.
+      </div>
+    )
+  }
+
+  const { profile } = profileQuery.data
   const result = calculateCompatibility(pet, profile)
 
   return (
