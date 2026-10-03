@@ -1,15 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { cancelAdoptionRequest, createAdoptionRequest, getRequests } from '../services/localApi'
-import type { AdoptionRequest, Pet, QuestionnaireAnswers } from '../types'
+import { api } from '../lib/api'
+import { adoptionRequestSchema, adoptionRequestsResponseSchema } from '../schemas/requestSchema'
+import type { QuestionnaireAnswers } from '../types'
 
 export const adoptionRequestKeys = {
   all: ['adoption-requests'] as const,
+  list: () => [...adoptionRequestKeys.all, 'list'] as const,
+  detail: (id: string) => [...adoptionRequestKeys.all, 'detail', id] as const,
 }
+
+export const fetchAdoptionRequests = async () =>
+  adoptionRequestsResponseSchema.parse(await api.get('/me/requests')).data
 
 export function useAdoptionRequests() {
   return useQuery({
-    queryKey: adoptionRequestKeys.all,
-    queryFn: getRequests,
+    queryKey: adoptionRequestKeys.list(),
+    queryFn: fetchAdoptionRequests,
+  })
+}
+
+export function useAdoptionRequest(requestId: string | undefined) {
+  return useQuery({
+    queryKey: adoptionRequestKeys.detail(requestId ?? ''),
+    queryFn: async () => adoptionRequestSchema.parse(await api.get(`/requests/${requestId}`)),
+    enabled: Boolean(requestId),
   })
 }
 
@@ -17,14 +31,9 @@ export function useCreateAdoptionRequest() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ pet, answers }: { pet: Pet; answers: QuestionnaireAnswers }) =>
-      createAdoptionRequest(pet, answers),
-    onSuccess: (createdRequest) => {
-      queryClient.setQueryData<AdoptionRequest[]>(adoptionRequestKeys.all, (current = []) => [
-        createdRequest,
-        ...current,
-      ])
-    },
+    mutationFn: async (input: { petId: string; answers: QuestionnaireAnswers }) =>
+      adoptionRequestSchema.parse(await api.post('/requests', input)),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adoptionRequestKeys.all }),
   })
 }
 
@@ -32,11 +41,11 @@ export function useCancelAdoptionRequest() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: cancelAdoptionRequest,
-    onSuccess: (cancelledRequest) => {
-      queryClient.setQueryData<AdoptionRequest[]>(adoptionRequestKeys.all, (current = []) =>
-        current.map((request) => (request.id === cancelledRequest.id ? cancelledRequest : request)),
-      )
-    },
+    mutationFn: async (requestId: string) =>
+      adoptionRequestSchema.parse(
+        await api.post(`/requests/${requestId}/transitions`, { to: 'CANCELADA' }),
+      ),
+    // Também no erro: um 409 indica que o status mudou, então a lista precisa recarregar.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: adoptionRequestKeys.all }),
   })
 }

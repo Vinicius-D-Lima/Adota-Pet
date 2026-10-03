@@ -1,18 +1,30 @@
 import { Check, ClipboardList, Heart, Home } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
-import type { AdoptionRequest, Pet } from '../types'
+import { useAdoptionRequest } from '../hooks/useAdoptionRequests'
+import { ApiError } from '../lib/ApiError'
 
-interface RequestSuccessPageProps {
-  requests: AdoptionRequest[]
-  pets: Pet[]
-}
-
-export function RequestSuccessPage({ requests, pets }: RequestSuccessPageProps) {
+export function RequestSuccessPage() {
   const { requestId } = useParams()
-  const request = requests.find((item) => item.id === requestId)
-  if (!request) return <Navigate to="/solicitacoes" replace />
-  const pet = pets.find((item) => item.id === request.petId)
+  const requestQuery = useAdoptionRequest(requestId)
+
+  if (requestQuery.isPending) {
+    return <div className="app-feedback">Carregando solicitação...</div>
+  }
+
+  if (requestQuery.isError) {
+    if (requestQuery.error instanceof ApiError && requestQuery.error.statusCode === 404) {
+      return <Navigate to="/solicitacoes" replace />
+    }
+    return (
+      <div className="app-feedback error" role="alert">
+        Não foi possível carregar a solicitação. Tente novamente.
+      </div>
+    )
+  }
+
+  const request = requestQuery.data
+  const pet = request.pet
   if (!pet) return <Navigate to="/solicitacoes" replace />
 
   return (
