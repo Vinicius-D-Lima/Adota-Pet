@@ -17,27 +17,70 @@ export default function App() {
   const [favorites, setFavorites] = useState<string[]>(['luna'])
   const [requests, setRequests] = useState<AdoptionRequest[]>(initialRequests)
 
-  const toggleFavorite = (petId: string) => setFavorites((current) => current.includes(petId) ? current.filter((id) => id !== petId) : [...current, petId])
+  const toggleFavorite = (petId: string) =>
+    setFavorites((current) =>
+      current.includes(petId) ? current.filter((id) => id !== petId) : [...current, petId],
+    )
 
   const createRequest = (pet: Pet, answers: QuestionnaireAnswers): AdoptionRequest => {
     const id = `SOL-${String(1042 + requests.length).padStart(4, '0')}`
-    const request: AdoptionRequest = { id, petId: pet.id, status: 'Enviada', date: '14 set 2026', message: 'Sua solicitação foi enviada e aguarda o início da análise.', answers }
+    const request: AdoptionRequest = {
+      id,
+      petId: pet.id,
+      status: 'Enviada',
+      date: '14 set 2026',
+      message: 'Sua solicitação foi enviada e aguarda o início da análise.',
+      answers,
+    }
     setRequests((current) => [request, ...current])
     return request
   }
 
-  const cancelRequest = (requestId: string) => setRequests((current) => current.map((request) => request.id === requestId ? { ...request, status: 'Cancelada', message: 'Você cancelou esta solicitação.' } : request))
+  const cancelRequest = (requestId: string) =>
+    setRequests((current) =>
+      current.map((request) =>
+        request.id === requestId
+          ? { ...request, status: 'Cancelada', message: 'Você cancelou esta solicitação.' }
+          : request,
+      ),
+    )
 
   return (
-    <Layout profileName={profile.name} requestCount={requests.filter((request) => !['Cancelada', 'Recusada'].includes(request.status)).length}>
+    <Layout
+      profileName={profile.name}
+      requestCount={
+        requests.filter((request) => !['Cancelada', 'Recusada'].includes(request.status)).length
+      }
+    >
       <Routes>
-        <Route path="/" element={<HomePage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />} />
-        <Route path="/pets" element={<PetsPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />} />
-        <Route path="/pets/:petId" element={<PetDetailPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />} />
-        <Route path="/pets/:petId/compatibilidade" element={<CompatibilityPage pets={pets} profile={profile} />} />
-        <Route path="/pets/:petId/questionario" element={<QuestionnairePage pets={pets} onSubmit={createRequest} />} />
-        <Route path="/solicitacoes" element={<RequestsPage requests={requests} pets={pets} onCancel={cancelRequest} />} />
-        <Route path="/solicitacoes/:requestId/enviada" element={<RequestSuccessPage requests={requests} pets={pets} />} />
+        <Route
+          path="/"
+          element={<HomePage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
+        />
+        <Route
+          path="/pets"
+          element={<PetsPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
+        />
+        <Route
+          path="/pets/:petId"
+          element={<PetDetailPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
+        />
+        <Route
+          path="/pets/:petId/compatibilidade"
+          element={<CompatibilityPage pets={pets} profile={profile} />}
+        />
+        <Route
+          path="/pets/:petId/questionario"
+          element={<QuestionnairePage pets={pets} onSubmit={createRequest} />}
+        />
+        <Route
+          path="/solicitacoes"
+          element={<RequestsPage requests={requests} pets={pets} onCancel={cancelRequest} />}
+        />
+        <Route
+          path="/solicitacoes/:requestId/enviada"
+          element={<RequestSuccessPage requests={requests} pets={pets} />}
+        />
         <Route path="/perfil" element={<ProfilePage profile={profile} onSave={setProfile} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -32,6 +32,20 @@ Para rodar apenas a checagem de tipos:
 npm run typecheck
 ```
 
+## Qualidade de código
+
+| Script                 | O que faz                                                        |
+| ---------------------- | ---------------------------------------------------------------- |
+| `npm run lint`         | ESLint (typescript-eslint, react-hooks, react-refresh, jsx-a11y) |
+| `npm run lint:fix`     | ESLint corrigindo o que for possível automaticamente             |
+| `npm run format`       | Prettier reescrevendo os arquivos                                |
+| `npm run format:check` | Prettier apenas verificando (usado no CI)                        |
+| `npm test`             | Vitest (Testing Library + jsdom), execução única                 |
+| `npm run test:watch`   | Vitest em modo watch                                             |
+
+O workflow `.github/workflows/ci.yml` roda em todo PR e em push na `main`:
+`npm ci` → `lint` → `format:check` → `typecheck` → `test` → `build`.
+
 ## Organização
 
 - `src/components`: componentes reutilizáveis de layout, cards, formulários e etapas
