@@ -1,25 +1,66 @@
 import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
-import type { Pet } from '../types'
+import { usePet } from '../hooks/usePets'
+import { ApiError } from '../lib/ApiError'
 
 interface PetDetailPageProps {
-  pets: Pet[]
   favorites: string[]
   onFavorite: (petId: string) => void
 }
 
-export function PetDetailPage({ pets, favorites, onFavorite }: PetDetailPageProps) {
+export function PetDetailPage({ favorites, onFavorite }: PetDetailPageProps) {
   const { petId } = useParams()
-  const pet = pets.find((item) => item.id === petId)
-  if (!pet) return <Navigate to="/pets" replace />
+  const location = useLocation()
+  const petQuery = usePet(petId)
+  const backTo = (location.state as { from?: string } | null)?.from ?? '/pets'
+
+  if (petQuery.isPending)
+    return (
+      <div className="page-surface">
+        <div
+          className="container detail-page detail-skeleton skeleton-block"
+          aria-label="Carregando pet"
+        />
+      </div>
+    )
+
+  if (petQuery.isError) {
+    const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
+    return (
+      <div className="page-surface">
+        <section className="container detail-page">
+          <div className="empty-state" role="alert">
+            <h1>{notFound ? 'Pet não encontrado' : 'Não foi possível carregar o pet'}</h1>
+            <p>
+              {notFound
+                ? 'Este pet não está mais disponível ou o endereço está incorreto.'
+                : 'Verifique a conexão com a API simulada e tente novamente.'}
+            </p>
+            {notFound ? (
+              <Link className="button primary" to="/pets">
+                Ver outros pets
+              </Link>
+            ) : (
+              <button className="button primary" onClick={() => void petQuery.refetch()}>
+                Tentar novamente
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
+    )
+  }
+
+  const pet = petQuery.data
   const isFavorite = favorites.includes(pet.id)
-  const gallery = pet.gallery?.length ? pet.gallery : [pet.image, pet.image, pet.image]
+  const petGallery = pet.gallery?.length ? pet.gallery : [pet.image]
+  const gallery = [petGallery[0], petGallery[1] ?? petGallery[0], petGallery[2] ?? petGallery[0]]
 
   return (
     <div className="page-surface">
       <section className="container detail-page">
-        <Link to="/pets" className="back-link">
+        <Link to={backTo} className="back-link">
           <ArrowLeft size={17} /> Voltar para os pets
         </Link>
         <FlowSteps current={0} />
@@ -112,7 +153,7 @@ export function PetDetailPage({ pets, favorites, onFavorite }: PetDetailPageProp
               <MapPin size={18} />
               <span>
                 <strong>{pet.city}</strong>
-                <small>A aproximadamente {pet.distance}</small>
+                {pet.distance && <small>A aproximadamente {pet.distance}</small>}
               </span>
             </div>
             <div className="adoption-divider" />

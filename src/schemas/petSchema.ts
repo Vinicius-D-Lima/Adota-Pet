@@ -10,7 +10,8 @@ export const petSchema = z.object({
   size: z.string().min(1),
   sex: z.string().min(1),
   city: z.string().min(1),
-  distance: z.string().min(1),
+  distance: z.string().nullable(),
+  distanceKm: z.number().nonnegative().nullable(),
   image: z.url(),
   gallery: z.array(z.url()).optional(),
   summary: z.string().min(1),
@@ -25,8 +26,16 @@ export const petSchema = z.object({
   neutered: z.boolean(),
   organization: z.string().min(1),
   organizationInitials: z.string().min(1),
+  lat: z.number(),
+  lng: z.number(),
+  createdAt: z.string().min(1),
 })
 
 export const petsSchema = z.array(petSchema)
+export const petsResponseSchema = z.object({
+  data: petsSchema,
+  total: z.number().int().nonnegative(),
+})
 
 export type Pet = z.infer<typeof petSchema>
+export type PetsResponse = z.infer<typeof petsResponseSchema>
