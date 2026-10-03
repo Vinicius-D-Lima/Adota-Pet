@@ -26,15 +26,19 @@ interface StatusPillProps {
 
 const statusConfig: Record<RequestStatus, [LucideIcon, string]> = {
   'Em análise': [Clock3, 'status-review'],
-  'Aprovada': [CheckCircle2, 'status-approved'],
-  'Enviada': [CheckCircle2, 'status-sent'],
-  'Recusada': [AlertCircle, 'status-declined'],
-  'Cancelada': [AlertCircle, 'status-declined'],
+  Aprovada: [CheckCircle2, 'status-approved'],
+  Enviada: [CheckCircle2, 'status-sent'],
+  Recusada: [AlertCircle, 'status-declined'],
+  Cancelada: [AlertCircle, 'status-declined'],
 }
 
 export function StatusPill({ status }: StatusPillProps) {
   const [Icon, className] = statusConfig[status] || [Clock3, 'status-review']
-  return <span className={`status-pill ${className}`}><Icon size={14} /> {status}</span>
+  return (
+    <span className={`status-pill ${className}`}>
+      <Icon size={14} /> {status}
+    </span>
+  )
 }
 
 interface FieldProps {
