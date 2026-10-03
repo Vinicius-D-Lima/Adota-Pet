@@ -23,10 +23,14 @@ beforeEach(() => {
   })
 })
 
-const setup = (route = '/pets') => renderWithProviders(
-  <><PetsPage favorites={[]} onFavorite={() => {}} /><LocationProbe /></>,
-  { route },
-)
+const setup = (route = '/pets') =>
+  renderWithProviders(
+    <>
+      <PetsPage favorites={[]} onFavorite={() => {}} />
+      <LocationProbe />
+    </>,
+    { route },
+  )
 
 describe('PetsPage - consulta e filtros', () => {
   it('renderiza os pets retornados pela API e carrega a próxima página', async () => {
@@ -34,9 +38,12 @@ describe('PetsPage - consulta e filtros', () => {
     expect(await screen.findByRole('heading', { name: 'Luna' })).toBeInTheDocument()
     await userEvent.setup().click(screen.getByRole('button', { name: 'Carregar mais' }))
     expect(await screen.findByRole('heading', { name: 'Tobias' })).toBeInTheDocument()
-    expect(mocks.get).toHaveBeenLastCalledWith('/pets', expect.objectContaining({
-      query: expect.objectContaining({ page: 2, limit: 4 }),
-    }))
+    expect(mocks.get).toHaveBeenLastCalledWith(
+      '/pets',
+      expect.objectContaining({
+        query: expect.objectContaining({ page: 2, limit: 4 }),
+      }),
+    )
   })
 
   it('inicializa os filtros a partir da URL sem enviar filtros "Todos"', async () => {
@@ -54,8 +61,13 @@ describe('PetsPage - consulta e filtros', () => {
     await screen.findByRole('heading', { name: 'Luna' })
     await userEvent.setup().selectOptions(screen.getByLabelText('Filtrar por porte'), 'Médio')
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('size=M%C3%A9dio'))
-    await waitFor(() => expect(mocks.get).toHaveBeenLastCalledWith('/pets', expect.objectContaining({
-      query: expect.objectContaining({ size: 'Médio' }),
-    })))
+    await waitFor(() =>
+      expect(mocks.get).toHaveBeenLastCalledWith(
+        '/pets',
+        expect.objectContaining({
+          query: expect.objectContaining({ size: 'Médio' }),
+        }),
+      ),
+    )
   })
 })

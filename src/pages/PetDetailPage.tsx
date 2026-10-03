@@ -15,32 +15,54 @@ export function PetDetailPage({ favorites, onFavorite }: PetDetailPageProps) {
   const petQuery = usePet(petId)
   const backTo = (location.state as { from?: string } | null)?.from ?? '/pets'
 
-  if (petQuery.isPending) return <div className="page-surface"><div className="container detail-page detail-skeleton skeleton-block" aria-label="Carregando pet" /></div>
+  if (petQuery.isPending)
+    return (
+      <div className="page-surface">
+        <div
+          className="container detail-page detail-skeleton skeleton-block"
+          aria-label="Carregando pet"
+        />
+      </div>
+    )
 
   if (petQuery.isError) {
     const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
     return (
-      <div className="page-surface"><section className="container detail-page"><div className="empty-state" role="alert">
-        <h1>{notFound ? 'Pet não encontrado' : 'Não foi possível carregar o pet'}</h1>
-        <p>{notFound ? 'Este pet não está mais disponível ou o endereço está incorreto.' : 'Verifique a conexão com a API simulada e tente novamente.'}</p>
-        {notFound ? <Link className="button primary" to="/pets">Ver outros pets</Link> : <button className="button primary" onClick={() => void petQuery.refetch()}>Tentar novamente</button>}
-      </div></section></div>
+      <div className="page-surface">
+        <section className="container detail-page">
+          <div className="empty-state" role="alert">
+            <h1>{notFound ? 'Pet não encontrado' : 'Não foi possível carregar o pet'}</h1>
+            <p>
+              {notFound
+                ? 'Este pet não está mais disponível ou o endereço está incorreto.'
+                : 'Verifique a conexão com a API simulada e tente novamente.'}
+            </p>
+            {notFound ? (
+              <Link className="button primary" to="/pets">
+                Ver outros pets
+              </Link>
+            ) : (
+              <button className="button primary" onClick={() => void petQuery.refetch()}>
+                Tentar novamente
+              </button>
+            )}
+          </div>
+        </section>
+      </div>
     )
   }
 
   const pet = petQuery.data
   const isFavorite = favorites.includes(pet.id)
   const petGallery = pet.gallery?.length ? pet.gallery : [pet.image]
-  const gallery = [
-    petGallery[0],
-    petGallery[1] ?? petGallery[0],
-    petGallery[2] ?? petGallery[0],
-  ]
+  const gallery = [petGallery[0], petGallery[1] ?? petGallery[0], petGallery[2] ?? petGallery[0]]
 
   return (
     <div className="page-surface">
       <section className="container detail-page">
-        <Link to={backTo} className="back-link"><ArrowLeft size={17} /> Voltar para os pets</Link>
+        <Link to={backTo} className="back-link">
+          <ArrowLeft size={17} /> Voltar para os pets
+        </Link>
         <FlowSteps current={0} />
         <div className="detail-grid">
           <div>
@@ -51,31 +73,104 @@ export function PetDetailPage({ favorites, onFavorite }: PetDetailPageProps) {
             </div>
             <div className="detail-content">
               <div className="detail-title-row">
-                <div><span className="eyebrow">Conheça {pet.name}</span><h1>{pet.name}</h1><p>{pet.breed} · {pet.ageLabel} · {pet.size} · {pet.sex}</p></div>
-                <button className={isFavorite ? 'favorite-label active' : 'favorite-label'} onClick={() => onFavorite(pet.id)}><Heart size={19} fill={isFavorite ? 'currentColor' : 'none'} /> {isFavorite ? 'Favoritado' : 'Favoritar'}</button>
+                <div>
+                  <span className="eyebrow">Conheça {pet.name}</span>
+                  <h1>{pet.name}</h1>
+                  <p>
+                    {pet.breed} · {pet.ageLabel} · {pet.size} · {pet.sex}
+                  </p>
+                </div>
+                <button
+                  className={isFavorite ? 'favorite-label active' : 'favorite-label'}
+                  onClick={() => onFavorite(pet.id)}
+                >
+                  <Heart size={19} fill={isFavorite ? 'currentColor' : 'none'} />{' '}
+                  {isFavorite ? 'Favoritado' : 'Favoritar'}
+                </button>
               </div>
-              <div className="trait-list large">{pet.traits.map((trait) => <span key={trait}>{trait}</span>)}</div>
-              <section className="content-block"><h2>Minha história</h2><p>{pet.description}</p></section>
+              <div className="trait-list large">
+                {pet.traits.map((trait) => (
+                  <span key={trait}>{trait}</span>
+                ))}
+              </div>
+              <section className="content-block">
+                <h2>Minha história</h2>
+                <p>{pet.description}</p>
+              </section>
               <section className="content-block">
                 <h2>O que eu preciso</h2>
                 <div className="needs-grid">
-                  <div><span className="need-icon"><Sparkles /></span><span><strong>Nível de energia</strong>{pet.energy}</span></div>
-                  <div><span className="need-icon"><Home /></span><span><strong>Espaço ideal</strong>{pet.space}</span></div>
-                  <div><span className="need-icon"><Check /></span><span><strong>Convive com crianças</strong>{pet.children ? 'Sim' : 'Prefere sem crianças'}</span></div>
-                  <div><span className="need-icon"><Heart /></span><span><strong>Convive com outros pets</strong>{pet.otherPets ? 'Sim' : 'Prefere ser único pet'}</span></div>
+                  <div>
+                    <span className="need-icon">
+                      <Sparkles />
+                    </span>
+                    <span>
+                      <strong>Nível de energia</strong>
+                      {pet.energy}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="need-icon">
+                      <Home />
+                    </span>
+                    <span>
+                      <strong>Espaço ideal</strong>
+                      {pet.space}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="need-icon">
+                      <Check />
+                    </span>
+                    <span>
+                      <strong>Convive com crianças</strong>
+                      {pet.children ? 'Sim' : 'Prefere sem crianças'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="need-icon">
+                      <Heart />
+                    </span>
+                    <span>
+                      <strong>Convive com outros pets</strong>
+                      {pet.otherPets ? 'Sim' : 'Prefere ser único pet'}
+                    </span>
+                  </div>
                 </div>
               </section>
             </div>
           </div>
           <aside className="adoption-card">
-            <div className="org-row"><span className="org-avatar">{pet.organizationInitials}</span><span><small>Responsável</small><strong>{pet.organization}</strong></span><ShieldCheck size={19} /></div>
-            <div className="location-row"><MapPin size={18} /><span><strong>{pet.city}</strong>{pet.distance && <small>A aproximadamente {pet.distance}</small>}</span></div>
+            <div className="org-row">
+              <span className="org-avatar">{pet.organizationInitials}</span>
+              <span>
+                <small>Responsável</small>
+                <strong>{pet.organization}</strong>
+              </span>
+              <ShieldCheck size={19} />
+            </div>
+            <div className="location-row">
+              <MapPin size={18} />
+              <span>
+                <strong>{pet.city}</strong>
+                {pet.distance && <small>A aproximadamente {pet.distance}</small>}
+              </span>
+            </div>
             <div className="adoption-divider" />
-            <span className="eyebrow"><Sparkles size={14} /> Próximo passo</span>
+            <span className="eyebrow">
+              <Sparkles size={14} /> Próximo passo
+            </span>
             <h2>Vocês combinam?</h2>
-            <p>Compare sua rotina com as necessidades de {pet.name} e veja os pontos fortes desse encontro.</p>
-            <Link className="button primary full" to={`/pets/${pet.id}/compatibilidade`}>Ver compatibilidade <Sparkles size={18} /></Link>
-            <p className="fine-print">O resultado é orientativo e não garante a aprovação da adoção.</p>
+            <p>
+              Compare sua rotina com as necessidades de {pet.name} e veja os pontos fortes desse
+              encontro.
+            </p>
+            <Link className="button primary full" to={`/pets/${pet.id}/compatibilidade`}>
+              Ver compatibilidade <Sparkles size={18} />
+            </Link>
+            <p className="fine-print">
+              O resultado é orientativo e não garante a aprovação da adoção.
+            </p>
           </aside>
         </div>
       </section>

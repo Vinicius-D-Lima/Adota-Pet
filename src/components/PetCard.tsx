@@ -39,7 +39,9 @@ export function PetCard({ pet, favorite, onFavorite }: PetCardProps) {
         </p>
         <p className="pet-summary">{pet.summary}</p>
         <div className="trait-list">
-          {pet.traits.slice(0, 3).map((trait) => <span key={trait}>{trait}</span>)}
+          {pet.traits.slice(0, 3).map((trait) => (
+            <span key={trait}>{trait}</span>
+          ))}
         </div>
         <Link to={`/pets/${pet.id}`} state={{ from }} className="text-link">
           Conhecer {pet.name} <span aria-hidden="true">→</span>

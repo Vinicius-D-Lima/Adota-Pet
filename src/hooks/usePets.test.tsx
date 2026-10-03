@@ -22,9 +22,12 @@ describe('hooks de pets', () => {
     const { result } = renderHook(() => usePets(filters), { wrapper })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    expect(mocks.get).toHaveBeenCalledWith('/pets', expect.objectContaining({
-      query: expect.objectContaining({ species: 'Gato', sort: 'recent', limit: 4, page: 1 }),
-    }))
+    expect(mocks.get).toHaveBeenCalledWith(
+      '/pets',
+      expect.objectContaining({
+        query: expect.objectContaining({ species: 'Gato', sort: 'recent', limit: 4, page: 1 }),
+      }),
+    )
     expect(result.current.data?.pages[0].total).toBe(6)
   })
 

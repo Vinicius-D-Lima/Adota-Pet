@@ -18,7 +18,18 @@ export function CompatibilityPage({ profile }: CompatibilityPageProps) {
   if (petQuery.isPending) return <div className="app-feedback">Carregando compatibilidade...</div>
   if (petQuery.isError) {
     const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
-    return <div className="app-feedback error" role="alert"><div><p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>{!notFound && <button className="button ghost" onClick={() => void petQuery.refetch()}>Tentar novamente</button>}</div></div>
+    return (
+      <div className="app-feedback error" role="alert">
+        <div>
+          <p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>
+          {!notFound && (
+            <button className="button ghost" onClick={() => void petQuery.refetch()}>
+              Tentar novamente
+            </button>
+          )}
+        </div>
+      </div>
+    )
   }
 
   const pet = petQuery.data

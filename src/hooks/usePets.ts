@@ -49,7 +49,9 @@ export function usePet(id?: string) {
   return useQuery({
     queryKey: petKeys.detail(id ?? ''),
     queryFn: async ({ signal }) => {
-      const response = await api.get<unknown>(`/pets/${encodeURIComponent(id as string)}`, { signal })
+      const response = await api.get<unknown>(`/pets/${encodeURIComponent(id as string)}`, {
+        signal,
+      })
       return petSchema.parse(response)
     },
     enabled: Boolean(id),

@@ -56,10 +56,7 @@ export default function App() {
       }
     >
       <Routes>
-        <Route
-          path="/"
-          element={<HomePage favorites={favorites} onFavorite={toggleFavorite} />}
-        />
+        <Route path="/" element={<HomePage favorites={favorites} onFavorite={toggleFavorite} />} />
         <Route
           path="/pets"
           element={<PetsPage favorites={favorites} onFavorite={toggleFavorite} />}

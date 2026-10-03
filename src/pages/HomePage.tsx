@@ -53,7 +53,12 @@ export function HomePage({ favorites, onFavorite }: HomePageProps) {
               </span>
             </div>
           </div>
-          <div className="hero-visual" aria-label={heroPet ? `${heroPet.name}, pet disponível para adoção` : 'Pet disponível para adoção'}>
+          <div
+            className="hero-visual"
+            aria-label={
+              heroPet ? `${heroPet.name}, pet disponível para adoção` : 'Pet disponível para adoção'
+            }
+          >
             <div className="hero-photo-frame">
               {heroPet ? (
                 <img src={heroPet.image} alt={`${heroPet.name}, pet disponível para adoção`} />
@@ -134,21 +139,32 @@ export function HomePage({ favorites, onFavorite }: HomePageProps) {
           </div>
           {petsQuery.isPending ? (
             <div className="pet-grid featured-grid">
-              {Array.from({ length: 3 }, (_, index) => <PetCardSkeleton key={index} />)}
+              {Array.from({ length: 3 }, (_, index) => (
+                <PetCardSkeleton key={index} />
+              ))}
             </div>
           ) : petsQuery.isError ? (
             <div className="query-state" role="alert">
               <p>Não foi possível carregar os novos amigos.</p>
-              <button className="button ghost" onClick={() => void petsQuery.refetch()}>Tentar novamente</button>
+              <button className="button ghost" onClick={() => void petsQuery.refetch()}>
+                Tentar novamente
+              </button>
             </div>
           ) : pets.length ? (
             <div className="pet-grid featured-grid">
               {pets.map((pet) => (
-                <PetCard key={pet.id} pet={pet} favorite={favorites.includes(pet.id)} onFavorite={onFavorite} />
+                <PetCard
+                  key={pet.id}
+                  pet={pet}
+                  favorite={favorites.includes(pet.id)}
+                  onFavorite={onFavorite}
+                />
               ))}
             </div>
           ) : (
-            <div className="query-state"><p>Nenhum novo pet disponível no momento.</p></div>
+            <div className="query-state">
+              <p>Nenhum novo pet disponível no momento.</p>
+            </div>
           )}
         </div>
       </section>

@@ -13,7 +13,17 @@ export function RequestsPage({ requests, onCancel }: RequestsPageProps) {
   const petsQuery = usePets({ limit: 100 })
 
   if (petsQuery.isPending) return <div className="app-feedback">Carregando solicitações...</div>
-  if (petsQuery.isError) return <div className="app-feedback error" role="alert"><div><p>Não foi possível carregar os pets das solicitações.</p><button className="button ghost" onClick={() => void petsQuery.refetch()}>Tentar novamente</button></div></div>
+  if (petsQuery.isError)
+    return (
+      <div className="app-feedback error" role="alert">
+        <div>
+          <p>Não foi possível carregar os pets das solicitações.</p>
+          <button className="button ghost" onClick={() => void petsQuery.refetch()}>
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    )
 
   const pets = petsQuery.data.pages.flatMap((page) => page.data)
   return (

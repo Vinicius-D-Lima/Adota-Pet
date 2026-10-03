@@ -14,7 +14,17 @@ export function RequestSuccessPage({ requests }: RequestSuccessPageProps) {
   const petQuery = usePet(request?.petId)
   if (!request) return <Navigate to="/solicitacoes" replace />
   if (petQuery.isPending) return <div className="app-feedback">Carregando solicitação...</div>
-  if (petQuery.isError) return <div className="app-feedback error" role="alert"><div><p>Não foi possível carregar o pet.</p><button className="button ghost" onClick={() => void petQuery.refetch()}>Tentar novamente</button></div></div>
+  if (petQuery.isError)
+    return (
+      <div className="app-feedback error" role="alert">
+        <div>
+          <p>Não foi possível carregar o pet.</p>
+          <button className="button ghost" onClick={() => void petQuery.refetch()}>
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    )
   const pet = petQuery.data
 
   return (
