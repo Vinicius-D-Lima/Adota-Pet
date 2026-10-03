@@ -6,11 +6,6 @@ import { PageIntro } from '../components/UI'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePets, type PetSort } from '../hooks/usePets'
 
-interface PetsPageProps {
-  favorites: string[]
-  onFavorite: (petId: string) => void
-}
-
 export const PAGE_SIZE = 4
 
 const allowed = {
@@ -25,7 +20,7 @@ const readParam = (params: URLSearchParams, key: keyof typeof allowed) => {
   return (allowed[key] as readonly string[]).includes(value) ? value : ''
 }
 
-export function PetsPage({ favorites, onFavorite }: PetsPageProps) {
+export function PetsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const searchFromUrl = searchParams.get('search') ?? ''
   const [searchState, setSearchState] = useState({ source: searchFromUrl, value: searchFromUrl })
@@ -188,12 +183,7 @@ export function PetsPage({ favorites, onFavorite }: PetsPageProps) {
           <>
             <div className="pet-grid">
               {pets.map((pet) => (
-                <PetCard
-                  key={pet.id}
-                  pet={pet}
-                  favorite={favorites.includes(pet.id)}
-                  onFavorite={onFavorite}
-                />
+                <PetCard key={pet.id} pet={pet} />
               ))}
               {petsQuery.isFetchingNextPage &&
                 Array.from({ length: PAGE_SIZE }, (_, index) => (

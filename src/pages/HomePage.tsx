@@ -11,12 +11,7 @@ import { Link } from 'react-router-dom'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
 import { usePets } from '../hooks/usePets'
 
-interface HomePageProps {
-  favorites: string[]
-  onFavorite: (petId: string) => void
-}
-
-export function HomePage({ favorites, onFavorite }: HomePageProps) {
+export function HomePage() {
   const petsQuery = usePets({ sort: 'recent', limit: 3 })
   const pets = petsQuery.data?.pages[0]?.data ?? []
   const heroPet = pets[0]
@@ -153,12 +148,7 @@ export function HomePage({ favorites, onFavorite }: HomePageProps) {
           ) : pets.length ? (
             <div className="pet-grid featured-grid">
               {pets.map((pet) => (
-                <PetCard
-                  key={pet.id}
-                  pet={pet}
-                  favorite={favorites.includes(pet.id)}
-                  onFavorite={onFavorite}
-                />
+                <PetCard key={pet.id} pet={pet} />
               ))}
             </div>
           ) : (
