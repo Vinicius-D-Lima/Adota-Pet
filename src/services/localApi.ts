@@ -1,12 +1,7 @@
-import { initialRequests, pets } from '../data/pets'
-import { petsSchema } from '../schemas/petSchema'
+import { initialRequests } from '../data/appData'
 import type { AdoptionRequest, Pet, QuestionnaireAnswers } from '../types'
 
 let requestsStore: AdoptionRequest[] = initialRequests.map((request) => ({ ...request }))
-
-export async function getPets(): Promise<Pet[]> {
-  return petsSchema.parse(pets)
-}
 
 export async function getRequests(): Promise<AdoptionRequest[]> {
   return requestsStore.map((request) => ({ ...request }))
@@ -36,9 +31,7 @@ export async function createAdoptionRequest(
 export async function cancelAdoptionRequest(requestId: string): Promise<AdoptionRequest> {
   const currentRequest = requestsStore.find((request) => request.id === requestId)
 
-  if (!currentRequest) {
-    throw new Error('Solicitação não encontrada.')
-  }
+  if (!currentRequest) throw new Error('Solicitação não encontrada.')
 
   const cancelledRequest: AdoptionRequest = {
     ...currentRequest,
