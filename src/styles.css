@@ -1734,6 +1734,14 @@ input {
   font-size: 12px;
   font-weight: 700;
 }
+.save-message.save-error,
+.save-message.profile-incomplete {
+  background: var(--coral-pale);
+  color: #a33f2d;
+}
+.save-message.profile-incomplete {
+  font-weight: 500;
+}
 .profile-form {
   display: grid;
   grid-template-columns: 250px minmax(0, 1fr);

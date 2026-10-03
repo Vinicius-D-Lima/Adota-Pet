@@ -1,24 +1,4 @@
-import type { AdoptionRequest, ProfileDraft } from '../types'
-
-export const initialProfile: ProfileDraft = {
-  name: '',
-  cpf: '',
-  birthDate: '',
-  email: '',
-  phone: '',
-  zipCode: '',
-  address: '',
-  housing: '',
-  hasOutdoorArea: '',
-  dailyTime: '',
-  activityLevel: '',
-  hasChildren: '',
-  hasOtherPets: '',
-  experience: '',
-  acceptsSpecialCare: '',
-  preferredSpecies: '',
-  preferredSize: '',
-}
+import type { AdoptionRequest } from '../types'
 
 export const initialRequests: AdoptionRequest[] = [
   {

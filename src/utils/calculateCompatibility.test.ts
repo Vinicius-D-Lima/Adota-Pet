@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { initialProfile } from '../data/appData'
+import { emptyProfile } from '../test/fixtures/profile'
 import { petFixture } from '../test/petFixture'
 import type { Pet, ProfileDraft } from '../types'
 import { calculateCompatibility } from './calculateCompatibility'
@@ -7,7 +7,7 @@ import { calculateCompatibility } from './calculateCompatibility'
 const pet: Pet = { ...petFixture, name: 'Teste' }
 
 const profile: ProfileDraft = {
-  ...initialProfile,
+  ...emptyProfile,
   activityLevel: 'Moderado',
   hasOutdoorArea: false,
   hasChildren: false,

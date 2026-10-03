@@ -2,20 +2,19 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } fro
 import type { CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
+import { useAdopterProfile } from '../hooks/useAdopterProfile'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
-import type { ProfileDraft } from '../types'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
 
-interface CompatibilityPageProps {
-  profile: ProfileDraft
-}
-
-export function CompatibilityPage({ profile }: CompatibilityPageProps) {
+export function CompatibilityPage() {
   const { petId } = useParams()
   const petQuery = usePet(petId)
+  const profileQuery = useAdopterProfile()
 
-  if (petQuery.isPending) return <div className="app-feedback">Carregando compatibilidade...</div>
+  if (petQuery.isPending || profileQuery.isPending) {
+    return <div className="app-feedback">Carregando compatibilidade...</div>
+  }
   if (petQuery.isError) {
     const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
     return (
@@ -32,7 +31,21 @@ export function CompatibilityPage({ profile }: CompatibilityPageProps) {
     )
   }
 
+  if (profileQuery.isError) {
+    return (
+      <div className="app-feedback error" role="alert">
+        <div>
+          <p>Não foi possível carregar seu perfil.</p>
+          <button className="button ghost" onClick={() => void profileQuery.refetch()}>
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   const pet = petQuery.data
+  const { profile } = profileQuery.data
   const result = calculateCompatibility(pet, profile)
 
   return (
