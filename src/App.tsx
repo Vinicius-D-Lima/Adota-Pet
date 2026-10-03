@@ -1,13 +1,12 @@
 import { useState } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
-import { initialProfile } from './data/pets'
+import { initialProfile } from './data/appData'
 import {
   useAdoptionRequests,
   useCancelAdoptionRequest,
   useCreateAdoptionRequest,
 } from './hooks/useAdoptionRequests'
-import { usePets } from './hooks/usePets'
 import { CompatibilityPage } from './pages/CompatibilityPage'
 import { HomePage } from './pages/HomePage'
 import { PetDetailPage } from './pages/PetDetailPage'
@@ -21,12 +20,10 @@ import type { Pet, QuestionnaireAnswers } from './types'
 export default function App() {
   const [profile, setProfile] = useState(initialProfile)
   const [favorites, setFavorites] = useState<string[]>(['luna'])
-  const petsQuery = usePets()
   const requestsQuery = useAdoptionRequests()
   const createRequestMutation = useCreateAdoptionRequest()
   const cancelRequestMutation = useCancelAdoptionRequest()
 
-  const pets = petsQuery.data ?? []
   const requests = requestsQuery.data ?? []
 
   const toggleFavorite = (petId: string) =>
@@ -39,11 +36,11 @@ export default function App() {
 
   const cancelRequest = (requestId: string) => cancelRequestMutation.mutateAsync(requestId)
 
-  if (petsQuery.isPending || requestsQuery.isPending) {
+  if (requestsQuery.isPending) {
     return <div className="app-feedback">Carregando dados...</div>
   }
 
-  if (petsQuery.isError || requestsQuery.isError) {
+  if (requestsQuery.isError) {
     return (
       <div className="app-feedback error" role="alert">
         Não foi possível carregar os dados. Tente novamente.
@@ -61,31 +58,31 @@ export default function App() {
       <Routes>
         <Route
           path="/"
-          element={<HomePage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
+          element={<HomePage favorites={favorites} onFavorite={toggleFavorite} />}
         />
         <Route
           path="/pets"
-          element={<PetsPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
+          element={<PetsPage favorites={favorites} onFavorite={toggleFavorite} />}
         />
         <Route
           path="/pets/:petId"
-          element={<PetDetailPage pets={pets} favorites={favorites} onFavorite={toggleFavorite} />}
+          element={<PetDetailPage favorites={favorites} onFavorite={toggleFavorite} />}
         />
         <Route
           path="/pets/:petId/compatibilidade"
-          element={<CompatibilityPage pets={pets} profile={profile} />}
+          element={<CompatibilityPage profile={profile} />}
         />
         <Route
           path="/pets/:petId/questionario"
-          element={<QuestionnairePage pets={pets} onSubmit={createRequest} />}
+          element={<QuestionnairePage onSubmit={createRequest} />}
         />
         <Route
           path="/solicitacoes"
-          element={<RequestsPage requests={requests} pets={pets} onCancel={cancelRequest} />}
+          element={<RequestsPage requests={requests} onCancel={cancelRequest} />}
         />
         <Route
           path="/solicitacoes/:requestId/enviada"
-          element={<RequestSuccessPage requests={requests} pets={pets} />}
+          element={<RequestSuccessPage requests={requests} />}
         />
         <Route
           path="/perfil"

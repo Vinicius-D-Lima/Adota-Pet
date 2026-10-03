@@ -1,14 +1,15 @@
 import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { Field } from '../components/UI'
+import { usePet } from '../hooks/usePets'
+import { ApiError } from '../lib/ApiError'
 import { questionnaireSchema } from '../schemas/questionnaireSchema'
 import type { AdoptionRequest, Pet, QuestionnaireAnswers } from '../types'
 import { getZodFieldErrors, type FieldErrors } from '../utils/zodFieldErrors'
 
 interface QuestionnairePageProps {
-  pets: Pet[]
   onSubmit: (pet: Pet, answers: QuestionnaireAnswers) => Promise<AdoptionRequest>
 }
 
@@ -21,16 +22,22 @@ const initialForm: QuestionnaireAnswers = {
   commitment: false,
 }
 
-export function QuestionnairePage({ pets, onSubmit }: QuestionnairePageProps) {
+export function QuestionnairePage({ onSubmit }: QuestionnairePageProps) {
   const { petId } = useParams()
-  const pet = pets.find((item) => item.id === petId)
+  const petQuery = usePet(petId)
   const navigate = useNavigate()
   const [form, setForm] = useState<QuestionnaireAnswers>(initialForm)
   const [errors, setErrors] = useState<FieldErrors<keyof QuestionnaireAnswers>>({})
   const [submitError, setSubmitError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  if (!pet) return <Navigate to="/pets" replace />
+  if (petQuery.isPending) return <div className="app-feedback">Carregando questionário...</div>
+  if (petQuery.isError) {
+    const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
+    return <div className="app-feedback error" role="alert"><div><p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>{!notFound && <button className="button ghost" onClick={() => void petQuery.refetch()}>Tentar novamente</button>}</div></div>
+  }
+
+  const pet = petQuery.data
 
   const update = <K extends keyof QuestionnaireAnswers>(key: K, value: QuestionnaireAnswers[K]) => {
     setForm((current) => ({ ...current, [key]: value }))

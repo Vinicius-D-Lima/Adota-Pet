@@ -1,15 +1,21 @@
 import { CalendarDays, ChevronRight, ClipboardList, MapPin } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PageIntro, StatusPill } from '../components/UI'
-import type { AdoptionRequest, Pet } from '../types'
+import { usePets } from '../hooks/usePets'
+import type { AdoptionRequest } from '../types'
 
 interface RequestsPageProps {
   requests: AdoptionRequest[]
-  pets: Pet[]
   onCancel: (requestId: string) => Promise<AdoptionRequest>
 }
 
-export function RequestsPage({ requests, pets, onCancel }: RequestsPageProps) {
+export function RequestsPage({ requests, onCancel }: RequestsPageProps) {
+  const petsQuery = usePets({ limit: 100 })
+
+  if (petsQuery.isPending) return <div className="app-feedback">Carregando solicitações...</div>
+  if (petsQuery.isError) return <div className="app-feedback error" role="alert"><div><p>Não foi possível carregar os pets das solicitações.</p><button className="button ghost" onClick={() => void petsQuery.refetch()}>Tentar novamente</button></div></div>
+
+  const pets = petsQuery.data.pages.flatMap((page) => page.data)
   return (
     <div className="page-surface">
       <section className="container page-section">

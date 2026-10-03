@@ -1,5 +1,5 @@
 import { Heart, MapPin } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import type { Pet } from '../types'
 
 interface PetCardProps {
@@ -9,8 +9,9 @@ interface PetCardProps {
 }
 
 export function PetCard({ pet, favorite, onFavorite }: PetCardProps) {
-  const idPet = pet.id
-  console.log('id do pet', idPet)
+  const location = useLocation()
+  const from = `${location.pathname}${location.search}`
+
   return (
     <article className="pet-card">
       <div className="pet-image-wrap">
@@ -22,9 +23,11 @@ export function PetCard({ pet, favorite, onFavorite }: PetCardProps) {
         >
           <Heart size={20} fill={favorite ? 'currentColor' : 'none'} />
         </button>
-        <span className="pet-distance">
-          <MapPin size={13} /> {pet.distance}
-        </span>
+        {pet.distance && (
+          <span className="pet-distance">
+            <MapPin size={13} /> {pet.distance}
+          </span>
+        )}
       </div>
       <div className="pet-card-body">
         <div className="pet-card-heading">
@@ -36,13 +39,25 @@ export function PetCard({ pet, favorite, onFavorite }: PetCardProps) {
         </p>
         <p className="pet-summary">{pet.summary}</p>
         <div className="trait-list">
-          {pet.traits.slice(0, 3).map((trait) => (
-            <span key={trait}>{trait}</span>
-          ))}
+          {pet.traits.slice(0, 3).map((trait) => <span key={trait}>{trait}</span>)}
         </div>
-        <Link to={`/pets/${pet.id}`} className="text-link">
+        <Link to={`/pets/${pet.id}`} state={{ from }} className="text-link">
           Conhecer {pet.name} <span aria-hidden="true">→</span>
         </Link>
+      </div>
+    </article>
+  )
+}
+
+export function PetCardSkeleton() {
+  return (
+    <article className="pet-card pet-card-skeleton" aria-hidden="true">
+      <div className="pet-image-wrap skeleton-block" />
+      <div className="pet-card-body">
+        <div className="skeleton-line skeleton-title" />
+        <div className="skeleton-line skeleton-meta" />
+        <div className="skeleton-line" />
+        <div className="skeleton-line skeleton-short" />
       </div>
     </article>
   )

@@ -1,19 +1,21 @@
 import { Check, ClipboardList, Heart, Home } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
-import type { AdoptionRequest, Pet } from '../types'
+import { usePet } from '../hooks/usePets'
+import type { AdoptionRequest } from '../types'
 
 interface RequestSuccessPageProps {
   requests: AdoptionRequest[]
-  pets: Pet[]
 }
 
-export function RequestSuccessPage({ requests, pets }: RequestSuccessPageProps) {
+export function RequestSuccessPage({ requests }: RequestSuccessPageProps) {
   const { requestId } = useParams()
   const request = requests.find((item) => item.id === requestId)
+  const petQuery = usePet(request?.petId)
   if (!request) return <Navigate to="/solicitacoes" replace />
-  const pet = pets.find((item) => item.id === request.petId)
-  if (!pet) return <Navigate to="/solicitacoes" replace />
+  if (petQuery.isPending) return <div className="app-feedback">Carregando solicitação...</div>
+  if (petQuery.isError) return <div className="app-feedback error" role="alert"><div><p>Não foi possível carregar o pet.</p><button className="button ghost" onClick={() => void petQuery.refetch()}>Tentar novamente</button></div></div>
+  const pet = petQuery.data
 
   return (
     <div className="page-surface success-page">

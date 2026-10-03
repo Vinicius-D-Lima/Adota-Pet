@@ -8,16 +8,19 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { PetCard } from '../components/PetCard'
-import type { Pet } from '../types'
+import { PetCard, PetCardSkeleton } from '../components/PetCard'
+import { usePets } from '../hooks/usePets'
 
 interface HomePageProps {
-  pets: Pet[]
   favorites: string[]
   onFavorite: (petId: string) => void
 }
 
-export function HomePage({ pets, favorites, onFavorite }: HomePageProps) {
+export function HomePage({ favorites, onFavorite }: HomePageProps) {
+  const petsQuery = usePets({ sort: 'recent', limit: 3 })
+  const pets = petsQuery.data?.pages[0]?.data ?? []
+  const heroPet = pets[0]
+
   return (
     <>
       <section className="hero">
@@ -50,9 +53,13 @@ export function HomePage({ pets, favorites, onFavorite }: HomePageProps) {
               </span>
             </div>
           </div>
-          <div className="hero-visual" aria-label="Luna, uma cachorra disponível para adoção">
+          <div className="hero-visual" aria-label={heroPet ? `${heroPet.name}, pet disponível para adoção` : 'Pet disponível para adoção'}>
             <div className="hero-photo-frame">
-              <img src={pets[0].image} alt="Luna, cachorra disponível para adoção" />
+              {heroPet ? (
+                <img src={heroPet.image} alt={`${heroPet.name}, pet disponível para adoção`} />
+              ) : (
+                <div className="hero-image-skeleton skeleton-block" />
+              )}
               {/*<div className="hero-pet-card">
                 {/*<div><strong>Luna</strong><span>2 anos · São Paulo</span></div>
                 <span className="match-badge"><Sparkles size={14} /> 100% match</span>
@@ -125,16 +132,24 @@ export function HomePage({ pets, favorites, onFavorite }: HomePageProps) {
               Ver todos os pets <ArrowRight size={17} />
             </Link>
           </div>
-          <div className="pet-grid featured-grid">
-            {pets.slice(0, 3).map((pet) => (
-              <PetCard
-                key={pet.id}
-                pet={pet}
-                favorite={favorites.includes(pet.id)}
-                onFavorite={onFavorite}
-              />
-            ))}
-          </div>
+          {petsQuery.isPending ? (
+            <div className="pet-grid featured-grid">
+              {Array.from({ length: 3 }, (_, index) => <PetCardSkeleton key={index} />)}
+            </div>
+          ) : petsQuery.isError ? (
+            <div className="query-state" role="alert">
+              <p>Não foi possível carregar os novos amigos.</p>
+              <button className="button ghost" onClick={() => void petsQuery.refetch()}>Tentar novamente</button>
+            </div>
+          ) : pets.length ? (
+            <div className="pet-grid featured-grid">
+              {pets.map((pet) => (
+                <PetCard key={pet.id} pet={pet} favorite={favorites.includes(pet.id)} onFavorite={onFavorite} />
+              ))}
+            </div>
+          ) : (
+            <div className="query-state"><p>Nenhum novo pet disponível no momento.</p></div>
+          )}
         </div>
       </section>
 

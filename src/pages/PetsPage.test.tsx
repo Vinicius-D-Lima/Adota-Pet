@@ -1,57 +1,61 @@
-import { render, screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
-import { pets } from '../data/pets'
+import { useLocation } from 'react-router-dom'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { petFixtures } from '../test/fixtures/pets'
+import { renderWithProviders } from '../test/renderWithProviders'
 import { PetsPage } from './PetsPage'
 
-function setup() {
-  render(
-    <MemoryRouter>
-      <PetsPage pets={pets} favorites={[]} onFavorite={() => {}} />
-    </MemoryRouter>,
-  )
-  return userEvent.setup()
+const mocks = vi.hoisted(() => ({ get: vi.fn() }))
+vi.mock('../lib/api', () => ({ api: { get: mocks.get } }))
+
+function LocationProbe() {
+  const location = useLocation()
+  return <output data-testid="location">{location.search}</output>
 }
 
-const countText = () => document.querySelector('.results-bar strong')?.textContent
+beforeEach(() => {
+  mocks.get.mockReset()
+  mocks.get.mockImplementation((_path, options) => {
+    const page = Number(options?.query?.page ?? 1)
+    const start = (page - 1) * 4
+    return Promise.resolve({ data: petFixtures.slice(start, start + 4), total: petFixtures.length })
+  })
+})
 
-describe('PetsPage - filtros', () => {
-  it('mostra todos os pets sem filtros', () => {
+const setup = (route = '/pets') => renderWithProviders(
+  <><PetsPage favorites={[]} onFavorite={() => {}} /><LocationProbe /></>,
+  { route },
+)
+
+describe('PetsPage - consulta e filtros', () => {
+  it('renderiza os pets retornados pela API e carrega a próxima página', async () => {
     setup()
-    expect(countText()).toBe(String(pets.length))
-    expect(screen.queryByRole('button', { name: /limpar/i })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Luna' })).toBeInTheDocument()
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Carregar mais' }))
+    expect(await screen.findByRole('heading', { name: 'Tobias' })).toBeInTheDocument()
+    expect(mocks.get).toHaveBeenLastCalledWith('/pets', expect.objectContaining({
+      query: expect.objectContaining({ page: 2, limit: 4 }),
+    }))
   })
 
-  it('filtra pela busca por nome, raça ou cidade', async () => {
-    const user = setup()
-    await user.type(screen.getByPlaceholderText(/busque por nome/i), 'beagle')
-    expect(countText()).toBe('1')
-    expect(screen.getByRole('heading', { name: 'Bento' })).toBeInTheDocument()
+  it('inicializa os filtros a partir da URL sem enviar filtros "Todos"', async () => {
+    setup('/pets?species=Gato')
+    expect(screen.getByLabelText('Filtrar por espécie')).toHaveValue('Gato')
+    await waitFor(() => expect(mocks.get).toHaveBeenCalled())
+    expect(mocks.get.mock.calls[0][1].query).toMatchObject({ species: 'Gato' })
+    expect(mocks.get.mock.calls[0][1].query).not.toHaveProperty('city')
+    expect(mocks.get.mock.calls[0][1].query).not.toHaveProperty('lat')
+    expect(mocks.get.mock.calls[0][1].query).not.toHaveProperty('lng')
   })
 
-  it('combina filtros de espécie, porte e sexo', async () => {
-    const user = setup()
-    await user.selectOptions(screen.getByLabelText('Filtrar por espécie'), 'Cachorro')
-    await user.selectOptions(screen.getByLabelText('Filtrar por porte'), 'Médio')
-    await user.selectOptions(screen.getByLabelText('Filtrar por sexo'), 'Macho')
-    const expected = pets.filter(
-      (p) => p.species === 'Cachorro' && p.size === 'Médio' && p.sex === 'Macho',
-    )
-    expect(countText()).toBe(String(expected.length))
-    expect(screen.getByRole('heading', { name: 'Bento' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Luna' })).not.toBeInTheDocument()
-  })
-
-  it('o botão Limpar restaura todos os filtros', async () => {
-    const user = setup()
-    await user.type(screen.getByPlaceholderText(/busque por nome/i), 'beagle')
-    await user.selectOptions(screen.getByLabelText('Filtrar por espécie'), 'Gato')
-    expect(screen.getByText('Nenhum pet encontrado')).toBeInTheDocument()
-
-    await user.click(screen.getByRole('button', { name: /^limpar$/i }))
-    expect(countText()).toBe(String(pets.length))
-    expect(screen.getByPlaceholderText(/busque por nome/i)).toHaveValue('')
-    expect(screen.getByLabelText('Filtrar por espécie')).toHaveValue('Todos')
+  it('reflete o filtro na URL e faz nova consulta', async () => {
+    setup()
+    await screen.findByRole('heading', { name: 'Luna' })
+    await userEvent.setup().selectOptions(screen.getByLabelText('Filtrar por porte'), 'Médio')
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('size=M%C3%A9dio'))
+    await waitFor(() => expect(mocks.get).toHaveBeenLastCalledWith('/pets', expect.objectContaining({
+      query: expect.objectContaining({ size: 'Médio' }),
+    })))
   })
 })

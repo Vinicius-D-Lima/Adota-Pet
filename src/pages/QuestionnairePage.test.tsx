@@ -1,28 +1,35 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { describe, expect, it, vi } from 'vitest'
-import { pets } from '../data/pets'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { petFixture } from '../test/petFixture'
 import type { AdoptionRequest } from '../types'
 import { QuestionnairePage } from './QuestionnairePage'
+
+const mocks = vi.hoisted(() => ({ usePet: vi.fn() }))
+vi.mock('../hooks/usePets', () => ({ usePet: mocks.usePet }))
+
+beforeEach(() => {
+  mocks.usePet.mockReturnValue({ data: petFixture, isPending: false, isError: false })
+})
 
 const longText = 'Texto com mais de vinte caracteres para validar.'
 
 function setup() {
   const request: AdoptionRequest = {
     id: 'SOL-TESTE',
-    petId: pets[0].id,
+    petId: petFixture.id,
     status: 'Enviada',
     date: '01 jan 2026',
     message: '',
   }
   const onSubmit = vi.fn(() => Promise.resolve(request))
   render(
-    <MemoryRouter initialEntries={[`/pets/${pets[0].id}/questionario`]}>
+    <MemoryRouter initialEntries={[`/pets/${petFixture.id}/questionario`]}>
       <Routes>
         <Route
           path="/pets/:petId/questionario"
-          element={<QuestionnairePage pets={pets} onSubmit={onSubmit} />}
+          element={<QuestionnairePage onSubmit={onSubmit} />}
         />
         <Route path="/solicitacoes/:id/enviada" element={<p>Solicitação enviada</p>} />
       </Routes>
