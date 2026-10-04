@@ -1,5 +1,6 @@
 import { Check, ClipboardList, Heart, Home } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
+import { LinkButton } from '../components/ui'
 import { FlowSteps } from '../components/FlowSteps'
 import { useAdoptionRequest } from '../hooks/useAdoptionRequests'
 import { ApiError } from '../lib/ApiError'
@@ -76,12 +77,12 @@ export function RequestSuccessPage() {
             </div>
           </div>
           <div className="success-actions">
-            <Link className="button primary" to="/solicitacoes">
+            <LinkButton to="/solicitacoes">
               <ClipboardList size={18} /> Acompanhar solicitação
-            </Link>
-            <Link className="button ghost" to="/pets">
+            </LinkButton>
+            <LinkButton variant="secondary" to="/pets">
               <Heart size={18} /> Continuar explorando
-            </Link>
+            </LinkButton>
           </div>
         </div>
         <Link className="back-home-link" to="/">

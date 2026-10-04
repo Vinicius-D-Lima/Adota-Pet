@@ -1,7 +1,15 @@
-import { CalendarDays, ChevronRight, ClipboardList, Info, MapPin } from 'lucide-react'
+import { CalendarDays, ChevronRight, ClipboardList, MapPin } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PageIntro, StatusPill } from '../components/UI'
+import {
+  Alert,
+  Button,
+  Card,
+  EmptyState,
+  LinkButton,
+  PageIntro,
+  StatusPill,
+} from '../components/ui'
 import { useAdoptionRequests, useCancelAdoptionRequest } from '../hooks/useAdoptionRequests'
 import { ApiError } from '../lib/ApiError'
 import { formatRequestDate } from '../utils/formatRequestDate'
@@ -51,17 +59,13 @@ export function RequestsPage() {
           title="Minhas solicitações"
           description="Veja o andamento das suas adoções e as próximas etapas de cada processo."
         />
-        {cancelError && (
-          <div className="form-error" role="alert">
-            <Info size={17} /> {cancelError}
-          </div>
-        )}
+        {cancelError && <Alert>{cancelError}</Alert>}
         {requests.length ? (
           <div className="requests-list">
             {requests.map((request) => {
               const { pet } = request
               return (
-                <article className="request-card" key={request.id}>
+                <Card as="article" className="request-card" key={request.id}>
                   {pet && <img src={pet.image} alt={pet.name} />}
                   <div className="request-main">
                     <div className="request-topline">
@@ -85,13 +89,13 @@ export function RequestsPage() {
                   </div>
                   <div className="request-actions">
                     {canCancelRequest(request.status) && (
-                      <button
-                        className="text-button danger"
+                      <Button
+                        variant="text-danger"
                         disabled={cancelRequest.isPending && cancelRequest.variables === request.id}
                         onClick={() => void cancel(request.id)}
                       >
                         Cancelar
-                      </button>
+                      </Button>
                     )}
                     {pet && (
                       <Link
@@ -103,19 +107,18 @@ export function RequestsPage() {
                       </Link>
                     )}
                   </div>
-                </article>
+                </Card>
               )
             })}
           </div>
         ) : (
-          <div className="empty-state">
-            <ClipboardList size={36} />
-            <h2>Nenhuma solicitação ainda</h2>
-            <p>Quando você enviar uma solicitação de adoção, ela aparecerá aqui.</p>
-            <Link className="button primary" to="/pets">
-              Encontrar um pet
-            </Link>
-          </div>
+          <EmptyState
+            icon={<ClipboardList size={36} />}
+            title="Nenhuma solicitação ainda"
+            description="Quando você enviar uma solicitação de adoção, ela aparecerá aqui."
+          >
+            <LinkButton to="/pets">Encontrar um pet</LinkButton>
+          </EmptyState>
         )}
       </section>
     </div>

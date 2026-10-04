@@ -19,7 +19,10 @@ export default tseslint.config(
     plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'jsx-a11y/label-has-associated-control': ['error', { depth: 3 }],
+      'jsx-a11y/label-has-associated-control': [
+        'error',
+        { depth: 3, controlComponents: ['Input', 'Select', 'Textarea'] },
+      ],
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },

@@ -1,8 +1,8 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Button, EmptyState, Input, PageIntro, Select } from '../components/ui'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
-import { PageIntro } from '../components/UI'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePets, type PetSort } from '../hooks/usePets'
 
@@ -96,7 +96,7 @@ export function PetsPage() {
         <div className="filter-panel">
           <label className="search-box">
             <Search size={20} />
-            <input
+            <Input
               value={searchInput}
               onChange={(event) =>
                 setSearchState({ source: searchFromUrl, value: event.target.value })
@@ -108,7 +108,7 @@ export function PetsPage() {
             <span className="filter-title">
               <SlidersHorizontal size={17} /> Filtrar por
             </span>
-            <select
+            <Select
               value={species}
               onChange={(event) => setFilter('species', event.target.value)}
               aria-label="Filtrar por espécie"
@@ -116,8 +116,8 @@ export function PetsPage() {
               <option value="">Todas as espécies</option>
               <option>Cachorro</option>
               <option>Gato</option>
-            </select>
-            <select
+            </Select>
+            <Select
               value={size}
               onChange={(event) => setFilter('size', event.target.value)}
               aria-label="Filtrar por porte"
@@ -126,8 +126,8 @@ export function PetsPage() {
               <option>Pequeno</option>
               <option>Médio</option>
               <option>Grande</option>
-            </select>
-            <select
+            </Select>
+            <Select
               value={sex}
               onChange={(event) => setFilter('sex', event.target.value)}
               aria-label="Filtrar por sexo"
@@ -135,8 +135,8 @@ export function PetsPage() {
               <option value="">Todos os sexos</option>
               <option>Fêmea</option>
               <option>Macho</option>
-            </select>
-            <select
+            </Select>
+            <Select
               value={sort}
               onChange={(event) => setFilter('sort', event.target.value)}
               aria-label="Ordenar pets"
@@ -144,11 +144,11 @@ export function PetsPage() {
               <option value="recent">Mais recentes</option>
               <option value="name">Nome A–Z</option>
               <option value="distance">Mais próximos</option>
-            </select>
+            </Select>
             {hasFilters && (
-              <button className="clear-filter" onClick={clearFilters}>
+              <Button variant="text" className="clear-filter" onClick={clearFilters}>
                 <X size={15} /> Limpar
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -172,13 +172,13 @@ export function PetsPage() {
             ))}
           </div>
         ) : petsQuery.isError ? (
-          <div className="empty-state" role="alert">
-            <h2>Não foi possível carregar os pets</h2>
-            <p>Verifique sua conexão com a API simulada e tente novamente.</p>
-            <button className="button primary" onClick={() => void petsQuery.refetch()}>
-              Tentar novamente
-            </button>
-          </div>
+          <EmptyState
+            title="Não foi possível carregar os pets"
+            description="Verifique sua conexão com a API simulada e tente novamente."
+            role="alert"
+          >
+            <Button onClick={() => void petsQuery.refetch()}>Tentar novamente</Button>
+          </EmptyState>
         ) : pets.length ? (
           <>
             <div className="pet-grid">
@@ -192,25 +192,24 @@ export function PetsPage() {
             </div>
             {petsQuery.hasNextPage && (
               <div className="load-more-row">
-                <button
-                  className="button ghost"
+                <Button
+                  variant="secondary"
                   onClick={() => void petsQuery.fetchNextPage()}
                   disabled={petsQuery.isFetchingNextPage}
                 >
                   {petsQuery.isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
-                </button>
+                </Button>
               </div>
             )}
           </>
         ) : (
-          <div className="empty-state">
-            <Search size={34} />
-            <h2>Nenhum pet encontrado</h2>
-            <p>Tente remover algum filtro ou buscar por outro termo.</p>
-            <button className="button primary" onClick={clearFilters}>
-              Limpar filtros
-            </button>
-          </div>
+          <EmptyState
+            icon={<Search size={34} />}
+            title="Nenhum pet encontrado"
+            description="Tente remover algum filtro ou buscar por outro termo."
+          >
+            <Button onClick={clearFilters}>Limpar filtros</Button>
+          </EmptyState>
         )}
       </section>
     </div>

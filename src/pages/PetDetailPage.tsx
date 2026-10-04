@@ -1,5 +1,6 @@
 import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { Button, EmptyState, LinkButton } from '../components/ui'
 import { FlowSteps } from '../components/FlowSteps'
 import { useFavorite } from '../hooks/useFavorites'
 import { usePet } from '../hooks/usePets'
@@ -27,23 +28,24 @@ export function PetDetailPage() {
     return (
       <div className="page-surface">
         <section className="container detail-page">
-          <div className="empty-state" role="alert">
-            <h1>{notFound ? 'Pet não encontrado' : 'Não foi possível carregar o pet'}</h1>
-            <p>
-              {notFound
-                ? 'Este pet não está mais disponível ou o endereço está incorreto.'
-                : 'Verifique a conexão com a API simulada e tente novamente.'}
-            </p>
+          <EmptyState
+            title={notFound ? 'Pet não encontrado' : 'Não foi possível carregar o pet'}
+            headingAs="h1"
+            description={
+              <>
+                {notFound
+                  ? 'Este pet não está mais disponível ou o endereço está incorreto.'
+                  : 'Verifique a conexão com a API simulada e tente novamente.'}
+              </>
+            }
+            role="alert"
+          >
             {notFound ? (
-              <Link className="button primary" to="/pets">
-                Ver outros pets
-              </Link>
+              <LinkButton to="/pets">Ver outros pets</LinkButton>
             ) : (
-              <button className="button primary" onClick={() => void petQuery.refetch()}>
-                Tentar novamente
-              </button>
+              <Button onClick={() => void petQuery.refetch()}>Tentar novamente</Button>
             )}
-          </div>
+          </EmptyState>
         </section>
       </div>
     )
@@ -163,9 +165,9 @@ export function PetDetailPage() {
               Compare sua rotina com as necessidades de {pet.name} e veja os pontos fortes desse
               encontro.
             </p>
-            <Link className="button primary full" to={`/pets/${pet.id}/compatibilidade`}>
+            <LinkButton fullWidth to={`/pets/${pet.id}/compatibilidade`}>
               Ver compatibilidade <Sparkles size={18} />
-            </Link>
+            </LinkButton>
             <p className="fine-print">
               O resultado é orientativo e não garante a aprovação da adoção.
             </p>

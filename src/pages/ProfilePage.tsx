@@ -1,11 +1,11 @@
 import { AlertTriangle, Check, Info, Save } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
-import { Field, PageIntro } from '../components/UI'
 import {
   type AdopterProfile,
   useAdopterProfile,
   useSaveAdopterProfile,
 } from '../hooks/useAdopterProfile'
+import { Button, Field, Input, PageIntro, Select } from '../components/ui'
 import { ApiError } from '../lib/ApiError'
 import { profileSchema } from '../schemas/profileSchema'
 import type { ProfileDraft } from '../types'
@@ -194,7 +194,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
               </div>
               <div className="form-grid">
                 <Field label="Nome completo" error={errors.name} full>
-                  <input
+                  <Input
                     value={draft.name}
                     onChange={(event) => update('name', event.target.value)}
                     aria-invalid={Boolean(errors.name)}
@@ -203,7 +203,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                   />
                 </Field>
                 <Field label="CPF" error={errors.cpf}>
-                  <input
+                  <Input
                     value={draft.cpf}
                     onChange={(event) =>
                       update('cpf', event.target.value.replace(/\D/g, '').slice(0, 11))
@@ -221,7 +221,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                   error={errors.birthDate}
                   hint="É necessário ter pelo menos 18 anos."
                 >
-                  <input
+                  <Input
                     type="date"
                     value={draft.birthDate}
                     onChange={(event) => update('birthDate', event.target.value)}
@@ -230,7 +230,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                   />
                 </Field>
                 <Field label="E-mail" error={errors.email}>
-                  <input
+                  <Input
                     type="email"
                     value={draft.email}
                     onChange={(event) => update('email', event.target.value)}
@@ -240,7 +240,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                   />
                 </Field>
                 <Field label="Telefone/celular" error={errors.phone}>
-                  <input
+                  <Input
                     type="tel"
                     value={draft.phone}
                     onChange={(event) =>
@@ -255,7 +255,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                   />
                 </Field>
                 <Field label="CEP" error={errors.zipCode}>
-                  <input
+                  <Input
                     value={draft.zipCode}
                     onChange={(event) =>
                       update('zipCode', event.target.value.replace(/\D/g, '').slice(0, 8))
@@ -269,7 +269,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                   />
                 </Field>
                 <Field label="Endereço" error={errors.address} full>
-                  <input
+                  <Input
                     value={draft.address}
                     onChange={(event) => update('address', event.target.value)}
                     aria-invalid={Boolean(errors.address)}
@@ -290,7 +290,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
               </div>
               <div className="form-grid">
                 <Field label="Tipo de moradia" error={errors.housing}>
-                  <select
+                  <Select
                     value={draft.housing}
                     onChange={(event) =>
                       update('housing', event.target.value as ProfileDraft['housing'])
@@ -303,10 +303,10 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     <option>Apartamento</option>
                     <option>Casa</option>
                     <option>Chácara ou sítio</option>
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Área externa segura?" error={errors.hasOutdoorArea}>
-                  <select
+                  <Select
                     value={draft.hasOutdoorArea === '' ? '' : draft.hasOutdoorArea ? 'Sim' : 'Não'}
                     onChange={(event) =>
                       update(
@@ -321,10 +321,10 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     </option>
                     <option>Não</option>
                     <option>Sim</option>
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Há crianças na residência?" error={errors.hasChildren}>
-                  <select
+                  <Select
                     value={draft.hasChildren === '' ? '' : draft.hasChildren ? 'Sim' : 'Não'}
                     onChange={(event) =>
                       update(
@@ -339,10 +339,10 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     </option>
                     <option>Não</option>
                     <option>Sim</option>
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Já há outros pets?" error={errors.hasOtherPets}>
-                  <select
+                  <Select
                     value={draft.hasOtherPets === '' ? '' : draft.hasOtherPets ? 'Sim' : 'Não'}
                     onChange={(event) =>
                       update(
@@ -357,7 +357,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     </option>
                     <option>Não</option>
                     <option>Sim</option>
-                  </select>
+                  </Select>
                 </Field>
               </div>
             </section>
@@ -372,7 +372,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
               </div>
               <div className="form-grid">
                 <Field label="Tempo disponível por dia" error={errors.dailyTime}>
-                  <select
+                  <Select
                     value={draft.dailyTime}
                     onChange={(event) =>
                       update('dailyTime', event.target.value as ProfileDraft['dailyTime'])
@@ -385,10 +385,10 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     <option>Até 1 hora</option>
                     <option>2 a 3 horas</option>
                     <option>Mais de 3 horas</option>
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Nível de atividade" error={errors.activityLevel}>
-                  <select
+                  <Select
                     value={draft.activityLevel}
                     onChange={(event) =>
                       update('activityLevel', event.target.value as ProfileDraft['activityLevel'])
@@ -401,10 +401,10 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     <option>Tranquilo</option>
                     <option>Moderado</option>
                     <option>Ativo</option>
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Experiência com animais" error={errors.experience}>
-                  <select
+                  <Select
                     value={draft.experience}
                     onChange={(event) =>
                       update('experience', event.target.value as ProfileDraft['experience'])
@@ -417,13 +417,13 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     <option>Primeiro pet</option>
                     <option>Já tive pets</option>
                     <option>Tenho bastante experiência</option>
-                  </select>
+                  </Select>
                 </Field>
                 <Field
                   label="Disponibilidade para cuidados especiais?"
                   error={errors.acceptsSpecialCare}
                 >
-                  <select
+                  <Select
                     value={
                       draft.acceptsSpecialCare === ''
                         ? ''
@@ -444,7 +444,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     </option>
                     <option>Não</option>
                     <option>Sim</option>
-                  </select>
+                  </Select>
                 </Field>
               </div>
             </section>
@@ -459,7 +459,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
               </div>
               <div className="form-grid">
                 <Field label="Espécie" error={errors.preferredSpecies}>
-                  <select
+                  <Select
                     value={draft.preferredSpecies}
                     onChange={(event) =>
                       update(
@@ -475,10 +475,10 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     <option>Sem preferência</option>
                     <option>Cachorro</option>
                     <option>Gato</option>
-                  </select>
+                  </Select>
                 </Field>
                 <Field label="Porte" error={errors.preferredSize}>
-                  <select
+                  <Select
                     value={draft.preferredSize}
                     onChange={(event) =>
                       update('preferredSize', event.target.value as ProfileDraft['preferredSize'])
@@ -492,16 +492,16 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     <option>Pequeno</option>
                     <option>Pequeno ou médio</option>
                     <option>Médio ou grande</option>
-                  </select>
+                  </Select>
                 </Field>
               </div>
             </section>
 
             <div className="profile-submit">
               <p>Alterações relevantes podem mudar os resultados de compatibilidade.</p>
-              <button className="button primary" type="submit" disabled={saveProfile.isPending}>
+              <Button type="submit" disabled={saveProfile.isPending}>
                 <Save size={18} /> {saveProfile.isPending ? 'Salvando…' : 'Salvar perfil'}
-              </button>
+              </Button>
             </div>
           </div>
         </form>

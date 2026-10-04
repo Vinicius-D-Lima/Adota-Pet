@@ -2,8 +2,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Alert, Button, Checkbox, Field, Select, Textarea } from '../components/ui'
 import { FlowSteps } from '../components/FlowSteps'
-import { Field } from '../components/UI'
 import {
   adoptionRequestKeys,
   fetchAdoptionRequests,
@@ -74,9 +74,9 @@ export function QuestionnairePage() {
         <div>
           <p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>
           {!notFound && (
-            <button className="button ghost" onClick={() => void petQuery.refetch()}>
+            <Button variant="secondary" onClick={() => void petQuery.refetch()}>
               Tentar novamente
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -199,7 +199,7 @@ export function QuestionnairePage() {
               error={errors.motivation}
               full
             >
-              <textarea
+              <Textarea
                 maxLength={500}
                 rows={5}
                 value={form.motivation}
@@ -214,7 +214,7 @@ export function QuestionnairePage() {
               error={errors.routine}
               full
             >
-              <textarea
+              <Textarea
                 maxLength={500}
                 rows={5}
                 value={form.routine}
@@ -224,7 +224,7 @@ export function QuestionnairePage() {
               />
             </Field>
             <Field label="Por quanto tempo o pet ficaria sozinho?" error={errors.aloneTime} full>
-              <select
+              <Select
                 value={form.aloneTime}
                 onChange={(event) =>
                   update('aloneTime', event.target.value as QuestionnaireAnswers['aloneTime'])
@@ -235,7 +235,7 @@ export function QuestionnairePage() {
                 <option>Até 4 horas</option>
                 <option>De 4 a 8 horas</option>
                 <option>Mais de 8 horas</option>
-              </select>
+              </Select>
             </Field>
             <div className="form-section-heading second">
               <span>2</span>
@@ -250,7 +250,7 @@ export function QuestionnairePage() {
               error={errors.adaptation}
               full
             >
-              <textarea
+              <Textarea
                 maxLength={350}
                 rows={4}
                 value={form.adaptation}
@@ -259,43 +259,27 @@ export function QuestionnairePage() {
                 placeholder="Conte sobre o espaço, a rotina inicial e a adaptação com outros moradores..."
               />
             </Field>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={form.costs}
-                onChange={(event) => update('costs', event.target.checked)}
-                aria-invalid={Boolean(errors.costs)}
-              />
-              <span>
-                <strong>Estou ciente dos custos recorrentes</strong>
-                <small>Alimentação, vacinas, consultas, medicamentos e outros cuidados.</small>
-                {errors.costs && <small className="check-error">{errors.costs}</small>}
-              </span>
-            </label>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={form.commitment}
-                onChange={(event) => update('commitment', event.target.checked)}
-                aria-invalid={Boolean(errors.commitment)}
-              />
-              <span>
-                <strong>Assumo o compromisso com o bem-estar do pet</strong>
-                <small>Inclusive em mudanças de rotina, moradia ou composição familiar.</small>
-                {errors.commitment && <small className="check-error">{errors.commitment}</small>}
-              </span>
-            </label>
-            {submitError && (
-              <div className="form-error" role="alert">
-                <Info size={17} /> {submitError}
-              </div>
-            )}
+            <Checkbox
+              checked={form.costs}
+              onChange={(event) => update('costs', event.target.checked)}
+              label="Estou ciente dos custos recorrentes"
+              description="Alimentação, vacinas, consultas, medicamentos e outros cuidados."
+              error={errors.costs}
+            />
+            <Checkbox
+              checked={form.commitment}
+              onChange={(event) => update('commitment', event.target.checked)}
+              label="Assumo o compromisso com o bem-estar do pet"
+              description="Inclusive em mudanças de rotina, moradia ou composição familiar."
+              error={errors.commitment}
+            />
+            {submitError && <Alert>{submitError}</Alert>}
             <div className="questionnaire-actions">
               <span>Suas respostas ficam salvas apenas nesta simulação.</span>
-              <button className="button primary" type="submit" disabled={isSubmitting}>
+              <Button type="submit" loading={isSubmitting}>
                 {isSubmitting ? 'Enviando...' : 'Revisar e enviar solicitação'}{' '}
                 {!isSubmitting && <ArrowRight size={18} />}
-              </button>
+              </Button>
             </div>
           </form>
           <aside className="pet-side-summary">
