@@ -2215,3 +2215,21 @@ input {
     display: none;
   }
 }
+
+.toast-region {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  max-width: min(360px, calc(100vw - 32px));
+}
+.toast {
+  margin: 0;
+  padding: 12px 15px;
+  border-radius: 10px;
+  background: var(--green-900);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: var(--shadow);
+}

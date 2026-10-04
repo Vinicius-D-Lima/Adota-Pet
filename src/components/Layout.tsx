@@ -2,8 +2,10 @@ import { Heart, Menu, PawPrint, X } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAdoptionRequests } from '../hooks/useAdoptionRequests'
+import { useFavoriteIds } from '../hooks/useFavorites'
 import { getInitials } from '../utils/getInitials'
 import { isActiveRequest } from '../utils/requestStatus'
+import { FavoriteNotice } from './FavoriteNotice'
 
 interface LayoutProps {
   children: ReactNode
@@ -15,6 +17,7 @@ export function Layout({ children, profileName }: LayoutProps) {
   const requestCount =
     requestsQuery.data?.filter((item) => isActiveRequest(item.status)).length ?? 0
   const [open, setOpen] = useState(false)
+  const favoriteCount = useFavoriteIds().data?.length ?? 0
   const savedName = profileName.trim()
   const initials = savedName ? getInitials(savedName) : ''
   const firstName = savedName.split(/\s+/)[0]
@@ -22,6 +25,7 @@ export function Layout({ children, profileName }: LayoutProps) {
   const nav: [string, string][] = [
     ['/', 'Início'],
     ['/pets', 'Encontrar pets'],
+    ['/favoritos', 'Favoritos'],
     ['/solicitacoes', 'Minhas solicitações'],
     ['/perfil', 'Meu perfil'],
   ]
@@ -52,6 +56,9 @@ export function Layout({ children, profileName }: LayoutProps) {
                 className={({ isActive }) => (isActive ? 'active' : '')}
               >
                 {label}
+                {to === '/favoritos' && favoriteCount > 0 && (
+                  <span className="nav-count">{favoriteCount}</span>
+                )}
                 {to === '/solicitacoes' && requestCount > 0 && (
                   <span className="nav-count">{requestCount}</span>
                 )}
@@ -79,6 +86,7 @@ export function Layout({ children, profileName }: LayoutProps) {
         </div>
       </header>
       <main>{children}</main>
+      <FavoriteNotice />
       <footer className="site-footer">
         <div className="container footer-inner">
           <div>
