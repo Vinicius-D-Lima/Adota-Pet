@@ -7,7 +7,7 @@ import { Field } from '../components/UI'
 import {
   adoptionRequestKeys,
   fetchAdoptionRequests,
-  useActiveRequestForPet,
+  useActiveRequestLookup,
   useCreateAdoptionRequest,
 } from '../hooks/useAdoptionRequests'
 import { usePet } from '../hooks/usePets'
@@ -62,7 +62,7 @@ export function QuestionnairePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createRequest = useCreateAdoptionRequest()
-  const activeRequest = useActiveRequestForPet(petId)
+  const { request: activeRequest, isFetching: isCheckingRequests } = useActiveRequestLookup(petId)
   const [form, setForm] = useState<QuestionnaireAnswers>(initialForm)
   const [errors, setErrors] = useState<FieldErrors<FieldName>>({})
   const [submitError, setSubmitError] = useState<ReactNode>('')
@@ -85,9 +85,15 @@ export function QuestionnairePage() {
     )
   }
 
-  // Só bloqueia quem ainda não tentou enviar: depois de um envio com sucesso a própria solicitação
-  // nova passa a ser "ativa" e a navegação para /enviada não pode ser atropelada por este redirecionamento.
-  if (activeRequest && createRequest.isIdle) return <Navigate to="/solicitacoes" replace />
+  // Redireciona só quem ainda não começou a preencher e com a lista já atualizada. Quem digitou,
+  // enviou ou está enviando nunca é desviado: perderia as respostas, e a própria solicitação nova
+  // (ativa depois do envio) atropelaria a navegação para /enviada. O 409 do servidor cobre o resto.
+  const isPristine = (Object.keys(initialForm) as FieldName[]).every(
+    (field) => form[field] === initialForm[field],
+  )
+  if (activeRequest && isPristine && !isCheckingRequests) {
+    return <Navigate to="/solicitacoes" replace />
+  }
 
   const pet = petQuery.data
 

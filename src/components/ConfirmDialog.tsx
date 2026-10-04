@@ -28,6 +28,7 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const titleId = useId()
   const descriptionId = useId()
+  const backdropRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<HTMLButtonElement>(null)
   // Os handlers mudam a cada render; o efeito de foco/teclado só deve rodar ao abrir e fechar.
@@ -40,6 +41,14 @@ export function ConfirmDialog({
     const opener = document.activeElement as HTMLElement | null
     // O foco inicial vai para a opção segura, não para a destrutiva.
     cancelRef.current?.focus()
+
+    // Deixa o resto da página inerte (leitor de tela e cliques) e trava a rolagem ao fundo.
+    const inerted = Array.from(document.body.children).filter(
+      (element) => element !== backdropRef.current && !element.hasAttribute('inert'),
+    )
+    inerted.forEach((element) => element.setAttribute('inert', ''))
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
 
     const onKeyDown = (event: KeyboardEvent) => {
       const dialog = dialogRef.current
@@ -76,13 +85,21 @@ export function ConfirmDialog({
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
+      inerted.forEach((element) => element.removeAttribute('inert'))
+      document.body.style.overflow = previousOverflow
       const target = latest.current.returnFocus?.() ?? opener
       if (target?.isConnected) target.focus()
     }
   }, [])
 
+  // Botões desabilitados perdem o foco; mantê-lo no diálogo evita que ele caia no <body>.
+  useEffect(() => {
+    if (busy) dialogRef.current?.focus()
+  }, [busy])
+
   return createPortal(
     <div
+      ref={backdropRef}
       className="modal-backdrop"
       role="presentation"
       onMouseDown={(event) => {

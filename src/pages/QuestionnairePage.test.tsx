@@ -274,6 +274,23 @@ describe('QuestionnairePage - solicitação ativa', () => {
     expect(listVisits).toEqual([])
   })
 
+  it('não redireciona quem já começou a preencher quando a lista passa a mostrar a solicitação', async () => {
+    getMock.mockResolvedValue(list())
+    const user = setup()
+    const [motivation] = screen.getAllByRole('textbox')
+    await user.type(motivation, longText)
+
+    await act(async () => {
+      queryClient.setQueryData(adoptionRequestKeys.list(), [
+        makeRequest({ petId: pet.id, status: 'Em análise' }),
+      ])
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(listVisits).toEqual([])
+    expect(screen.getAllByRole('textbox')[0]).toHaveValue(longText)
+  })
+
   it('após enviar com sucesso vai para /enviada, não para a lista (sem corrida)', async () => {
     // A lista só passa a conter a solicitação nova depois do POST, como no servidor.
     let created = false

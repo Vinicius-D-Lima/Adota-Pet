@@ -1,6 +1,7 @@
-import { screen, waitFor } from '@testing-library/react'
+import { act, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { adoptionRequestKeys } from '../hooks/useAdoptionRequests'
 import { api } from '../lib/api'
 import { ApiError } from '../lib/ApiError'
 import { makeRequest } from '../test/fixtures/requests'
@@ -142,6 +143,42 @@ describe('RequestsPage', () => {
       await user.keyboard('{Escape}')
       expect(screen.getByRole('dialog')).toBeInTheDocument()
       expect(postMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('um refetch que falha não derruba o modal aberto', async () => {
+      getMock.mockResolvedValue(list(makeRequest({ status: 'Enviada' })))
+      postMock.mockReturnValue(new Promise(() => {}))
+      const { queryClient } = renderWithProviders(<RequestsPage />)
+      const user = userEvent.setup()
+
+      await user.click(await screen.findByRole('button', { name: 'Cancelar' }))
+      getMock.mockRejectedValue(ApiError.network())
+      await act(async () => {
+        await queryClient.invalidateQueries()
+        // O TanStack Query notifica os componentes em um setTimeout(0).
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(queryClient.getQueryState(adoptionRequestKeys.list())?.status).toBe('error')
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(
+        screen.queryByText(/não foi possível carregar suas solicitações/i),
+      ).not.toBeInTheDocument()
+    })
+
+    it('limpa o erro de uma tentativa anterior ao abrir o modal de novo', async () => {
+      getMock.mockResolvedValue(list(makeRequest({ status: 'Enviada' })))
+      postMock.mockRejectedValue(ApiError.network())
+      renderWithProviders(<RequestsPage />)
+      const user = userEvent.setup()
+
+      await user.click(await screen.findByRole('button', { name: 'Cancelar' }))
+      await user.click(screen.getByRole('button', { name: 'Cancelar solicitação' }))
+      expect(await screen.findByRole('alert')).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Cancelar' }))
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     })
 
     it('409 ao cancelar fecha o modal e mostra mensagem clara', async () => {

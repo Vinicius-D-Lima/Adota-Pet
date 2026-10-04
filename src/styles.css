@@ -1749,6 +1749,9 @@ input {
   font-weight: 700;
   text-decoration: underline;
 }
+.active-request-notice p {
+  font-size: 14px;
+}
 .icon-button {
   width: 38px;
   height: 38px;

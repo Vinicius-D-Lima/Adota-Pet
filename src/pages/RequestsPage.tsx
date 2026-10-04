@@ -40,7 +40,8 @@ export function RequestsPage() {
     return <div className="app-feedback">Carregando solicitações...</div>
   }
 
-  if (requestsQuery.isError) {
+  // Só é erro de tela cheia se nunca houve dados: um refetch que falha não pode derrubar o modal aberto.
+  if (requestsQuery.isLoadingError) {
     return (
       <div className="app-feedback error" role="alert">
         Não foi possível carregar suas solicitações. Tente novamente.
@@ -99,7 +100,10 @@ export function RequestsPage() {
                     {canCancelRequest(request.status) && (
                       <button
                         className="text-button danger"
-                        onClick={(event) => setToCancel({ request, opener: event.currentTarget })}
+                        onClick={(event) => {
+                          setCancelError('')
+                          setToCancel({ request, opener: event.currentTarget })
+                        }}
                       >
                         Cancelar
                       </button>

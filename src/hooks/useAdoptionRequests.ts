@@ -24,10 +24,17 @@ export function useAdoptionRequests() {
  * Solicitação ainda ativa (nem Cancelada nem Recusada) do pet, se houver.
  * Enquanto a lista carrega ou se ela falhar devolve `undefined`: o servidor continua barrando com 409.
  */
-export function useActiveRequestForPet(petId: string | undefined) {
-  const { data } = useAdoptionRequests()
-  return data?.find((request) => request.petId === petId && isActiveRequest(request.status))
+export function useActiveRequestLookup(petId: string | undefined) {
+  const { data, isFetching } = useAdoptionRequests()
+  return {
+    request: data?.find((item) => item.petId === petId && isActiveRequest(item.status)),
+    /** Há uma atualização da lista em andamento: o resultado ainda pode mudar. */
+    isFetching,
+  }
 }
+
+export const useActiveRequestForPet = (petId: string | undefined) =>
+  useActiveRequestLookup(petId).request
 
 export function useAdoptionRequest(requestId: string | undefined) {
   return useQuery({

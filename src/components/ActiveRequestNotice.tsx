@@ -9,7 +9,7 @@ interface ActiveRequestNoticeProps {
 
 export function ActiveRequestNotice({ request, petName }: ActiveRequestNoticeProps) {
   return (
-    <div className="info-note" role="status">
+    <div className="info-note active-request-notice" role="status">
       <Info size={18} />
       <p>
         Você já tem uma solicitação em andamento para {petName} ({request.id} · {request.status}).{' '}
