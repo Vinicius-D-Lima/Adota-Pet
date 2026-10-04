@@ -32,7 +32,7 @@ export function FavoritesPage() {
         ) : favoritesQuery.data.length ? (
           <div className="pet-grid">
             {favoritesQuery.data.map((pet) => (
-              <PetCard key={pet.id} pet={pet} />
+              <PetCard key={pet.id} pet={pet} headingLevel="h2" />
             ))}
           </div>
         ) : (

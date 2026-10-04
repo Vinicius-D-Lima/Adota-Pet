@@ -62,3 +62,24 @@ describe('PetsPage - consulta e filtros', () => {
     await waitFor(() => expect(lastPetsCall()?.[1]).toMatchObject({ query: { size: 'Médio' } }))
   })
 })
+
+describe('PetsPage - acessibilidade', () => {
+  it('o campo de busca tem rótulo acessível', async () => {
+    setup()
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Buscar pets por nome, raça ou cidade' }),
+    ).toBeInTheDocument()
+  })
+
+  it('anuncia a contagem de resultados como status, sem anunciar "0" durante o carregamento', async () => {
+    setup()
+
+    const loading = screen.getByText('Buscando pets...')
+    expect(loading).toHaveAttribute('role', 'status')
+    const count = await screen.findByText(/pets encontrados/)
+    expect(count).toHaveAttribute('role', 'status')
+    expect(count).toHaveTextContent(`${petFixtures.length} pets encontrados`)
+    expect(screen.queryByText(/^0 pets encontrados/)).not.toBeInTheDocument()
+  })
+})
