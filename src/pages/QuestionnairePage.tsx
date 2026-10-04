@@ -1,17 +1,23 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, type ReactNode, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { Field } from '../components/UI'
+import {
+  adoptionRequestKeys,
+  fetchAdoptionRequests,
+  useCreateAdoptionRequest,
+} from '../hooks/useAdoptionRequests'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
 import { questionnaireSchema } from '../schemas/questionnaireSchema'
-import type { AdoptionRequest, Pet, QuestionnaireAnswers } from '../types'
+import type { QuestionnaireAnswers } from '../types'
+import { profileFieldLabels } from '../utils/profileFieldLabels'
+import { isActiveRequest } from '../utils/requestStatus'
 import { getZodFieldErrors, type FieldErrors } from '../utils/zodFieldErrors'
 
-interface QuestionnairePageProps {
-  onSubmit: (pet: Pet, answers: QuestionnaireAnswers) => Promise<AdoptionRequest>
-}
+type FieldName = keyof QuestionnaireAnswers
 
 const initialForm: QuestionnaireAnswers = {
   motivation: '',
@@ -22,14 +28,43 @@ const initialForm: QuestionnaireAnswers = {
   commitment: false,
 }
 
-export function QuestionnairePage({ onSubmit }: QuestionnairePageProps) {
+const GENERIC_ERROR = 'Não foi possível enviar a solicitação. Tente novamente.'
+const ANSWERS_PREFIX = 'answers.'
+
+const isFormField = (field: string): field is FieldName => field in initialForm
+
+/** Remove o prefixo `answers.` dos campos do servidor e descarta o que não existe no formulário. */
+function toFormErrors(error: ApiError): FieldErrors<FieldName> {
+  const errors: FieldErrors<FieldName> = {}
+  for (const [field, message] of Object.entries(error.toFieldErrors())) {
+    const name = field.startsWith(ANSWERS_PREFIX) ? field.slice(ANSWERS_PREFIX.length) : field
+    if (isFormField(name)) errors[name] = message
+  }
+  return errors
+}
+
+/** Rótulos dos campos que faltam no perfil, a partir dos `details` do 422. */
+function toMissingProfileFields(error: ApiError): string[] {
+  const { details } = error
+  if (!Array.isArray(details)) return []
+  return details.flatMap((item: unknown) => {
+    if (!item || typeof item !== 'object') return []
+    const { field, message } = item as { field?: unknown; message?: unknown }
+    if (typeof field === 'string') return [profileFieldLabels[field] ?? field]
+    return typeof message === 'string' ? [message] : []
+  })
+}
+
+export function QuestionnairePage() {
   const { petId } = useParams()
   const petQuery = usePet(petId)
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const createRequest = useCreateAdoptionRequest()
   const [form, setForm] = useState<QuestionnaireAnswers>(initialForm)
-  const [errors, setErrors] = useState<FieldErrors<keyof QuestionnaireAnswers>>({})
-  const [submitError, setSubmitError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [errors, setErrors] = useState<FieldErrors<FieldName>>({})
+  const [submitError, setSubmitError] = useState<ReactNode>('')
+  const isSubmitting = createRequest.isPending
 
   if (petQuery.isPending) return <div className="app-feedback">Carregando questionário...</div>
   if (petQuery.isError) {
@@ -50,31 +85,87 @@ export function QuestionnairePage({ onSubmit }: QuestionnairePageProps) {
 
   const pet = petQuery.data
 
-  const update = <K extends keyof QuestionnaireAnswers>(key: K, value: QuestionnaireAnswers[K]) => {
+  const update = <K extends FieldName>(key: K, value: QuestionnaireAnswers[K]) => {
     setForm((current) => ({ ...current, [key]: value }))
     setErrors((current) => ({ ...current, [key]: undefined }))
     setSubmitError('')
   }
 
+  const describeFailure = async (error: unknown): Promise<ReactNode> => {
+    if (!(error instanceof ApiError)) return GENERIC_ERROR
+
+    if (error.statusCode === 400) {
+      const fieldErrors = toFormErrors(error)
+      if (Object.keys(fieldErrors).length === 0) return GENERIC_ERROR
+      setErrors(fieldErrors)
+      return 'Revise os campos destacados e tente novamente.'
+    }
+
+    if (error.statusCode === 404) {
+      return (
+        <>
+          Este pet não está mais disponível. <Link to="/pets">Ver outros pets</Link>
+        </>
+      )
+    }
+
+    if (error.statusCode === 409) {
+      // A API não devolve o id da solicitação existente; ele é buscado na lista.
+      const existing = await queryClient
+        .fetchQuery({
+          queryKey: adoptionRequestKeys.list(),
+          queryFn: fetchAdoptionRequests,
+          staleTime: 0,
+        })
+        .then((requests) =>
+          requests.find((item) => item.petId === pet.id && isActiveRequest(item.status)),
+        )
+        .catch(() => undefined)
+      return (
+        <>
+          Você já tem uma solicitação em andamento para {pet.name}
+          {existing ? ` (${existing.id} · ${existing.status})` : ''}.{' '}
+          <Link to="/solicitacoes">Ver minhas solicitações</Link>
+        </>
+      )
+    }
+
+    if (error.statusCode === 422) {
+      const missing = toMissingProfileFields(error)
+      return (
+        <>
+          Complete seu perfil para solicitar a adoção. <Link to="/perfil">Ir para o perfil</Link>
+          {missing.length > 0 && (
+            <>
+              <br />
+              Faltam: {missing.join(', ')}.
+            </>
+          )}
+        </>
+      )
+    }
+
+    return GENERIC_ERROR
+  }
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+    if (isSubmitting) return
     const result = questionnaireSchema.safeParse(form)
 
     if (!result.success) {
-      setErrors(getZodFieldErrors<keyof QuestionnaireAnswers>(result.error))
+      setErrors(getZodFieldErrors<FieldName>(result.error))
       return
     }
 
     setErrors({})
-    setIsSubmitting(true)
+    setSubmitError('')
 
     try {
-      const request = await onSubmit(pet, result.data)
+      const request = await createRequest.mutateAsync({ petId: pet.id, answers: result.data })
       navigate(`/solicitacoes/${request.id}/enviada`)
-    } catch {
-      setSubmitError('Não foi possível enviar a solicitação. Tente novamente.')
-    } finally {
-      setIsSubmitting(false)
+    } catch (error) {
+      setSubmitError(await describeFailure(error))
     }
   }
 

@@ -1,31 +1,31 @@
 import { Check, ClipboardList, Heart, Home } from 'lucide-react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
-import { usePet } from '../hooks/usePets'
-import type { AdoptionRequest } from '../types'
+import { useAdoptionRequest } from '../hooks/useAdoptionRequests'
+import { ApiError } from '../lib/ApiError'
 
-interface RequestSuccessPageProps {
-  requests: AdoptionRequest[]
-}
-
-export function RequestSuccessPage({ requests }: RequestSuccessPageProps) {
+export function RequestSuccessPage() {
   const { requestId } = useParams()
-  const request = requests.find((item) => item.id === requestId)
-  const petQuery = usePet(request?.petId)
-  if (!request) return <Navigate to="/solicitacoes" replace />
-  if (petQuery.isPending) return <div className="app-feedback">Carregando solicitação...</div>
-  if (petQuery.isError)
+  const requestQuery = useAdoptionRequest(requestId)
+
+  if (requestQuery.isPending) {
+    return <div className="app-feedback">Carregando solicitação...</div>
+  }
+
+  if (requestQuery.isError) {
+    if (requestQuery.error instanceof ApiError && requestQuery.error.statusCode === 404) {
+      return <Navigate to="/solicitacoes" replace />
+    }
     return (
       <div className="app-feedback error" role="alert">
-        <div>
-          <p>Não foi possível carregar o pet.</p>
-          <button className="button ghost" onClick={() => void petQuery.refetch()}>
-            Tentar novamente
-          </button>
-        </div>
+        Não foi possível carregar a solicitação. Tente novamente.
       </div>
     )
-  const pet = petQuery.data
+  }
+
+  const request = requestQuery.data
+  const pet = request.pet
+  if (!pet) return <Navigate to="/solicitacoes" replace />
 
   return (
     <div className="page-surface success-page">

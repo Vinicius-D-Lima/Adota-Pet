@@ -1,17 +1,21 @@
 import { Heart, Menu, PawPrint, X } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { useAdoptionRequests } from '../hooks/useAdoptionRequests'
 import { useFavoriteIds } from '../hooks/useFavorites'
 import { getInitials } from '../utils/getInitials'
+import { isActiveRequest } from '../utils/requestStatus'
 import { FavoriteNotice } from './FavoriteNotice'
 
 interface LayoutProps {
   children: ReactNode
   profileName: string
-  requestCount: number
 }
 
-export function Layout({ children, profileName, requestCount }: LayoutProps) {
+export function Layout({ children, profileName }: LayoutProps) {
+  const requestsQuery = useAdoptionRequests()
+  const requestCount =
+    requestsQuery.data?.filter((item) => isActiveRequest(item.status)).length ?? 0
   const [open, setOpen] = useState(false)
   const favoriteCount = useFavoriteIds().data?.length ?? 0
   const savedName = profileName.trim()
