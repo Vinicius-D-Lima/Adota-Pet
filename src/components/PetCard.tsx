@@ -1,14 +1,14 @@
 import { Heart, MapPin } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
+import { useFavorite } from '../hooks/useFavorites'
 import type { Pet } from '../types'
 
 interface PetCardProps {
   pet: Pet
-  favorite: boolean
-  onFavorite: (petId: string) => void
 }
 
-export function PetCard({ pet, favorite, onFavorite }: PetCardProps) {
+export function PetCard({ pet }: PetCardProps) {
+  const { isFavorite, toggle, isPending } = useFavorite(pet.id)
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
 
@@ -17,11 +17,13 @@ export function PetCard({ pet, favorite, onFavorite }: PetCardProps) {
       <div className="pet-image-wrap">
         <img src={pet.image} alt={`${pet.name}, ${pet.breed}`} className="pet-image" />
         <button
-          className={favorite ? 'favorite active' : 'favorite'}
-          onClick={() => onFavorite(pet.id)}
-          aria-label={favorite ? `Remover ${pet.name} dos favoritos` : `Favoritar ${pet.name}`}
+          className={isFavorite ? 'favorite active' : 'favorite'}
+          onClick={toggle}
+          aria-pressed={isFavorite}
+          aria-busy={isPending}
+          aria-label={isFavorite ? `Remover ${pet.name} dos favoritos` : `Favoritar ${pet.name}`}
         >
-          <Heart size={20} fill={favorite ? 'currentColor' : 'none'} />
+          <Heart size={20} fill={isFavorite ? 'currentColor' : 'none'} />
         </button>
         {pet.distance && (
           <span className="pet-distance">

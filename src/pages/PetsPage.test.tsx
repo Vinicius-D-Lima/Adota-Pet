@@ -16,17 +16,20 @@ function LocationProbe() {
 
 beforeEach(() => {
   mocks.get.mockReset()
-  mocks.get.mockImplementation((_path, options) => {
+  mocks.get.mockImplementation((path, options) => {
+    if (path === '/me/favorites/ids') return Promise.resolve({ data: [], total: 0 })
     const page = Number(options?.query?.page ?? 1)
     const start = (page - 1) * 4
     return Promise.resolve({ data: petFixtures.slice(start, start + 4), total: petFixtures.length })
   })
 })
 
+const lastPetsCall = () => mocks.get.mock.calls.filter(([path]) => path === '/pets').slice(-1)[0]
+
 const setup = (route = '/pets') =>
   renderWithProviders(
     <>
-      <PetsPage favorites={[]} onFavorite={() => {}} />
+      <PetsPage />
       <LocationProbe />
     </>,
     { route },
@@ -38,12 +41,7 @@ describe('PetsPage - consulta e filtros', () => {
     expect(await screen.findByRole('heading', { name: 'Luna' })).toBeInTheDocument()
     await userEvent.setup().click(screen.getByRole('button', { name: 'Carregar mais' }))
     expect(await screen.findByRole('heading', { name: 'Tobias' })).toBeInTheDocument()
-    expect(mocks.get).toHaveBeenLastCalledWith(
-      '/pets',
-      expect.objectContaining({
-        query: expect.objectContaining({ page: 2, limit: 4 }),
-      }),
-    )
+    expect(lastPetsCall()?.[1]).toMatchObject({ query: { page: 2, limit: 4 } })
   })
 
   it('inicializa os filtros a partir da URL sem enviar filtros "Todos"', async () => {
@@ -61,13 +59,6 @@ describe('PetsPage - consulta e filtros', () => {
     await screen.findByRole('heading', { name: 'Luna' })
     await userEvent.setup().selectOptions(screen.getByLabelText('Filtrar por porte'), 'Médio')
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('size=M%C3%A9dio'))
-    await waitFor(() =>
-      expect(mocks.get).toHaveBeenLastCalledWith(
-        '/pets',
-        expect.objectContaining({
-          query: expect.objectContaining({ size: 'Médio' }),
-        }),
-      ),
-    )
+    await waitFor(() => expect(lastPetsCall()?.[1]).toMatchObject({ query: { size: 'Médio' } }))
   })
 })

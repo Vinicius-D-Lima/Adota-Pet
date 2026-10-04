@@ -1,18 +1,15 @@
 import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
+import { useFavorite } from '../hooks/useFavorites'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
 
-interface PetDetailPageProps {
-  favorites: string[]
-  onFavorite: (petId: string) => void
-}
-
-export function PetDetailPage({ favorites, onFavorite }: PetDetailPageProps) {
+export function PetDetailPage() {
   const { petId } = useParams()
   const location = useLocation()
   const petQuery = usePet(petId)
+  const { isFavorite, toggle, isPending: isFavoritePending } = useFavorite(petId ?? '')
   const backTo = (location.state as { from?: string } | null)?.from ?? '/pets'
 
   if (petQuery.isPending)
@@ -53,7 +50,6 @@ export function PetDetailPage({ favorites, onFavorite }: PetDetailPageProps) {
   }
 
   const pet = petQuery.data
-  const isFavorite = favorites.includes(pet.id)
   const petGallery = pet.gallery?.length ? pet.gallery : [pet.image]
   const gallery = [petGallery[0], petGallery[1] ?? petGallery[0], petGallery[2] ?? petGallery[0]]
 
@@ -82,7 +78,9 @@ export function PetDetailPage({ favorites, onFavorite }: PetDetailPageProps) {
                 </div>
                 <button
                   className={isFavorite ? 'favorite-label active' : 'favorite-label'}
-                  onClick={() => onFavorite(pet.id)}
+                  onClick={toggle}
+                  aria-pressed={isFavorite}
+                  aria-busy={isFavoritePending}
                 >
                   <Heart size={19} fill={isFavorite ? 'currentColor' : 'none'} />{' '}
                   {isFavorite ? 'Favoritado' : 'Favoritar'}
