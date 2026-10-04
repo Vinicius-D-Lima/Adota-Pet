@@ -47,6 +47,19 @@ describe('GET /pets', () => {
     expect(combined.body.data.every((p) => p.species === 'Gato' && p.sex === 'Fêmea')).toBe(true)
   })
 
+  it('aceita parâmetro repetido como "um dos valores", também com sort=distance', async () => {
+    const plain = await request(app).get('/pets?size=Pequeno&size=Médio')
+    expect(plain.status).toBe(200)
+    expect(plain.body.total).toBeGreaterThan(0)
+    const sizes = new Set(plain.body.data.map((p) => p.size))
+    expect([...sizes].every((size) => ['Pequeno', 'Médio'].includes(size))).toBe(true)
+
+    const byDistance = await request(app).get('/pets?size=Pequeno&size=Médio&sort=distance')
+    expect(byDistance.body.total).toBe(plain.body.total)
+    const km = byDistance.body.data.map((p) => p.distanceKm)
+    expect(km).toEqual([...km].sort((a, b) => a - b))
+  })
+
   it('pagina e informa o total', async () => {
     const res = await request(app).get('/pets').query({ page: 2, limit: 4 })
     expect(res.body.data).toHaveLength(2)

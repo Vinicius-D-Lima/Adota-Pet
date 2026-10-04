@@ -24,6 +24,12 @@ describe('buildUrl', () => {
     )
   })
 
+  it('serializa listas como parâmetro repetido', () => {
+    expect(buildUrl('/pets', { size: ['Pequeno', 'Médio'], sex: [], q: null })).toBe(
+      '/api/pets?size=Pequeno&size=M%C3%A9dio',
+    )
+  })
+
   it('respeita VITE_API_URL', () => {
     vi.stubEnv('VITE_API_URL', 'https://api.exemplo.com/v1/')
     expect(buildUrl('pets')).toBe('https://api.exemplo.com/v1/pets')

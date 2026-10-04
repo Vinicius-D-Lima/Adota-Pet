@@ -47,6 +47,13 @@ export function calculateCompatibility(pet: Pet, profile: ProfileDraft): Compati
       good: 'Sua experiência anterior ajuda na adaptação e nos cuidados.',
       attention: 'Como será seu primeiro pet, uma rede de apoio será importante no início.',
     },
+    {
+      ok: !(pet.energy === 'Alta' && profile.dailyTime === 'Até 1 hora'),
+      good: profile.dailyTime
+        ? `Seu tempo disponível (${profile.dailyTime.toLowerCase()}) é compatível com a rotina de ${pet.name}.`
+        : `Seu tempo disponível ainda não foi informado; ${pet.name} não exige uma rotina específica.`,
+      attention: `${pet.name} tem energia alta e pode precisar de mais tempo do que ${profile.dailyTime.toLowerCase()} por dia.`,
+    },
   ]
   const matched = checks.filter((item) => item.ok).length
   const score = Math.round((matched / checks.length) * 100)

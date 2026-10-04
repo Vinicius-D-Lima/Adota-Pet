@@ -178,8 +178,9 @@ export function createApp({
             .filter((v) => typeof v === 'string')
             .join(' ')
             .toLowerCase()
-          const exact = Object.entries(filters).every(
-            ([key, value]) => String(pet[key]) === String(value),
+          // Parâmetro repetido (?size=A&size=B) significa "um dos valores".
+          const exact = Object.entries(filters).every(([key, value]) =>
+            [value].flat().some((item) => String(pet[key]) === String(item)),
           )
           return exact && (!term || text.includes(term))
         })

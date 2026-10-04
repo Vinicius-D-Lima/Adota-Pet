@@ -7,7 +7,7 @@ export type PetSort = 'recent' | 'name' | 'distance'
 export interface PetFilters {
   search?: string
   species?: string
-  size?: string
+  size?: string[]
   sex?: string
   sort?: PetSort
   limit?: number
@@ -26,7 +26,7 @@ export function usePets(filters: PetFilters = {}) {
         query: {
           search: filters.search || undefined,
           species: filters.species || undefined,
-          size: filters.size || undefined,
+          size: filters.size?.length ? filters.size : undefined,
           sex: filters.sex || undefined,
           sort: filters.sort ?? 'recent',
           limit: filters.limit,
