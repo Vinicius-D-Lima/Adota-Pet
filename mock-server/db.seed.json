@@ -181,6 +181,12 @@
   ],
   "profile": {
     "name": "Luquinhas Ferreira",
+    "cpf": "52998224725",
+    "birthDate": "1995-05-20",
+    "email": "demo@adotapet.local",
+    "phone": "11987654321",
+    "zipCode": "01310100",
+    "address": "Avenida Paulista, 1000 - Bela Vista, São Paulo - SP",
     "housing": "Apartamento",
     "hasOutdoorArea": false,
     "dailyTime": "2 a 3 horas",
