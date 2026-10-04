@@ -2,6 +2,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } fro
 import type { CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
+import { NotFoundState } from '../components/NotFoundState'
 import { useAdopterProfile } from '../hooks/useAdopterProfile'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
@@ -17,15 +18,23 @@ export function CompatibilityPage() {
   }
   if (petQuery.isError) {
     const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
+    if (notFound) {
+      return (
+        <NotFoundState
+          title="Pet não encontrado"
+          message="Este pet não está mais disponível ou o endereço está incorreto."
+          to="/pets"
+          linkLabel="Ver outros pets"
+        />
+      )
+    }
     return (
       <div className="app-feedback error" role="alert">
         <div>
-          <p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>
-          {!notFound && (
-            <button className="button ghost" onClick={() => void petQuery.refetch()}>
-              Tentar novamente
-            </button>
-          )}
+          <p>Não foi possível carregar o pet.</p>
+          <button className="button ghost" onClick={() => void petQuery.refetch()}>
+            Tentar novamente
+          </button>
         </div>
       </div>
     )
@@ -79,7 +88,7 @@ export function CompatibilityPage() {
               Compatibilidade {result.level.toLowerCase()}
             </span>
             <div className="mini-pet">
-              <img src={pet.image} alt={pet.name} />
+              <img src={pet.image} alt={pet.name} width={48} height={48} loading="lazy" />
               <span>
                 <strong>{pet.name}</strong>
                 <small>

@@ -62,7 +62,9 @@ export function RequestsPage() {
               const { pet } = request
               return (
                 <article className="request-card" key={request.id}>
-                  {pet && <img src={pet.image} alt={pet.name} />}
+                  {pet && (
+                    <img src={pet.image} alt={pet.name} width={145} height={110} loading="lazy" />
+                  )}
                   <div className="request-main">
                     <div className="request-topline">
                       <div>
