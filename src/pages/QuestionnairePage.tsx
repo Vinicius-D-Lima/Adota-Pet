@@ -1,12 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { Field } from '../components/UI'
 import {
   adoptionRequestKeys,
   fetchAdoptionRequests,
+  useActiveRequestForPet,
   useCreateAdoptionRequest,
 } from '../hooks/useAdoptionRequests'
 import { usePet } from '../hooks/usePets'
@@ -61,6 +62,7 @@ export function QuestionnairePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createRequest = useCreateAdoptionRequest()
+  const activeRequest = useActiveRequestForPet(petId)
   const [form, setForm] = useState<QuestionnaireAnswers>(initialForm)
   const [errors, setErrors] = useState<FieldErrors<FieldName>>({})
   const [submitError, setSubmitError] = useState<ReactNode>('')
@@ -82,6 +84,10 @@ export function QuestionnairePage() {
       </div>
     )
   }
+
+  // Só bloqueia quem ainda não tentou enviar: depois de um envio com sucesso a própria solicitação
+  // nova passa a ser "ativa" e a navegação para /enviada não pode ser atropelada por este redirecionamento.
+  if (activeRequest && createRequest.isIdle) return <Navigate to="/solicitacoes" replace />
 
   const pet = petQuery.data
 

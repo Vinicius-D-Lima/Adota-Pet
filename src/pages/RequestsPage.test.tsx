@@ -40,36 +40,137 @@ describe('RequestsPage', () => {
     renderWithProviders(<RequestsPage />)
 
     await screen.findByText('SOL-1042')
-    const button = screen.queryByRole('button', { name: /cancelar/i })
+    const button = screen.queryByRole('button', { name: 'Cancelar' })
     expect(Boolean(button)).toBe(visible)
   })
 
-  it('cancela com POST transitions { to: CANCELADA } e recarrega a lista', async () => {
-    getMock
-      .mockResolvedValueOnce(list(makeRequest({ status: 'Enviada' })))
-      .mockResolvedValue(list(makeRequest({ status: 'Cancelada' })))
-    postMock.mockResolvedValue(makeRequest({ status: 'Cancelada' }))
-    renderWithProviders(<RequestsPage />)
-    const user = userEvent.setup()
+  describe('cancelamento com confirmação', () => {
+    const cancelButton = () => screen.getByRole('button', { name: 'Cancelar' })
+    const dialog = () => screen.getByRole('dialog')
 
-    await user.click(await screen.findByRole('button', { name: /cancelar/i }))
+    async function openDialog(status: 'Enviada' | 'Em análise' = 'Enviada') {
+      getMock.mockResolvedValue(list(makeRequest({ status })))
+      renderWithProviders(<RequestsPage />)
+      const user = userEvent.setup()
+      await user.click(await screen.findByRole('button', { name: 'Cancelar' }))
+      return user
+    }
 
-    expect(postMock).toHaveBeenCalledWith('/requests/SOL-1042/transitions', { to: 'CANCELADA' })
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /cancelar/i })).not.toBeInTheDocument(),
-    )
-    expect(screen.getByText('Cancelada')).toBeInTheDocument()
-  })
+    it('"Cancelar" abre o modal acessível sem enviar nada', async () => {
+      await openDialog()
 
-  it('409 ao cancelar mostra mensagem clara', async () => {
-    getMock.mockResolvedValue(list(makeRequest({ status: 'Enviada' })))
-    postMock.mockRejectedValue(new ApiError(409, 'Não é possível cancelar'))
-    renderWithProviders(<RequestsPage />)
-    const user = userEvent.setup()
+      expect(dialog()).toHaveAttribute('aria-modal', 'true')
+      expect(dialog()).toHaveAccessibleName(/cancelar a solicitação de /i)
+      expect(dialog()).toHaveTextContent('Essa ação não pode ser desfeita.')
+      expect(screen.getByRole('button', { name: 'Voltar' })).toHaveFocus()
+      expect(postMock).not.toHaveBeenCalled()
+    })
 
-    await user.click(await screen.findByRole('button', { name: /cancelar/i }))
+    it('"Voltar" fecha sem cancelar e devolve o foco ao botão de origem', async () => {
+      const user = await openDialog()
+      await user.click(screen.getByRole('button', { name: 'Voltar' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/não pode mais ser cancelada/i)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(postMock).not.toHaveBeenCalled()
+      expect(cancelButton()).toHaveFocus()
+    })
+
+    it('Esc fecha sem cancelar', async () => {
+      const user = await openDialog()
+      await user.keyboard('{Escape}')
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(postMock).not.toHaveBeenCalled()
+      expect(cancelButton()).toHaveFocus()
+    })
+
+    it('clique fora fecha sem cancelar, e clique dentro não fecha', async () => {
+      const user = await openDialog()
+      await user.click(dialog())
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+      await user.click(dialog().parentElement as HTMLElement)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(postMock).not.toHaveBeenCalled()
+    })
+
+    it('prende o foco dentro do modal com Tab e Shift+Tab', async () => {
+      const user = await openDialog()
+      const back = screen.getByRole('button', { name: 'Voltar' })
+      const confirm = screen.getByRole('button', { name: 'Cancelar solicitação' })
+
+      await user.tab()
+      expect(confirm).toHaveFocus()
+      await user.tab()
+      expect(back).toHaveFocus()
+      await user.tab({ shift: true })
+      expect(confirm).toHaveFocus()
+    })
+
+    it('confirmar cancela com POST transitions { to: CANCELADA } e recarrega a lista', async () => {
+      getMock
+        .mockResolvedValueOnce(list(makeRequest({ status: 'Enviada' })))
+        .mockResolvedValue(list(makeRequest({ status: 'Cancelada' })))
+      postMock.mockResolvedValue(makeRequest({ status: 'Cancelada' }))
+      renderWithProviders(<RequestsPage />)
+      const user = userEvent.setup()
+
+      await user.click(await screen.findByRole('button', { name: 'Cancelar' }))
+      await user.click(screen.getByRole('button', { name: 'Cancelar solicitação' }))
+
+      expect(postMock).toHaveBeenCalledWith('/requests/SOL-1042/transitions', {
+        to: 'CANCELADA',
+      })
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(screen.queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument()
+      expect(screen.getByText('Cancelada')).toBeInTheDocument()
+      // O botão de origem some com o status; o foco vai para o cartão da solicitação.
+      expect(document.getElementById('request-SOL-1042')).toHaveFocus()
+    })
+
+    it('trava os botões e ignora Esc enquanto a requisição está em andamento', async () => {
+      getMock.mockResolvedValue(list(makeRequest({ status: 'Enviada' })))
+      postMock.mockReturnValue(new Promise(() => {}))
+      renderWithProviders(<RequestsPage />)
+      const user = userEvent.setup()
+
+      await user.click(await screen.findByRole('button', { name: 'Cancelar' }))
+      await user.click(screen.getByRole('button', { name: 'Cancelar solicitação' }))
+
+      expect(screen.getByRole('button', { name: 'Cancelar solicitação' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Voltar' })).toBeDisabled()
+      await user.keyboard('{Escape}')
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(postMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('409 ao cancelar fecha o modal e mostra mensagem clara', async () => {
+      getMock.mockResolvedValue(list(makeRequest({ status: 'Enviada' })))
+      postMock.mockRejectedValue(new ApiError(409, 'Não é possível cancelar'))
+      renderWithProviders(<RequestsPage />)
+      const user = userEvent.setup()
+
+      await user.click(await screen.findByRole('button', { name: 'Cancelar' }))
+      await user.click(screen.getByRole('button', { name: 'Cancelar solicitação' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não pode mais ser cancelada/i)
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('falha de rede ao cancelar fecha o modal e mostra a mensagem genérica', async () => {
+      getMock.mockResolvedValue(list(makeRequest({ status: 'Enviada' })))
+      postMock.mockRejectedValue(ApiError.network())
+      renderWithProviders(<RequestsPage />)
+      const user = userEvent.setup()
+
+      await user.click(await screen.findByRole('button', { name: 'Cancelar' }))
+      await user.click(screen.getByRole('button', { name: 'Cancelar solicitação' }))
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Não foi possível cancelar a solicitação. Tente novamente.',
+      )
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
   })
 
   it('renderiza solicitação cujo pet veio null', async () => {

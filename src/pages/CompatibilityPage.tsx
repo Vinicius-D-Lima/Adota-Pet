@@ -1,8 +1,10 @@
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ActiveRequestNotice } from '../components/ActiveRequestNotice'
 import { FlowSteps } from '../components/FlowSteps'
 import { useAdopterProfile } from '../hooks/useAdopterProfile'
+import { useActiveRequestForPet } from '../hooks/useAdoptionRequests'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
@@ -11,6 +13,7 @@ export function CompatibilityPage() {
   const { petId } = useParams()
   const petQuery = usePet(petId)
   const profileQuery = useAdopterProfile()
+  const activeRequest = useActiveRequestForPet(petId)
 
   if (petQuery.isPending || profileQuery.isPending) {
     return <div className="app-feedback">Carregando compatibilidade...</div>
@@ -156,10 +159,13 @@ export function CompatibilityPage() {
               <Link className="button ghost" to={`/pets/${pet.id}`}>
                 Rever detalhes
               </Link>
-              <Link className="button primary" to={`/pets/${pet.id}/questionario`}>
-                Continuar para o questionário <ArrowRight size={18} />
-              </Link>
+              {!activeRequest && (
+                <Link className="button primary" to={`/pets/${pet.id}/questionario`}>
+                  Continuar para o questionário <ArrowRight size={18} />
+                </Link>
+              )}
             </div>
+            {activeRequest && <ActiveRequestNotice request={activeRequest} petName={pet.name} />}
           </div>
         </div>
       </section>
