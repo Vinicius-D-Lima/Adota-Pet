@@ -56,7 +56,12 @@ export function HomePage() {
           >
             <div className="hero-photo-frame">
               {heroPet ? (
-                <img src={heroPet.image} alt={`${heroPet.name}, pet disponível para adoção`} />
+                <img
+                  src={heroPet.image}
+                  alt={`${heroPet.name}, pet disponível para adoção`}
+                  width={560}
+                  height={620}
+                />
               ) : (
                 <div className="hero-image-skeleton skeleton-block" />
               )}

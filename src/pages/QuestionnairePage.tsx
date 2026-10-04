@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
+import { NotFoundState } from '../components/NotFoundState'
 import { Field } from '../components/UI'
 import {
   adoptionRequestKeys,
@@ -69,15 +70,23 @@ export function QuestionnairePage() {
   if (petQuery.isPending) return <div className="app-feedback">Carregando questionário...</div>
   if (petQuery.isError) {
     const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
+    if (notFound) {
+      return (
+        <NotFoundState
+          title="Pet não encontrado"
+          message="Este pet não está mais disponível ou o endereço está incorreto."
+          to="/pets"
+          linkLabel="Ver outros pets"
+        />
+      )
+    }
     return (
       <div className="app-feedback error" role="alert">
         <div>
-          <p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>
-          {!notFound && (
-            <button className="button ghost" onClick={() => void petQuery.refetch()}>
-              Tentar novamente
-            </button>
-          )}
+          <p>Não foi possível carregar o pet.</p>
+          <button className="button ghost" onClick={() => void petQuery.refetch()}>
+            Tentar novamente
+          </button>
         </div>
       </div>
     )
@@ -299,7 +308,7 @@ export function QuestionnairePage() {
             </div>
           </form>
           <aside className="pet-side-summary">
-            <img src={pet.image} alt={pet.name} />
+            <img src={pet.image} alt={pet.name} width={400} height={300} loading="lazy" />
             <div>
               <span className="eyebrow">Sua solicitação</span>
               <h2>{pet.name}</h2>

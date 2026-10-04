@@ -1,8 +1,18 @@
 import { Check, ClipboardList, Heart, Home } from 'lucide-react'
-import { Link, Navigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
+import { NotFoundState } from '../components/NotFoundState'
 import { useAdoptionRequest } from '../hooks/useAdoptionRequests'
 import { ApiError } from '../lib/ApiError'
+
+const RequestNotFound = () => (
+  <NotFoundState
+    title="Solicitação não encontrada"
+    message="Esta solicitação não existe mais ou o endereço está incorreto."
+    to="/solicitacoes"
+    linkLabel="Ver minhas solicitações"
+  />
+)
 
 export function RequestSuccessPage() {
   const { requestId } = useParams()
@@ -14,7 +24,7 @@ export function RequestSuccessPage() {
 
   if (requestQuery.isError) {
     if (requestQuery.error instanceof ApiError && requestQuery.error.statusCode === 404) {
-      return <Navigate to="/solicitacoes" replace />
+      return <RequestNotFound />
     }
     return (
       <div className="app-feedback error" role="alert">
@@ -25,7 +35,7 @@ export function RequestSuccessPage() {
 
   const request = requestQuery.data
   const pet = request.pet
-  if (!pet) return <Navigate to="/solicitacoes" replace />
+  if (!pet) return <RequestNotFound />
 
   return (
     <div className="page-surface success-page">
@@ -42,7 +52,7 @@ export function RequestSuccessPage() {
             pode acompanhar cada atualização pelo AdotaPet.
           </p>
           <div className="success-pet">
-            <img src={pet.image} alt={pet.name} />
+            <img src={pet.image} alt={pet.name} width={52} height={52} loading="lazy" />
             <div>
               <strong>{pet.name}</strong>
               <span>

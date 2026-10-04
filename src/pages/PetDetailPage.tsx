@@ -63,9 +63,28 @@ export function PetDetailPage() {
         <div className="detail-grid">
           <div>
             <div className="gallery">
-              <img className="gallery-main" src={gallery[0]} alt={`${pet.name} em destaque`} />
-              <img src={gallery[1]} alt={`${pet.name} em outro momento`} />
-              <img src={gallery[2]} alt={`${pet.name} brincando`} />
+              <img
+                className="gallery-main"
+                src={gallery[0]}
+                alt={`${pet.name} em destaque`}
+                width={800}
+                height={420}
+                loading="lazy"
+              />
+              <img
+                src={gallery[1]}
+                alt={`${pet.name} em outro momento`}
+                width={400}
+                height={205}
+                loading="lazy"
+              />
+              <img
+                src={gallery[2]}
+                alt={`${pet.name} brincando`}
+                width={400}
+                height={205}
+                loading="lazy"
+              />
             </div>
             <div className="detail-content">
               <div className="detail-title-row">

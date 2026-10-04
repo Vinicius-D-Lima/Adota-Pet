@@ -36,10 +36,16 @@ describe('RequestSuccessPage', () => {
     expect(getMock).toHaveBeenCalledWith('/requests/SOL-1042')
   })
 
-  it('redireciona para /solicitacoes quando a API responde 404', async () => {
+  it('mostra "Solicitação não encontrada" com link para a listagem quando a API responde 404', async () => {
     getMock.mockRejectedValue(new ApiError(404, 'Solicitação não encontrada'))
     setup()
 
-    expect(await screen.findByText('Minhas solicitações')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Solicitação não encontrada' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ver minhas solicitações' })).toHaveAttribute(
+      'href',
+      '/solicitacoes',
+    )
   })
 })
