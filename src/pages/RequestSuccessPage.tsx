@@ -4,6 +4,7 @@ import { FlowSteps } from '../components/FlowSteps'
 import { NotFoundState } from '../components/NotFoundState'
 import { useAdoptionRequest } from '../hooks/useAdoptionRequests'
 import { ApiError } from '../lib/ApiError'
+import { formatRequestDate } from '../utils/formatRequestDate'
 
 const RequestNotFound = () => (
   <NotFoundState
@@ -59,7 +60,7 @@ export function RequestSuccessPage() {
                 {pet.breed} · {pet.ageLabel}
               </span>
             </div>
-            <span>Enviada agora</span>
+            <span>Enviada em {formatRequestDate(request.date)}</span>
           </div>
           <div className="next-steps">
             <h2>O que acontece agora?</h2>

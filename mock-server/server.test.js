@@ -71,6 +71,17 @@ describe('GET /pets', () => {
     expect(res.body.details.map((d) => d.field)).toEqual(['page', 'sort'])
   })
 
+  it('retorna 400 apontando parâmetros desconhecidos em vez de lista vazia', async () => {
+    const res = await request(app).get('/pets').query({ lat: 1, lng: 2, species: 'Gato' })
+    expectError(res, 400, 'Bad Request')
+    expect(res.body.details).toEqual([
+      { field: 'lat', message: 'Parâmetro desconhecido' },
+      { field: 'lng', message: 'Parâmetro desconhecido' },
+    ])
+    const city = await request(app).get('/pets').query({ city: 'Nowhere' })
+    expect(city.status).toBe(200)
+  })
+
   it('retorna 404 no formato padrão para pet inexistente', async () => {
     expectError(await request(app).get('/pets/nao-existe'), 404, 'Not Found')
     const found = await request(app).get('/pets/luna')
@@ -86,6 +97,80 @@ describe('perfil', () => {
     expect(put.body.isComplete).toBe(false)
     const after = await request(app).get('/me/adopter-profile')
     expect(after.body.isComplete).toBe(false)
+  })
+
+  it('seed novo devolve isComplete true e missingFields vazio', async () => {
+    const res = await request(app).get('/me/adopter-profile')
+    expect(res.body).toMatchObject({ isComplete: true, missingFields: [] })
+    expect(res.body.cpf).toBe('52998224725')
+  })
+
+  it('persiste os campos novos e guarda cpf, phone e zipCode só com dígitos', async () => {
+    const put = await request(app).put('/me/adopter-profile').send({
+      cpf: '111.444.777-35',
+      phone: '(21) 98888-7777',
+      zipCode: '20040-020',
+      birthDate: '1990-01-15',
+      email: 'novo@exemplo.com',
+      address: 'Rua das Flores, 123',
+    })
+    expect(put.status).toBe(200)
+    const get = await request(app).get('/me/adopter-profile')
+    expect(get.body).toMatchObject({
+      cpf: '11144477735',
+      phone: '21988887777',
+      zipCode: '20040020',
+      birthDate: '1990-01-15',
+      email: 'novo@exemplo.com',
+      address: 'Rua das Flores, 123',
+      isComplete: true,
+    })
+  })
+
+  it('rejeita cpf inválido, menor de 18, e-mail inválido e CEP curto com details por campo', async () => {
+    const year = new Date().getFullYear() - 10
+    const res = await request(app)
+      .put('/me/adopter-profile')
+      .send({ cpf: '111.111.111-11', birthDate: `${year}-01-01`, email: 'x', zipCode: '123' })
+    expectError(res, 400, 'Bad Request')
+    expect(res.body.details.map((d) => d.field)).toEqual(['cpf', 'birthDate', 'email', 'zipCode'])
+    const badDigit = await request(app).put('/me/adopter-profile').send({ cpf: '52998224726' })
+    expect(badDigit.body.details[0].field).toBe('cpf')
+    const badDate = await request(app).put('/me/adopter-profile').send({ birthDate: '1990-02-31' })
+    expect(badDate.body.details[0].field).toBe('birthDate')
+  })
+
+  it('rejeita valor fora do enum, telefone, endereço e nome curtos', async () => {
+    const res = await request(app)
+      .put('/me/adopter-profile')
+      .send({ housing: 'Castelo', phone: '123', address: 'abc', name: 'Jo' })
+    expectError(res, 400, 'Bad Request')
+    expect(res.body.details.map((d) => d.field)).toEqual(['name', 'phone', 'address', 'housing'])
+  })
+
+  it('apagar um campo torna isComplete false e o lista em missingFields', async () => {
+    await request(app).put('/me/adopter-profile').send({ cpf: '', address: '' })
+    const res = await request(app).get('/me/adopter-profile')
+    expect(res.body.isComplete).toBe(false)
+    expect(res.body.missingFields).toEqual(['cpf', 'address'])
+  })
+
+  it('sobe com db antigo: perfil incompleto com os campos novos em missingFields', async () => {
+    const old = seed()
+    for (const key of ['cpf', 'birthDate', 'email', 'phone', 'zipCode', 'address'])
+      delete old.profile[key]
+    const oldApp = createApp({ db: old, delay: 0 })
+    const res = await request(oldApp).get('/me/adopter-profile')
+    expect(res.status).toBe(200)
+    expect(res.body.isComplete).toBe(false)
+    expect(res.body.missingFields).toEqual([
+      'cpf',
+      'birthDate',
+      'email',
+      'phone',
+      'zipCode',
+      'address',
+    ])
   })
 
   it('rejeita tipos inválidos com 400', async () => {
@@ -141,6 +226,7 @@ describe('POST /requests', () => {
     await request(app).put('/me/adopter-profile').send({ name: '' })
     const res = await request(app).post('/requests').send({ petId: 'luna', answers: validAnswers })
     expectError(res, 422, 'Unprocessable Entity')
+    expect(res.body.details).toEqual([expect.objectContaining({ field: 'name' })])
   })
 
   it('retorna 409 para solicitação ativa duplicada no mesmo pet', async () => {
