@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { useAdoptionRequest } from '../hooks/useAdoptionRequests'
 import { ApiError } from '../lib/ApiError'
+import { formatRequestDate } from '../utils/formatRequestDate'
 
 export function RequestSuccessPage() {
   const { requestId } = useParams()
@@ -49,7 +50,7 @@ export function RequestSuccessPage() {
                 {pet.breed} · {pet.ageLabel}
               </span>
             </div>
-            <span>Enviada agora</span>
+            <span>Enviada em {formatRequestDate(request.date)}</span>
           </div>
           <div className="next-steps">
             <h2>O que acontece agora?</h2>

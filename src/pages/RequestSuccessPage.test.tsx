@@ -5,6 +5,7 @@ import { api } from '../lib/api'
 import { ApiError } from '../lib/ApiError'
 import { makeRequest, requestPet } from '../test/fixtures/requests'
 import { renderWithProviders } from '../test/renderWithProviders'
+import { formatRequestDate } from '../utils/formatRequestDate'
 import { RequestSuccessPage } from './RequestSuccessPage'
 
 vi.mock('../lib/api', () => ({ api: { get: vi.fn() } }))
@@ -34,6 +35,17 @@ describe('RequestSuccessPage', () => {
       await screen.findByText(new RegExp(`com a equipe que cuida de ${requestPet.name}`, 'i')),
     ).toBeInTheDocument()
     expect(getMock).toHaveBeenCalledWith('/requests/SOL-1042')
+  })
+
+  it('mostra a data real da solicitação em vez de um texto fixo', async () => {
+    getMock.mockResolvedValue(makeRequest({ date: '2026-09-08T12:00:00.000Z' }))
+    setup()
+
+    expect(
+      await screen.findByText(`Enviada em ${formatRequestDate('2026-09-08T12:00:00.000Z')}`),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('Enviada agora')).not.toBeInTheDocument()
+    expect(screen.getByText(/set\.? de 2026/)).toBeInTheDocument()
   })
 
   it('redireciona para /solicitacoes quando a API responde 404', async () => {
