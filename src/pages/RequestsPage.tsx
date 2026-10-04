@@ -75,7 +75,9 @@ export function RequestsPage() {
                   key={request.id}
                   tabIndex={-1}
                 >
-                  {pet && <img src={pet.image} alt={pet.name} />}
+                  {pet && (
+                    <img src={pet.image} alt={pet.name} width={145} height={110} loading="lazy" />
+                  )}
                   <div className="request-main">
                     <div className="request-topline">
                       <div>
