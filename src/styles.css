@@ -1427,6 +1427,13 @@ input {
 .app-feedback.error {
   color: #a33f2d;
 }
+.feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 18px;
+}
 .check-field {
   display: flex;
   align-items: flex-start;
@@ -1739,6 +1746,50 @@ input {
 }
 .text-button.danger {
   color: #a55039;
+}
+.button.danger {
+  background: #a55039;
+  color: white;
+}
+.button.danger:hover {
+  background: #8c4130;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 42, 31, 0.5);
+}
+.modal {
+  width: min(440px, 100%);
+  padding: 28px;
+  border-radius: 20px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+.modal h2 {
+  margin: 0 0 10px;
+}
+.modal p {
+  margin: 0;
+  color: var(--muted);
+}
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+.info-note a {
+  font-weight: 700;
+  text-decoration: underline;
+}
+.active-request-notice p {
+  font-size: 14px;
 }
 .icon-button {
   width: 38px;
@@ -2267,6 +2318,61 @@ input {
   font-size: 12px;
   font-weight: 600;
   box-shadow: var(--shadow);
+}
+
+.size-toggle {
+  display: inline-flex;
+  gap: 6px;
+}
+.size-toggle button {
+  height: 43px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: white;
+  color: var(--green-800);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.size-toggle button.active {
+  background: var(--green-100);
+  border-color: var(--green-700);
+  color: var(--green-700);
+}
+.preferences-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 14px;
+}
+.preferences-row small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.health-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+.health-badges li {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 99px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--green-700);
+  background: var(--green-100);
+}
+.health-badges li.pending {
+  color: #98620c;
+  background: #fff0d3;
 }
 
 @media (prefers-reduced-motion: reduce) {

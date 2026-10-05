@@ -13,17 +13,104 @@ const MAX_LIMIT = 100
 const ACTIVE_STATUSES = ['Enviada', 'Em análise', 'Aprovada']
 const CANCELLABLE_STATUSES = ['Enviada', 'Em análise']
 const SORTS = ['recent', 'name', 'distance']
-const PROFILE_REQUIRED = [
+const PETS_QUERY_PARAMS = ['search', 'page', 'limit', 'sort', 'species', 'size', 'sex', 'city']
+const PROFILE_ENUMS = {
+  housing: ['Apartamento', 'Casa', 'Chácara ou sítio'],
+  dailyTime: ['Até 1 hora', '2 a 3 horas', 'Mais de 3 horas'],
+  activityLevel: ['Tranquilo', 'Moderado', 'Ativo'],
+  experience: ['Primeiro pet', 'Já tive pets', 'Tenho bastante experiência'],
+  preferredSpecies: ['Sem preferência', 'Cachorro', 'Gato'],
+  preferredSize: ['Sem preferência', 'Pequeno', 'Pequeno ou médio', 'Médio ou grande'],
+}
+const PROFILE_BOOLEANS = ['hasOutdoorArea', 'hasChildren', 'hasOtherPets', 'acceptsSpecialCare']
+const PROFILE_DIGITS = ['cpf', 'phone', 'zipCode']
+const PROFILE_FIELDS = [
   'name',
+  'cpf',
+  'birthDate',
+  'email',
+  'phone',
+  'zipCode',
+  'address',
   'housing',
+  'hasOutdoorArea',
   'dailyTime',
   'activityLevel',
+  'hasChildren',
+  'hasOtherPets',
   'experience',
+  'acceptsSpecialCare',
   'preferredSpecies',
   'preferredSize',
 ]
-const PROFILE_BOOLEANS = ['hasOutdoorArea', 'hasChildren', 'hasOtherPets', 'acceptsSpecialCare']
-const PROFILE_STRINGS = [...PROFILE_REQUIRED]
+
+const digitsOnly = (value) => value.replace(/\D/g, '')
+
+function isValidCpf(value) {
+  const cpf = digitsOnly(value)
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false
+  const calculateDigit = (length) => {
+    const sum = cpf
+      .slice(0, length)
+      .split('')
+      .reduce((total, digit, index) => total + Number(digit) * (length + 1 - index), 0)
+    const remainder = (sum * 10) % 11
+    return remainder === 10 ? 0 : remainder
+  }
+  return calculateDigit(9) === Number(cpf[9]) && calculateDigit(10) === Number(cpf[10])
+}
+
+function isAdult(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) return false
+  const [year, month, day] = match.slice(1).map(Number)
+  const birthDate = new Date(year, month - 1, day)
+  if (
+    birthDate.getFullYear() !== year ||
+    birthDate.getMonth() !== month - 1 ||
+    birthDate.getDate() !== day
+  )
+    return false
+  const today = new Date()
+  let age = today.getFullYear() - year
+  if (today.getMonth() < month - 1 || (today.getMonth() === month - 1 && today.getDate() < day))
+    age -= 1
+  return age >= 18
+}
+
+/** Mesmas regras do profileSchema do frontend: [validação, mensagem]. */
+const PROFILE_RULES = {
+  name: [(v) => v.trim().length >= 3, 'Informe seu nome completo.'],
+  cpf: [isValidCpf, 'Informe um CPF válido.'],
+  birthDate: [isAdult, 'É necessário ter pelo menos 18 anos.'],
+  email: [(v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()), 'Informe um e-mail válido.'],
+  phone: [(v) => /^\d{10,11}$/.test(digitsOnly(v)), 'Informe um telefone com DDD.'],
+  zipCode: [(v) => /^\d{8}$/.test(digitsOnly(v)), 'Informe um CEP válido.'],
+  address: [(v) => v.trim().length >= 5, 'Informe seu endereço.'],
+}
+
+/** Retorna a mensagem de erro do campo ou null quando o valor é válido. */
+function profileFieldError(key, value) {
+  if (PROFILE_BOOLEANS.includes(key)) {
+    return typeof value === 'boolean' ? null : `${key} deve ser verdadeiro ou falso`
+  }
+  if (typeof value !== 'string') return `${key} deve ser um texto`
+  if (PROFILE_ENUMS[key]) {
+    return PROFILE_ENUMS[key].includes(value)
+      ? null
+      : `${key} deve ser um de: ${PROFILE_ENUMS[key].join(', ')}`
+  }
+  const [isValid, message] = PROFILE_RULES[key]
+  return isValid(value) ? null : message
+}
+
+/** Campos exigidos pelo frontend que estão ausentes ou inválidos no perfil salvo. */
+const missingProfileFields = (profile) =>
+  PROFILE_FIELDS.filter((key) => {
+    const value = profile[key]
+    return value === undefined || value === null || profileFieldError(key, value) !== null
+  })
+
 const STATUS_NAMES = {
   400: 'Bad Request',
   404: 'Not Found',
@@ -84,10 +171,8 @@ export function createApp({
   })
   const getProfile = () => {
     const profile = store.get('profile').value() ?? {}
-    return {
-      ...profile,
-      isComplete: PROFILE_REQUIRED.every((key) => !isBlank(profile[key])),
-    }
+    const missingFields = missingProfileFields(profile)
+    return { ...profile, isComplete: missingFields.length === 0, missingFields }
   }
 
   const presentPet = (pet) => {
@@ -129,24 +214,24 @@ export function createApp({
         { field: 'body', message: 'Envie um objeto JSON' },
       ])
     }
-    for (const key of PROFILE_STRINGS) {
-      if (body[key] !== undefined && typeof body[key] !== 'string') {
-        details.push({ field: key, message: `${key} deve ser um texto` })
+    const normalized = {}
+    for (const key of PROFILE_FIELDS) {
+      if (body[key] === undefined) continue
+      // String vazia limpa o campo (o formulário usa '' para "não preenchido").
+      if (body[key] === '' && !PROFILE_BOOLEANS.includes(key)) {
+        normalized[key] = ''
+        continue
       }
-    }
-    for (const key of PROFILE_BOOLEANS) {
-      if (body[key] !== undefined && typeof body[key] !== 'boolean') {
-        details.push({
-          field: key,
-          message: `${key} deve ser verdadeiro ou falso`,
-        })
+      const message = profileFieldError(key, body[key])
+      if (message) {
+        details.push({ field: key, message })
+        continue
       }
+      normalized[key] = PROFILE_DIGITS.includes(key) ? digitsOnly(body[key]) : body[key]
     }
     if (details.length) return sendError(res, 400, 'Validação falhou', details)
 
-    const allowed = [...PROFILE_STRINGS, ...PROFILE_BOOLEANS]
-    const next = { ...store.get('profile').value(), userId: DEMO_USER_ID }
-    for (const key of allowed) if (body[key] !== undefined) next[key] = body[key]
+    const next = { ...store.get('profile').value(), ...normalized, userId: DEMO_USER_ID }
     store.set('profile', next).write()
     res.json(getProfile())
   })
@@ -154,7 +239,9 @@ export function createApp({
   // --- Pets -------------------------------------------------------------------
   server.get('/pets', (req, res, next) => {
     const { search, page, limit, sort = 'recent', ...filters } = req.query
-    const details = []
+    const details = Object.keys(req.query)
+      .filter((key) => !PETS_QUERY_PARAMS.includes(key))
+      .map((field) => ({ field, message: 'Parâmetro desconhecido' }))
     const pageNumber = positiveInt(page, 'page', details, 1)
     const limitNumber = positiveInt(limit, 'limit', details, DEFAULT_LIMIT)
     if (limitNumber > MAX_LIMIT)
@@ -178,8 +265,9 @@ export function createApp({
             .filter((v) => typeof v === 'string')
             .join(' ')
             .toLowerCase()
-          const exact = Object.entries(filters).every(
-            ([key, value]) => String(pet[key]) === String(value),
+          // Parâmetro repetido (?size=A&size=B) significa "um dos valores".
+          const exact = Object.entries(filters).every(([key, value]) =>
+            [value].flat().some((item) => String(pet[key]) === String(item)),
           )
           return exact && (!term || text.includes(term))
         })
@@ -239,7 +327,15 @@ export function createApp({
 
     if (!findPet(petId)) return sendError(res, 404, 'Pet não encontrado')
     if (!getProfile().isComplete) {
-      return sendError(res, 422, 'Complete seu perfil de adotante antes de solicitar uma adoção')
+      return sendError(
+        res,
+        422,
+        'Complete seu perfil de adotante antes de solicitar uma adoção',
+        getProfile().missingFields.map((field) => ({
+          field,
+          message: 'Campo obrigatório do perfil não preenchido ou inválido',
+        })),
+      )
     }
     const duplicate = myRequests().some(
       (request) => request.petId === petId && ACTIVE_STATUSES.includes(request.status),

@@ -56,14 +56,15 @@ export function HomePage() {
           >
             <div className="hero-photo-frame">
               {heroPet ? (
-                <img src={heroPet.image} alt={`${heroPet.name}, pet disponível para adoção`} />
+                <img
+                  src={heroPet.image}
+                  alt={`${heroPet.name}, pet disponível para adoção`}
+                  width={560}
+                  height={620}
+                />
               ) : (
                 <div className="hero-image-skeleton skeleton-block" />
               )}
-              {/*<div className="hero-pet-card">
-                {/*<div><strong>Luna</strong><span>2 anos · São Paulo</span></div>
-                <span className="match-badge"><Sparkles size={14} /> 100% match</span>
-              </div>*/}
             </div>
             <div className="floating-note note-one">
               <HeartHandshake size={18} />

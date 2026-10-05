@@ -2,6 +2,7 @@ import { Heart, MapPin } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useFavorite } from '../hooks/useFavorites'
 import type { Pet } from '../types'
+import { HealthBadges } from './HealthBadges'
 
 interface PetCardProps {
   pet: Pet
@@ -17,7 +18,14 @@ export function PetCard({ pet, headingLevel: Heading = 'h3' }: PetCardProps) {
   return (
     <article className="pet-card">
       <div className="pet-image-wrap">
-        <img src={pet.image} alt={`${pet.name}, ${pet.breed}`} className="pet-image" />
+        <img
+          src={pet.image}
+          alt={`${pet.name}, ${pet.breed}`}
+          className="pet-image"
+          width={600}
+          height={500}
+          loading="lazy"
+        />
         <button
           className={isFavorite ? 'favorite active' : 'favorite'}
           onClick={toggle}
@@ -41,6 +49,7 @@ export function PetCard({ pet, headingLevel: Heading = 'h3' }: PetCardProps) {
         <p className="pet-meta">
           {pet.breed} · {pet.ageLabel} · {pet.size}
         </p>
+        <HealthBadges pet={pet} />
         <p className="pet-summary">{pet.summary}</p>
         <div className="trait-list">
           {pet.traits.slice(0, 3).map((trait) => (

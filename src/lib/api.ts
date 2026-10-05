@@ -1,6 +1,9 @@
 import { ApiError } from './ApiError'
 
-type Query = Record<string, string | number | boolean | undefined | null>
+type QueryValue = string | number | boolean | undefined | null
+
+/** Listas viram parâmetro repetido: `size=Pequeno&size=Médio`. */
+type Query = Record<string, QueryValue | QueryValue[]>
 
 interface RequestOptions extends Omit<RequestInit, 'body' | 'method'> {
   /** Objeto/array serializado como JSON, ou FormData enviado como multipart. */
@@ -18,7 +21,9 @@ export function buildUrl(path: string, query?: Query): string {
   const url = `${getBaseUrl()}/${path.replace(/^\/+/, '')}`
   const params = new URLSearchParams()
   for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined && value !== null) params.append(key, String(value))
+    for (const item of Array.isArray(value) ? value : [value]) {
+      if (item !== undefined && item !== null) params.append(key, String(item))
+    }
   }
   const search = params.toString()
   return search ? `${url}?${search}` : url
