@@ -7,10 +7,13 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react'
+import { useMemo } from 'react'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
 import { PetGrid } from '../components/PetGrid'
 import { Button, Card, Container, Eyebrow, LinkButton, TextLink } from '../components/ui'
+import { useAdopterProfile } from '../hooks/useAdopterProfile'
 import { usePets } from '../hooks/usePets'
+import { calculateCompatibility } from '../utils/calculateCompatibility'
 
 const sectionTitle = 'mb-0 text-[clamp(34px,4vw,48px)] leading-[1.14]'
 const floatingNote =
@@ -38,9 +41,23 @@ const steps: [LucideIcon, string, string, string][] = [
 ]
 
 export function HomePage() {
-  const petsQuery = usePets({ sort: 'recent', limit: 3 })
-  const pets = petsQuery.data?.pages[0]?.data ?? []
+  const petsQuery = usePets({ sort: 'recent', limit: 12 })
+  const profileQuery = useAdopterProfile()
+  const pets = useMemo(() => petsQuery.data?.pages[0]?.data ?? [], [petsQuery.data])
   const heroPet = pets[0]
+  const recommendedPets = useMemo(() => {
+    if (!profileQuery.data?.isComplete) {
+      return []
+    }
+
+    return [...pets]
+      .map((pet) => ({
+        pet,
+        result: calculateCompatibility(pet, profileQuery.data.profile),
+      }))
+      .sort((a, b) => b.result.score - a.result.score)
+      .slice(0, 3)
+  }, [pets, profileQuery.data])
 
   return (
     <>
@@ -130,6 +147,36 @@ export function HomePage() {
         </Container>
       </section>
 
+      <section className="bg-white py-[68px] md:py-[92px]">
+        <Container>
+          <div className="mb-9">
+            <Eyebrow>Compatibilidade</Eyebrow>
+            <h2 className={sectionTitle}>Recomendados para você</h2>
+          </div>
+
+          {!profileQuery.isPending && !profileQuery.data?.isComplete && (
+            <Card className="p-6">
+              <h3 className="mb-3 text-xl">Complete seu perfil para receber recomendações</h3>
+              <p className="text-muted">Ainda faltam algumas informações importantes:</p>
+              <ul className="mb-5 mt-3 list-disc pl-5">
+                {profileQuery.data?.missingFields.map((field) => (
+                  <li key={field}>{field}</li>
+                ))}
+              </ul>
+              <LinkButton to="/perfil">Completar perfil</LinkButton>
+            </Card>
+          )}
+
+          {profileQuery.data?.isComplete && (
+            <PetGrid>
+              {recommendedPets.map(({ pet }) => (
+                <PetCard key={pet.id} pet={pet} />
+              ))}
+            </PetGrid>
+          )}
+        </Container>
+      </section>
+
       <section className="bg-cream py-[68px] md:py-[92px]">
         <Container>
           <div className="mb-9 flex flex-col items-start gap-[30px] md:flex-row md:items-end md:justify-between">
@@ -159,7 +206,7 @@ export function HomePage() {
             </div>
           ) : pets.length ? (
             <PetGrid className="max-md:[&>*:nth-child(3)]:hidden">
-              {pets.map((pet) => (
+              {pets.slice(0, 3).map((pet) => (
                 <PetCard key={pet.id} pet={pet} />
               ))}
             </PetGrid>
