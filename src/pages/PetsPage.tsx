@@ -144,7 +144,6 @@ export function PetsPage() {
           <label className="search-box">
             <Search size={20} />
             <Input
-              aria-label="Buscar pets por nome, raça ou cidade"
               value={searchInput}
               onChange={(event) =>
                 setSearchState({ source: searchFromUrl, value: event.target.value })
@@ -221,14 +220,8 @@ export function PetsPage() {
           </div>
         </div>
         <div className="results-bar">
-          <p role="status">
-            {petsQuery.isPending ? (
-              'Buscando pets...'
-            ) : (
-              <>
-                <strong>{total}</strong> {total === 1 ? 'pet encontrado' : 'pets encontrados'}
-              </>
-            )}
+          <p>
+            <strong>{total}</strong> {total === 1 ? 'pet encontrado' : 'pets encontrados'}
           </p>
           <span>
             {sort === 'distance'
@@ -240,7 +233,7 @@ export function PetsPage() {
         </div>
 
         {petsQuery.isPending ? (
-          <div className="pet-grid" role="status" aria-label="Carregando pets">
+          <div className="pet-grid" aria-label="Carregando pets">
             {Array.from({ length: PAGE_SIZE }, (_, index) => (
               <PetCardSkeleton key={index} />
             ))}
@@ -257,7 +250,7 @@ export function PetsPage() {
           <>
             <div className="pet-grid">
               {pets.map((pet) => (
-                <PetCard key={pet.id} pet={pet} headingLevel="h2" />
+                <PetCard key={pet.id} pet={pet} />
               ))}
               {petsQuery.isFetchingNextPage &&
                 Array.from({ length: PAGE_SIZE }, (_, index) => (

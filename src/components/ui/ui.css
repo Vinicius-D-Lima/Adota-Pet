@@ -20,12 +20,12 @@
   transform: translateY(-2px);
 }
 .button.primary {
-  background: var(--coral-dark);
+  background: var(--coral);
   color: white;
   box-shadow: 0 10px 22px rgba(210, 95, 59, 0.22);
 }
 .button.primary:hover {
-  background: var(--coral-darker);
+  background: var(--coral-dark);
 }
 .button.secondary {
   background: white;
@@ -75,7 +75,7 @@
   box-shadow: 0 0 0 3px rgba(47, 98, 76, 0.09);
 }
 .field small {
-  color: var(--muted);
+  color: #8b9791;
   font-size: 9px;
   text-align: right;
   margin-bottom: 18px;
