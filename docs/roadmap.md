@@ -23,6 +23,10 @@ O trabalho existe e foi validado, mas foi desfeito pelo PR #82 e **não está na
 
 Critérios de aceite da issue, para conferência: fluxo completo só com teclado e foco sempre visível; menu mobile que abre e fecha pelo teclado e anuncia o estado; sem animações com "reduzir movimento"; axe sem violações críticas ou sérias; contraste AA em todas as combinações.
 
+## Pendências em relação ao Plano de Projeto
+
+A lista completa está em [Escopo prometido x entregue](escopo-prometido-vs-entregue.md#5-pendências-em-relação-ao-plano). Em resumo: acessibilidade completa, decisão sobre o cancelamento de `Aprovada` (REQ-18), registro do teste de aceite e da demonstração, lições aprendidas e versão 1.1 do plano.
+
 ## Frontend ainda possível com o mock
 
 - **#33, Recomendações "Para você":** a issue prevê recomendações e compatibilidade vindas da API. Sem backend, pode ser adaptada para usar a compatibilidade já calculada no cliente (`calculateCompatibility`) sobre a lista de pets, ou para uma rota nova no mock (por exemplo `GET /me/matches`).
@@ -32,7 +36,7 @@ Critérios de aceite da issue, para conferência: fluxo completo só com teclado
 ## Limitações conhecidas
 
 - **Usuário único e sem autenticação:** tudo fala do usuário `demo`.
-- **Estados da solicitação:** `Aprovada` e `Recusada` existem no contrato e na interface, mas o mock não leva uma solicitação até eles.
+- **Estados da solicitação:** `Aprovada` e `Recusada` existem no contrato e na interface, mas o mock não leva uma solicitação até eles; só o seed traz exemplos.
 - **Distância:** calculada a partir de coordenadas fixas, sem geolocalização do navegador.
 - **Imagens:** os pets usam URLs externas; não há upload.
 - **Compatibilidade:** calculada no cliente, com critérios de peso igual e sem ajuste de pesos.

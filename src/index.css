@@ -1,0 +1,51 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'DM Sans', sans-serif;
+  --font-display: 'Fraunces', serif;
+
+  --color-forest-900: #193d30;
+  --color-forest-800: #224c3a;
+  --color-forest-700: #2f624c;
+  --color-forest-100: #e6eee7;
+  --color-forest-50: #f2f6f1;
+  --color-coral: #e97852;
+  --color-coral-dark: #cd5e3b;
+  --color-coral-pale: #fbeae2;
+  --color-cream: #fbf6eb;
+  --color-ink: #21312a;
+  --color-muted: #66756e;
+  --color-line: #dfe5df;
+  --color-page: #fbfaf6;
+
+  --shadow-soft: 0 18px 50px rgb(27 58 45 / 0.1);
+}
+
+@layer base {
+  /* O preflight usa 1.5; o desenho do site parte do espaçamento natural da fonte. */
+  html {
+    line-height: normal;
+  }
+  h1,
+  h2,
+  h3 {
+    color: var(--color-ink);
+    font-weight: 700;
+  }
+  h1,
+  h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.035em;
+  }
+  /* O preflight zera as margens; os títulos e parágrafos mantêm o respiro padrão do navegador. */
+  h1 {
+    margin-bottom: 0.67em;
+  }
+  h2 {
+    margin-bottom: 0.83em;
+  }
+  h3,
+  p {
+    margin-bottom: 1em;
+  }
+}

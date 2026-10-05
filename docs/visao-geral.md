@@ -26,7 +26,8 @@ Além do fluxo, o frontend tem:
 - bloqueio de solicitação duplicada **antes** de a pessoa preencher o questionário;
 - confirmação antes de cancelar uma solicitação;
 - selos de vacinação e castração, critério de tempo disponível na compatibilidade e atalho "Usar minhas preferências";
-- biblioteca de componentes reutilizáveis;
+- biblioteca de componentes reutilizáveis, estilizada com **Tailwind CSS**, e formulários com **react-hook-form** + Zod;
+- dados de demonstração prontos: 12 pets e uma solicitação de cada status;
 - lint, formatação, testes automatizados e CI.
 
 ## O que ficou fora (por decisão)
@@ -79,3 +80,9 @@ O json-server é um processo Node separado. Hospedagens estáticas (Vercel, Netl
 ## Quem fez o quê
 
 O projeto foi construído em PRs pequenos sobre a branch `dev`, por duas pessoas (Vinicius e Igor), com apoio do Claude Code. O histórico completo, com autoria e datas, está em [Histórico](historico.md).
+
+## Manuais e comparação com o plano
+
+- [Manual de instalação](manual-de-instalacao.md), [Manual de operação](manual-de-operacao.md) e [Manual do usuário](manual-do-usuario.md).
+- [Plano de Projeto](plano-de-projeto.md) (versão 1.0, como entregue pela equipe) e [Escopo prometido x entregue](escopo-prometido-vs-entregue.md), com as divergências justificadas.
+- [Prototipagem e refinamento](prototipagem-e-refinamento.md).

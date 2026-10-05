@@ -55,10 +55,10 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 - **Decisão:** `React.lazy` + `Suspense` em todas as páginas.
 - **Consequência:** o bundle inicial diminuiu de cerca de 384 kB para 330 kB. Imagens fora da primeira dobra usam `loading="lazy"`, e todas têm `width` e `height`.
 
-## 11. Biblioteca de componentes própria, sem framework de UI
+## 11. Biblioteca de componentes própria, sem framework de componentes
 
-- **Decisão:** componentes em `src/components/ui` com props consistentes (`variant`, `size`, `loading`, `invalid`...), em CSS puro. A variante `ghost` foi renomeada para `secondary`.
-- **Consequência:** telas mais curtas e uniformes, sem dependência nova. O custo foi converter todas as páginas, e quem escrever código novo deve usar os componentes (e não classes `button ...` soltas).
+- **Decisão:** componentes em `src/components/ui` com props consistentes (`variant`, `size`, `loading`, `invalid`...). A variante `ghost` foi renomeada para `secondary`. Na época os estilos eram CSS puro; hoje são Tailwind (ver decisão 16).
+- **Consequência:** telas mais curtas e uniformes. O custo foi converter todas as páginas, e quem escrever código novo deve usar os componentes (e não classes `button ...` soltas).
 
 ## 12. A compatibilidade é calculada no cliente
 
@@ -79,6 +79,23 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 
 - **Contexto:** os PRs passavam no CI sozinhos, mas o CI roda sobre o resultado da mescla com a `dev`, e alguns problemas só apareciam depois que outro PR entrava (por exemplo, um teste que usava um pet com solicitação ativa e passou a ser redirecionado).
 - **Decisão:** simular a sequência de mesclas, resolver os conflitos e rodar a bateria completa antes de mesclar, em vez de descobrir no CI.
+
+## 16. Tailwind CSS em vez de CSS puro
+
+- **Contexto:** o plano da disciplina pede um framework CSS de mercado, e o projeto tinha cerca de 2.400 linhas de CSS global em `styles.css` e `ui.css`. O pedido não dizia qual framework usar.
+- **Decisão:** **Tailwind CSS 4**, pelo plugin `@tailwindcss/vite`, com as cores, as fontes e a sombra do projeto como tokens no `@theme` (`src/index.css`) e `tailwind-merge` para combinar classes. Alternativas consideradas: Bootstrap e Chakra UI (trazem componentes e visual prontos, o que obrigaria a refazer o layout; o Tailwind permite manter o desenho atual).
+- **Consequência:** `styles.css` e `ui.css` deixaram de existir; as classes ficam no JSX; os breakpoints antigos (720, 820 e 920 px) foram consolidados em `md` (768 px) e `lg` (1024 px). Como o Tailwind redefine alguns padrões do navegador (altura de linha, margens de títulos e parágrafos), a camada `base` de `index.css` os restaura para manter o visual. A escolha é uma **suposição de quem executou a tarefa** e pode ser trocada em outra rodada.
+
+## 17. react-hook-form nos formulários
+
+- **Decisão:** o questionário e o perfil usam react-hook-form com `zodResolver`, reaproveitando os schemas Zod do contrato. `watch` foi trocado por `useWatch` (compatível com a regra `react-hooks/incompatible-library`), e as mensagens de "perfil atualizado" e de falha do envio são derivadas da identidade dos valores do formulário, e não de `useEffect`.
+- **Consequência:** a validação por campo e o estado `isDirty` vêm da biblioteca, e `src/utils/zodFieldErrors.ts` foi removido. Erros 400 do servidor entram com `setError`. Os campos de seleção de sim ou não usam `setValueAs`, que também é aplicado aos valores iniciais e por isso aceita booleanos.
+
+## 18. Seed com 12 pets e uma solicitação de cada status
+
+- **Contexto:** o mock não leva uma solicitação a `Aprovada` ou `Recusada`, então esses status não podiam ser vistos em demonstração.
+- **Decisão:** o `db.seed.json` passou de 6 para 12 pets (a segunda página da listagem ficou útil) e traz as solicitações `SOL-1039` (`Aprovada`), `SOL-1040` (`Recusada`), `SOL-1041` (`Cancelada`) e `SOL-1042` (`Em análise`).
+- **Consequência:** a próxima solicitação criada é a `SOL-1043`; os testes do servidor passaram a conferir o seed (12 pets, um de cada status e o 409 ao cancelar uma `Aprovada`).
 
 ## Decisão pendente: acessibilidade
 

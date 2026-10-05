@@ -1,8 +1,9 @@
 import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Button, EmptyState, Input, PageIntro, Select } from '../components/ui'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
+import { PetGrid } from '../components/PetGrid'
+import { Button, Container, EmptyState, PageIntro, PageSurface, Select, cx } from '../components/ui'
 import { useAdopterProfile } from '../hooks/useAdopterProfile'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePets, type PetSort } from '../hooks/usePets'
@@ -132,18 +133,21 @@ export function PetsPage() {
     setSearchParams({}, { replace: false })
   }
 
+  const filterSelect = 'h-[43px] w-auto rounded-[9px] bg-white py-0 pl-3 pr-9'
+
   return (
-    <div className="page-surface">
-      <section className="container page-section">
+    <PageSurface>
+      <Container as="section" className="pb-[90px] pt-[35px] md:pt-[54px]">
         <PageIntro
           eyebrow="Encontre seu companheiro"
           title="Pets esperando por você"
           description="Explore, filtre e conheça histórias. O encontro certo pode estar mais perto do que você imagina."
         />
-        <div className="filter-panel">
-          <label className="search-box">
+        <div className="rounded-[18px] border border-line bg-white p-[18px] shadow-[0_10px_34px_rgba(30,60,48,0.06)]">
+          <label className="flex h-[49px] items-center gap-2.5 rounded-[11px] border border-line px-3.5 text-muted focus-within:border-forest-700 focus-within:ring-[3px] focus-within:ring-forest-700/10">
             <Search size={20} />
-            <Input
+            <input
+              className="min-w-0 flex-1 border-0 bg-transparent text-ink outline-0"
               value={searchInput}
               onChange={(event) =>
                 setSearchState({ source: searchFromUrl, value: event.target.value })
@@ -151,11 +155,12 @@ export function PetsPage() {
               placeholder="Busque por nome, raça ou cidade"
             />
           </label>
-          <div className="select-filters">
-            <span className="filter-title">
+          <div className="flex flex-wrap items-center gap-2.5 pt-3.5">
+            <span className="mr-[5px] flex w-full items-center gap-[7px] text-xs font-bold text-muted sm:w-auto">
               <SlidersHorizontal size={17} /> Filtrar por
             </span>
             <Select
+              className={filterSelect}
               value={species}
               onChange={(event) => setFilter('species', event.target.value)}
               aria-label="Filtrar por espécie"
@@ -164,12 +169,17 @@ export function PetsPage() {
               <option>Cachorro</option>
               <option>Gato</option>
             </Select>
-            <div className="size-toggle" role="group" aria-label="Filtrar por porte">
+            <div className="inline-flex gap-1.5" role="group" aria-label="Filtrar por porte">
               {allowed.size.map((option) => (
                 <button
                   key={option}
                   type="button"
-                  className={size.includes(option) ? 'active' : undefined}
+                  className={cx(
+                    'h-[43px] cursor-pointer rounded-[9px] border px-3.5 text-xs font-bold',
+                    size.includes(option)
+                      ? 'border-forest-700 bg-forest-100 text-forest-700'
+                      : 'border-line bg-white text-forest-800',
+                  )}
                   aria-pressed={size.includes(option)}
                   onClick={() => toggleSize(option)}
                 >
@@ -178,6 +188,7 @@ export function PetsPage() {
               ))}
             </div>
             <Select
+              className={filterSelect}
               value={sex}
               onChange={(event) => setFilter('sex', event.target.value)}
               aria-label="Filtrar por sexo"
@@ -187,6 +198,7 @@ export function PetsPage() {
               <option>Macho</option>
             </Select>
             <Select
+              className={filterSelect}
               value={sort}
               onChange={(event) => setFilter('sort', event.target.value)}
               aria-label="Ordenar pets"
@@ -196,12 +208,12 @@ export function PetsPage() {
               <option value="distance">Mais próximos</option>
             </Select>
             {hasFilters && (
-              <Button variant="text" className="clear-filter" onClick={clearFilters}>
+              <Button variant="text" className="sm:ml-auto" onClick={clearFilters}>
                 <X size={15} /> Limpar
               </Button>
             )}
           </div>
-          <div className="preferences-row">
+          <div className="mt-3.5 flex flex-wrap items-center gap-3">
             <Button
               variant="secondary"
               onClick={applyPreferences}
@@ -210,7 +222,7 @@ export function PetsPage() {
             >
               <Sparkles size={16} /> Usar minhas preferências
             </Button>
-            <small id="preferences-help">
+            <small id="preferences-help" className="text-[11px] text-muted">
               {profileQuery.isPending
                 ? 'Carregando seu perfil...'
                 : hasPreferences
@@ -219,8 +231,8 @@ export function PetsPage() {
             </small>
           </div>
         </div>
-        <div className="results-bar">
-          <p>
+        <div className="mb-[18px] mt-7 flex items-center justify-between text-[13px] text-muted">
+          <p className="mb-0 text-ink">
             <strong>{total}</strong> {total === 1 ? 'pet encontrado' : 'pets encontrados'}
           </p>
           <span>
@@ -233,11 +245,11 @@ export function PetsPage() {
         </div>
 
         {petsQuery.isPending ? (
-          <div className="pet-grid" aria-label="Carregando pets">
+          <PetGrid aria-label="Carregando pets">
             {Array.from({ length: PAGE_SIZE }, (_, index) => (
               <PetCardSkeleton key={index} />
             ))}
-          </div>
+          </PetGrid>
         ) : petsQuery.isError ? (
           <EmptyState
             title="Não foi possível carregar os pets"
@@ -248,7 +260,7 @@ export function PetsPage() {
           </EmptyState>
         ) : pets.length ? (
           <>
-            <div className="pet-grid">
+            <PetGrid>
               {pets.map((pet) => (
                 <PetCard key={pet.id} pet={pet} />
               ))}
@@ -256,9 +268,9 @@ export function PetsPage() {
                 Array.from({ length: PAGE_SIZE }, (_, index) => (
                   <PetCardSkeleton key={`next-${index}`} />
                 ))}
-            </div>
+            </PetGrid>
             {petsQuery.hasNextPage && (
-              <div className="load-more-row">
+              <div className="flex justify-center pt-[34px]">
                 <Button
                   variant="secondary"
                   onClick={() => void petsQuery.fetchNextPage()}
@@ -278,7 +290,7 @@ export function PetsPage() {
             <Button onClick={clearFilters}>Limpar filtros</Button>
           </EmptyState>
         )}
-      </section>
-    </div>
+      </Container>
+    </PageSurface>
   )
 }

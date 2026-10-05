@@ -1,3 +1,5 @@
-/** Junta nomes de classe ignorando valores vazios. */
+import { twMerge } from 'tailwind-merge'
+
+/** Junta nomes de classe ignorando valores vazios e resolvendo conflitos do Tailwind (vence o último). */
 export const cx = (...names: Array<string | false | null | undefined>) =>
-  names.filter(Boolean).join(' ')
+  twMerge(names.filter(Boolean).join(' '))

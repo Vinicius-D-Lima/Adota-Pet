@@ -1,15 +1,36 @@
-import { AlertTriangle, Check, Info, Save } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { AlertTriangle, Check, Save } from 'lucide-react'
+import { type ReactNode, useState } from 'react'
+import {
+  type FieldErrors,
+  type RegisterOptions,
+  type Resolver,
+  type UseFormRegister,
+  useForm,
+  useWatch,
+} from 'react-hook-form'
+import {
+  Button,
+  Container,
+  Feedback,
+  Field,
+  InfoNote,
+  Input,
+  PageIntro,
+  PageSurface,
+  SectionHeading,
+  Select,
+  cardClass,
+  cx,
+} from '../components/ui'
 import {
   type AdopterProfile,
   useAdopterProfile,
   useSaveAdopterProfile,
 } from '../hooks/useAdopterProfile'
-import { Button, Field, Input, PageIntro, Select } from '../components/ui'
 import { ApiError } from '../lib/ApiError'
 import { profileSchema } from '../schemas/profileSchema'
-import type { ProfileDraft } from '../types'
-import { getZodFieldErrors, type FieldErrors } from '../utils/zodFieldErrors'
+import type { Profile, ProfileDraft } from '../types'
 
 const SAVE_ERROR_MESSAGE = 'Não foi possível salvar. Seus dados foram mantidos.'
 
@@ -35,19 +56,99 @@ const profileFieldLabels: Record<keyof ProfileDraft, string> = {
 
 const isProfileField = (field: string): field is keyof ProfileDraft => field in profileFieldLabels
 
+const controlClass = 'min-h-[50px] px-4 py-3.5'
+const selectClass = `${controlClass} pr-[42px]`
+
+const yesNoOptions: RegisterOptions<ProfileDraft> = {
+  // As opções "Sim"/"Não" viram booleanos; a opção vazia continua '' (ainda não respondido).
+  // O valor inicial também passa por aqui, já como booleano.
+  setValueAs: (value: unknown) =>
+    typeof value === 'boolean' ? value : value === 'true' ? true : value === 'false' ? false : '',
+}
+
+type NameOf = keyof ProfileDraft
+
+interface FormApi {
+  register: UseFormRegister<ProfileDraft>
+  errors: FieldErrors<ProfileDraft>
+}
+
+function ChoiceField({
+  form,
+  name,
+  label,
+  options,
+}: {
+  form: FormApi
+  name: NameOf
+  label: string
+  options: string[]
+}) {
+  return (
+    <Field label={label} error={form.errors[name]?.message as string | undefined} tight>
+      <Select className={selectClass} invalid={Boolean(form.errors[name])} {...form.register(name)}>
+        <option value="" disabled>
+          Selecione uma opção
+        </option>
+        {options.map((option) => (
+          <option key={option}>{option}</option>
+        ))}
+      </Select>
+    </Field>
+  )
+}
+
+function YesNoField({ form, name, label }: { form: FormApi; name: NameOf; label: string }) {
+  return (
+    <Field label={label} error={form.errors[name]?.message as string | undefined} tight>
+      <Select
+        className={selectClass}
+        invalid={Boolean(form.errors[name])}
+        {...form.register(name, yesNoOptions)}
+      >
+        <option value="" disabled>
+          Selecione uma opção
+        </option>
+        <option value="false">Não</option>
+        <option value="true">Sim</option>
+      </Select>
+    </Field>
+  )
+}
+
+function Notice({
+  tone,
+  children,
+  ...props
+}: {
+  tone: 'success' | 'warning'
+  children: ReactNode
+  role?: 'alert' | 'status'
+}) {
+  return (
+    <div
+      className={cx(
+        'mb-[18px] flex max-w-[860px] items-center gap-2 rounded-[10px] px-[15px] py-3 text-xs',
+        tone === 'success'
+          ? 'bg-forest-100 font-bold text-forest-700'
+          : 'bg-coral-pale text-[#a33f2d]',
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
 export function ProfilePage() {
   const profileQuery = useAdopterProfile()
 
   if (profileQuery.isPending) {
-    return <div className="app-feedback">Carregando seu perfil...</div>
+    return <Feedback>Carregando seu perfil...</Feedback>
   }
 
   if (profileQuery.isError) {
-    return (
-      <div className="app-feedback error" role="alert">
-        Não foi possível carregar seu perfil. Tente novamente.
-      </div>
-    )
+    return <Feedback error>Não foi possível carregar seu perfil. Tente novamente.</Feedback>
   }
 
   return <ProfileForm savedProfile={profileQuery.data} />
@@ -59,33 +160,46 @@ interface ProfileFormProps {
 
 function ProfileForm({ savedProfile }: ProfileFormProps) {
   const saveProfile = useSaveAdopterProfile()
-  const [draft, setDraft] = useState<ProfileDraft>(savedProfile.profile)
-  const [saved, setSaved] = useState(false)
+  // Guarda para qual versão do formulário a confirmação vale: editar qualquer campo a esconde.
+  const [savedFor, setSavedFor] = useState<unknown>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [errors, setErrors] = useState<FieldErrors<keyof ProfileDraft>>({})
 
-  const update = <K extends keyof ProfileDraft>(key: K, value: ProfileDraft[K]) => {
-    setDraft((current) => ({ ...current, [key]: value }))
-    setErrors((current) => ({ ...current, [key]: undefined }))
-    setSaved(false)
-  }
+  const {
+    register,
+    handleSubmit,
+    setError,
+    setValue,
+    control,
+    formState: { errors },
+  } = useForm<ProfileDraft, unknown, Profile>({
+    resolver: zodResolver(profileSchema) as unknown as Resolver<ProfileDraft, unknown, Profile>,
+    defaultValues: savedProfile.profile,
+  })
+  const draft = useWatch({ control }) as ProfileDraft
+  const form: FormApi = { register, errors }
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const saved = savedFor === draft
+
+  /** Campo numérico: aceita só dígitos e respeita o limite de tamanho. */
+  const digits = <N extends 'cpf' | 'phone' | 'zipCode'>(
+    name: N,
+    max: number,
+  ): RegisterOptions<ProfileDraft, N> => ({
+    onChange: (event) =>
+      // O tipo de `name` é só um dos três campos de texto; o valor é sempre uma string.
+      setValue(name as 'cpf', event.target.value.replace(/\D/g, '').slice(0, max), {
+        shouldDirty: true,
+      }),
+  })
+
+  const submit = handleSubmit(async (profile) => {
     if (saveProfile.isPending) return
-    const result = profileSchema.safeParse(draft)
-    setSaved(false)
+    setSavedFor(null)
     setSaveError(null)
 
-    if (!result.success) {
-      setErrors(getZodFieldErrors<keyof ProfileDraft>(result.error))
-      return
-    }
-
-    setErrors({})
     try {
-      await saveProfile.mutateAsync(result.data)
-      setSaved(true)
+      await saveProfile.mutateAsync(profile)
+      setSavedFor(draft)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (error) {
       if (error instanceof ApiError && error.statusCode === 400) {
@@ -93,13 +207,15 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
           isProfileField(field),
         )
         if (fieldErrors.length > 0) {
-          setErrors(Object.fromEntries(fieldErrors))
+          for (const [field, message] of fieldErrors) {
+            setError(field as NameOf, { type: 'server', message })
+          }
           return
         }
       }
       setSaveError(SAVE_ERROR_MESSAGE)
     }
-  }
+  })
 
   const profileEntries = Object.entries(profileFieldLabels) as Array<[keyof ProfileDraft, string]>
   const missingFields = profileEntries.filter(([key]) => {
@@ -113,399 +229,270 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
   )
 
   return (
-    <div className="page-surface">
-      <section className="container page-section profile-page">
+    <PageSurface>
+      <Container as="section" className="pb-[90px] pt-[35px] md:pt-[54px]">
         <PageIntro
+          className="mb-[22px]"
           eyebrow="Seu espaço no AdotaPet"
           title="Perfil do adotante"
           description="Essas informações são usadas para calcular sua compatibilidade e apoiar uma adoção responsável."
         />
         {saved && (
-          <div className="save-message">
+          <Notice tone="success" role="status">
             <Check size={18} /> Perfil atualizado. As próximas compatibilidades usarão estes dados.
-          </div>
+          </Notice>
         )}
         {saveError && (
-          <div className="save-message save-error" role="alert">
+          <Notice tone="warning" role="alert">
             <AlertTriangle size={18} /> {saveError}
-          </div>
+          </Notice>
         )}
         {!savedProfile.isComplete && (
-          <div className="save-message profile-incomplete" role="status">
+          <Notice tone="warning" role="status">
             <AlertTriangle size={18} />
-            <div>
+            <div className="font-medium">
               <strong>Seu perfil salvo está incompleto.</strong>
               {savedMissingFields.length > 0 && <> Complete: {savedMissingFields.join(', ')}.</>}
             </div>
-          </div>
+          </Notice>
         )}
-        <form className="profile-form" onSubmit={submit} noValidate>
-          <aside className="profile-aside">
-            <div className="profile-tracker">
-              <div className="profile-tracker-heading">
-                <h2>Acompanhe seu perfil</h2>
-                <p>Perfil {completionPercentage}% completo</p>
+        <form
+          className={cx(
+            cardClass,
+            'grid max-w-[990px] overflow-hidden md:grid-cols-[250px_minmax(0,1fr)]',
+          )}
+          onSubmit={submit}
+          noValidate
+        >
+          <aside className="border-b border-line bg-cream px-6 py-8 text-left md:border-b-0 md:border-r">
+            <div className="md:sticky md:top-[100px]">
+              <div>
+                <h2 className="mb-[5px] font-sans text-[17px]">Acompanhe seu perfil</h2>
+                <p className="mb-0 text-[11px] text-forest-700">
+                  Perfil {completionPercentage}% completo
+                </p>
               </div>
               <div
-                className="profile-progress"
+                className="mb-[22px] mt-3 h-[5px] overflow-hidden rounded-full bg-[#dce4de]"
                 role="progressbar"
                 aria-label="Completude do perfil"
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={completionPercentage}
               >
-                <span style={{ width: `${completionPercentage}%` }} />
+                <span
+                  className="block h-full bg-coral"
+                  style={{ width: `${completionPercentage}%` }}
+                />
               </div>
-              <div className="profile-missing" aria-live="polite">
+              <div className="mb-[22px]" aria-live="polite">
                 {missingFields.length > 0 ? (
                   <>
-                    <h3>
+                    <h3 className="mb-2.5 font-sans text-xs">
                       {missingFields.length === 1
                         ? 'Falta 1 campo'
                         : `Faltam ${missingFields.length} campos`}
                     </h3>
-                    <ul>
+                    <ul className="m-0 grid list-none gap-[7px] overflow-y-auto p-0 pr-[5px] md:max-h-[calc(100vh-410px)]">
                       {missingFields.map(([key, label]) => (
-                        <li key={key}>{label}</li>
+                        <li
+                          key={key}
+                          className="flex items-start gap-2 text-[10px] leading-[1.35] text-muted before:mt-1 before:size-1.5 before:shrink-0 before:rounded-full before:border before:border-coral before:content-['']"
+                        >
+                          {label}
+                        </li>
                       ))}
                     </ul>
                   </>
                 ) : (
-                  <p className="profile-complete">Todos os campos foram preenchidos.</p>
+                  <p className="mb-0 text-[11px] font-bold text-forest-700">
+                    Todos os campos foram preenchidos.
+                  </p>
                 )}
               </div>
-              <div className="info-note">
-                <Info size={17} />
-                <p>
+              <InfoNote>
+                <p className="mb-0">
                   Seus dados são compartilhados apenas com a organização quando você envia uma
                   solicitação.
                 </p>
-              </div>
+              </InfoNote>
             </div>
           </aside>
-          <div className="profile-fields">
+          <div className="px-[18px] py-[25px] md:p-8 [&>section+section]:mt-8 [&>section+section]:border-t [&>section+section]:border-line [&>section+section]:pt-7">
             <section>
-              <div className="form-section-heading">
-                <span>1</span>
-                <div>
-                  <h2>Informações pessoais</h2>
-                  <p>Dados de identificação e contato do responsável pela adoção.</p>
-                </div>
-              </div>
-              <div className="form-grid">
-                <Field label="Nome completo" error={errors.name} full>
+              <SectionHeading
+                number={1}
+                title="Informações pessoais"
+                description="Dados de identificação e contato do responsável pela adoção."
+              />
+              <div className="grid grid-cols-1 gap-[18px]">
+                <Field label="Nome completo" error={errors.name?.message} tight full>
                   <Input
-                    value={draft.name}
-                    onChange={(event) => update('name', event.target.value)}
-                    aria-invalid={Boolean(errors.name)}
+                    className={controlClass}
+                    invalid={Boolean(errors.name)}
                     placeholder="Digite seu nome completo"
                     autoComplete="name"
+                    {...register('name')}
                   />
                 </Field>
-                <Field label="CPF" error={errors.cpf}>
+                <Field label="CPF" error={errors.cpf?.message} tight>
                   <Input
-                    value={draft.cpf}
-                    onChange={(event) =>
-                      update('cpf', event.target.value.replace(/\D/g, '').slice(0, 11))
-                    }
-                    aria-invalid={Boolean(errors.cpf)}
+                    className={controlClass}
+                    invalid={Boolean(errors.cpf)}
                     placeholder="Ex.: 52998224725"
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={11}
                     autoComplete="off"
+                    {...register('cpf', digits('cpf', 11))}
                   />
                 </Field>
                 <Field
                   label="Data de nascimento"
-                  error={errors.birthDate}
+                  error={errors.birthDate?.message}
                   hint="É necessário ter pelo menos 18 anos."
+                  tight
                 >
                   <Input
+                    className={controlClass}
                     type="date"
-                    value={draft.birthDate}
-                    onChange={(event) => update('birthDate', event.target.value)}
-                    aria-invalid={Boolean(errors.birthDate)}
+                    invalid={Boolean(errors.birthDate)}
                     autoComplete="bday"
+                    {...register('birthDate')}
                   />
                 </Field>
-                <Field label="E-mail" error={errors.email}>
+                <Field label="E-mail" error={errors.email?.message} tight>
                   <Input
+                    className={controlClass}
                     type="email"
-                    value={draft.email}
-                    onChange={(event) => update('email', event.target.value)}
-                    aria-invalid={Boolean(errors.email)}
+                    invalid={Boolean(errors.email)}
                     placeholder="voce@exemplo.com"
                     autoComplete="email"
+                    {...register('email')}
                   />
                 </Field>
-                <Field label="Telefone/celular" error={errors.phone}>
+                <Field label="Telefone/celular" error={errors.phone?.message} tight>
                   <Input
+                    className={controlClass}
                     type="tel"
-                    value={draft.phone}
-                    onChange={(event) =>
-                      update('phone', event.target.value.replace(/\D/g, '').slice(0, 11))
-                    }
-                    aria-invalid={Boolean(errors.phone)}
+                    invalid={Boolean(errors.phone)}
                     placeholder="Ex.: 11999999999"
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={11}
                     autoComplete="tel"
+                    {...register('phone', digits('phone', 11))}
                   />
                 </Field>
-                <Field label="CEP" error={errors.zipCode}>
+                <Field label="CEP" error={errors.zipCode?.message} tight>
                   <Input
-                    value={draft.zipCode}
-                    onChange={(event) =>
-                      update('zipCode', event.target.value.replace(/\D/g, '').slice(0, 8))
-                    }
-                    aria-invalid={Boolean(errors.zipCode)}
+                    className={controlClass}
+                    invalid={Boolean(errors.zipCode)}
                     placeholder="Ex.: 01001000"
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={8}
                     autoComplete="postal-code"
+                    {...register('zipCode', digits('zipCode', 8))}
                   />
                 </Field>
-                <Field label="Endereço" error={errors.address} full>
+                <Field label="Endereço" error={errors.address?.message} tight full>
                   <Input
-                    value={draft.address}
-                    onChange={(event) => update('address', event.target.value)}
-                    aria-invalid={Boolean(errors.address)}
+                    className={controlClass}
+                    invalid={Boolean(errors.address)}
                     placeholder="Rua, número, bairro e cidade"
                     autoComplete="street-address"
+                    {...register('address')}
                   />
                 </Field>
               </div>
             </section>
 
             <section>
-              <div className="form-section-heading">
-                <span>2</span>
-                <div>
-                  <h2>Moradia e composição da casa</h2>
-                  <p>Conte como é o ambiente onde o pet viverá.</p>
-                </div>
-              </div>
-              <div className="form-grid">
-                <Field label="Tipo de moradia" error={errors.housing}>
-                  <Select
-                    value={draft.housing}
-                    onChange={(event) =>
-                      update('housing', event.target.value as ProfileDraft['housing'])
-                    }
-                    aria-invalid={Boolean(errors.housing)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Apartamento</option>
-                    <option>Casa</option>
-                    <option>Chácara ou sítio</option>
-                  </Select>
-                </Field>
-                <Field label="Área externa segura?" error={errors.hasOutdoorArea}>
-                  <Select
-                    value={draft.hasOutdoorArea === '' ? '' : draft.hasOutdoorArea ? 'Sim' : 'Não'}
-                    onChange={(event) =>
-                      update(
-                        'hasOutdoorArea',
-                        event.target.value === '' ? '' : event.target.value === 'Sim',
-                      )
-                    }
-                    aria-invalid={Boolean(errors.hasOutdoorArea)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Não</option>
-                    <option>Sim</option>
-                  </Select>
-                </Field>
-                <Field label="Há crianças na residência?" error={errors.hasChildren}>
-                  <Select
-                    value={draft.hasChildren === '' ? '' : draft.hasChildren ? 'Sim' : 'Não'}
-                    onChange={(event) =>
-                      update(
-                        'hasChildren',
-                        event.target.value === '' ? '' : event.target.value === 'Sim',
-                      )
-                    }
-                    aria-invalid={Boolean(errors.hasChildren)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Não</option>
-                    <option>Sim</option>
-                  </Select>
-                </Field>
-                <Field label="Já há outros pets?" error={errors.hasOtherPets}>
-                  <Select
-                    value={draft.hasOtherPets === '' ? '' : draft.hasOtherPets ? 'Sim' : 'Não'}
-                    onChange={(event) =>
-                      update(
-                        'hasOtherPets',
-                        event.target.value === '' ? '' : event.target.value === 'Sim',
-                      )
-                    }
-                    aria-invalid={Boolean(errors.hasOtherPets)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Não</option>
-                    <option>Sim</option>
-                  </Select>
-                </Field>
+              <SectionHeading
+                number={2}
+                title="Moradia e composição da casa"
+                description="Conte como é o ambiente onde o pet viverá."
+              />
+              <div className="grid grid-cols-1 gap-[18px]">
+                <ChoiceField
+                  form={form}
+                  name="housing"
+                  label="Tipo de moradia"
+                  options={['Apartamento', 'Casa', 'Chácara ou sítio']}
+                />
+                <YesNoField form={form} name="hasOutdoorArea" label="Área externa segura?" />
+                <YesNoField form={form} name="hasChildren" label="Há crianças na residência?" />
+                <YesNoField form={form} name="hasOtherPets" label="Já há outros pets?" />
               </div>
             </section>
 
             <section>
-              <div className="form-section-heading">
-                <span>3</span>
-                <div>
-                  <h2>Rotina e experiência</h2>
-                  <p>Isso nos ajuda a considerar energia, companhia e cuidados.</p>
-                </div>
-              </div>
-              <div className="form-grid">
-                <Field label="Tempo disponível por dia" error={errors.dailyTime}>
-                  <Select
-                    value={draft.dailyTime}
-                    onChange={(event) =>
-                      update('dailyTime', event.target.value as ProfileDraft['dailyTime'])
-                    }
-                    aria-invalid={Boolean(errors.dailyTime)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Até 1 hora</option>
-                    <option>2 a 3 horas</option>
-                    <option>Mais de 3 horas</option>
-                  </Select>
-                </Field>
-                <Field label="Nível de atividade" error={errors.activityLevel}>
-                  <Select
-                    value={draft.activityLevel}
-                    onChange={(event) =>
-                      update('activityLevel', event.target.value as ProfileDraft['activityLevel'])
-                    }
-                    aria-invalid={Boolean(errors.activityLevel)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Tranquilo</option>
-                    <option>Moderado</option>
-                    <option>Ativo</option>
-                  </Select>
-                </Field>
-                <Field label="Experiência com animais" error={errors.experience}>
-                  <Select
-                    value={draft.experience}
-                    onChange={(event) =>
-                      update('experience', event.target.value as ProfileDraft['experience'])
-                    }
-                    aria-invalid={Boolean(errors.experience)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Primeiro pet</option>
-                    <option>Já tive pets</option>
-                    <option>Tenho bastante experiência</option>
-                  </Select>
-                </Field>
-                <Field
+              <SectionHeading
+                number={3}
+                title="Rotina e experiência"
+                description="Isso nos ajuda a considerar energia, companhia e cuidados."
+              />
+              <div className="grid grid-cols-1 gap-[18px]">
+                <ChoiceField
+                  form={form}
+                  name="dailyTime"
+                  label="Tempo disponível por dia"
+                  options={['Até 1 hora', '2 a 3 horas', 'Mais de 3 horas']}
+                />
+                <ChoiceField
+                  form={form}
+                  name="activityLevel"
+                  label="Nível de atividade"
+                  options={['Tranquilo', 'Moderado', 'Ativo']}
+                />
+                <ChoiceField
+                  form={form}
+                  name="experience"
+                  label="Experiência com animais"
+                  options={['Primeiro pet', 'Já tive pets', 'Tenho bastante experiência']}
+                />
+                <YesNoField
+                  form={form}
+                  name="acceptsSpecialCare"
                   label="Disponibilidade para cuidados especiais?"
-                  error={errors.acceptsSpecialCare}
-                >
-                  <Select
-                    value={
-                      draft.acceptsSpecialCare === ''
-                        ? ''
-                        : draft.acceptsSpecialCare
-                          ? 'Sim'
-                          : 'Não'
-                    }
-                    onChange={(event) =>
-                      update(
-                        'acceptsSpecialCare',
-                        event.target.value === '' ? '' : event.target.value === 'Sim',
-                      )
-                    }
-                    aria-invalid={Boolean(errors.acceptsSpecialCare)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Não</option>
-                    <option>Sim</option>
-                  </Select>
-                </Field>
+                />
               </div>
             </section>
 
             <section>
-              <div className="form-section-heading">
-                <span>4</span>
-                <div>
-                  <h2>Preferências</h2>
-                  <p>Preferências ajudam na busca, mas não limitam suas possibilidades.</p>
-                </div>
-              </div>
-              <div className="form-grid">
-                <Field label="Espécie" error={errors.preferredSpecies}>
-                  <Select
-                    value={draft.preferredSpecies}
-                    onChange={(event) =>
-                      update(
-                        'preferredSpecies',
-                        event.target.value as ProfileDraft['preferredSpecies'],
-                      )
-                    }
-                    aria-invalid={Boolean(errors.preferredSpecies)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Sem preferência</option>
-                    <option>Cachorro</option>
-                    <option>Gato</option>
-                  </Select>
-                </Field>
-                <Field label="Porte" error={errors.preferredSize}>
-                  <Select
-                    value={draft.preferredSize}
-                    onChange={(event) =>
-                      update('preferredSize', event.target.value as ProfileDraft['preferredSize'])
-                    }
-                    aria-invalid={Boolean(errors.preferredSize)}
-                  >
-                    <option value="" disabled>
-                      Selecione uma opção
-                    </option>
-                    <option>Sem preferência</option>
-                    <option>Pequeno</option>
-                    <option>Pequeno ou médio</option>
-                    <option>Médio ou grande</option>
-                  </Select>
-                </Field>
+              <SectionHeading
+                number={4}
+                title="Preferências"
+                description="Preferências ajudam na busca, mas não limitam suas possibilidades."
+              />
+              <div className="grid grid-cols-1 gap-[18px]">
+                <ChoiceField
+                  form={form}
+                  name="preferredSpecies"
+                  label="Espécie"
+                  options={['Sem preferência', 'Cachorro', 'Gato']}
+                />
+                <ChoiceField
+                  form={form}
+                  name="preferredSize"
+                  label="Porte"
+                  options={['Sem preferência', 'Pequeno', 'Pequeno ou médio', 'Médio ou grande']}
+                />
               </div>
             </section>
 
-            <div className="profile-submit">
-              <p>Alterações relevantes podem mudar os resultados de compatibilidade.</p>
+            <div className="mt-[30px] flex flex-col items-stretch justify-between gap-5 border-t border-line pt-7 md:flex-row md:items-center">
+              <p className="mb-0 text-[10px] text-muted">
+                Alterações relevantes podem mudar os resultados de compatibilidade.
+              </p>
               <Button type="submit" disabled={saveProfile.isPending}>
                 <Save size={18} /> {saveProfile.isPending ? 'Salvando…' : 'Salvar perfil'}
               </Button>
             </div>
           </div>
         </form>
-      </section>
-    </div>
+      </Container>
+    </PageSurface>
   )
 }
