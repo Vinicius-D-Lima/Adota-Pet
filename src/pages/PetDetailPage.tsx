@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles, Syringe } from 'lucide-react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { ActiveRequestNotice } from '../components/ActiveRequestNotice'
 import { FlowSteps } from '../components/FlowSteps'
@@ -154,6 +154,24 @@ export function PetDetailPage() {
                     <span>
                       <strong>Convive com outros pets</strong>
                       {pet.otherPets ? 'Sim' : 'Prefere ser único pet'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="need-icon">
+                      <Syringe />
+                    </span>
+                    <span>
+                      <strong>Vacinação</strong>
+                      {pet.vaccinated ? 'Vacinado' : 'Não vacinado'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="need-icon">
+                      <ShieldCheck />
+                    </span>
+                    <span>
+                      <strong>Castração</strong>
+                      {pet.neutered ? 'Castrado' : 'Não castrado'}
                     </span>
                   </div>
                 </div>

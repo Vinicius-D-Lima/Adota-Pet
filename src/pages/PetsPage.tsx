@@ -1,8 +1,9 @@
-import { Search, SlidersHorizontal, X } from 'lucide-react'
+import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
 import { PageIntro } from '../components/UI'
+import { useAdopterProfile } from '../hooks/useAdopterProfile'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePets, type PetSort } from '../hooks/usePets'
 
@@ -14,6 +15,15 @@ const allowed = {
   sex: ['Fêmea', 'Macho'],
   sort: ['recent', 'name', 'distance'],
 } as const
+
+type PetSize = (typeof allowed.size)[number]
+
+/** Traduz as preferências do perfil em filtros; "Sem preferência" não filtra. */
+const sizesByPreference: Record<string, PetSize[]> = {
+  Pequeno: ['Pequeno'],
+  'Pequeno ou médio': ['Pequeno', 'Médio'],
+  'Médio ou grande': ['Médio', 'Grande'],
+}
 
 const readParam = (params: URLSearchParams, key: keyof typeof allowed) => {
   const value = params.get(key) ?? ''
@@ -28,7 +38,7 @@ export function PetsPage() {
   const debouncedSearch = useDebouncedValue(searchInput, 300)
 
   const species = readParam(searchParams, 'species')
-  const size = readParam(searchParams, 'size')
+  const size = allowed.size.filter((option) => searchParams.getAll('size').includes(option))
   const sex = readParam(searchParams, 'sex')
   const sort = (readParam(searchParams, 'sort') || 'recent') as PetSort
 
@@ -42,6 +52,43 @@ export function PetsPage() {
       },
       { replace },
     )
+  }
+
+  const toggleSize = (option: PetSize) => {
+    setSearchParams((current) => {
+      const selected = allowed.size.filter((item) =>
+        item === option
+          ? !current.getAll('size').includes(item)
+          : current.getAll('size').includes(item),
+      )
+      const next = new URLSearchParams(current)
+      next.delete('size')
+      for (const item of selected) next.append('size', item)
+      return next
+    })
+  }
+
+  const profileQuery = useAdopterProfile()
+  const preferences = useMemo(() => {
+    const profile = profileQuery.data?.profile
+    const preferredSpecies = profile?.preferredSpecies
+    return {
+      species:
+        preferredSpecies === 'Cachorro' || preferredSpecies === 'Gato' ? preferredSpecies : '',
+      size: sizesByPreference[profile?.preferredSize ?? ''] ?? [],
+    }
+  }, [profileQuery.data])
+  const hasPreferences = Boolean(preferences.species || preferences.size.length)
+
+  const applyPreferences = () => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.delete('species')
+      next.delete('size')
+      if (preferences.species) next.set('species', preferences.species)
+      for (const item of preferences.size) next.append('size', item)
+      return next
+    })
   }
 
   useEffect(() => {
@@ -62,7 +109,7 @@ export function PetsPage() {
     () => ({
       search: debouncedSearch.trim() || undefined,
       species: species || undefined,
-      size: size || undefined,
+      size: size.length ? size : undefined,
       sex: sex || undefined,
       sort,
       limit: PAGE_SIZE,
@@ -78,7 +125,7 @@ export function PetsPage() {
     return Array.from(unique.values())
   }, [petsQuery.data])
   const total = petsQuery.data?.pages[0]?.total ?? 0
-  const hasFilters = Boolean(searchFromUrl || species || size || sex || sort !== 'recent')
+  const hasFilters = Boolean(searchFromUrl || species || size.length || sex || sort !== 'recent')
 
   const clearFilters = () => {
     setSearchState({ source: searchFromUrl, value: '' })
@@ -117,16 +164,19 @@ export function PetsPage() {
               <option>Cachorro</option>
               <option>Gato</option>
             </select>
-            <select
-              value={size}
-              onChange={(event) => setFilter('size', event.target.value)}
-              aria-label="Filtrar por porte"
-            >
-              <option value="">Todos os portes</option>
-              <option>Pequeno</option>
-              <option>Médio</option>
-              <option>Grande</option>
-            </select>
+            <div className="size-toggle" role="group" aria-label="Filtrar por porte">
+              {allowed.size.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={size.includes(option) ? 'active' : undefined}
+                  aria-pressed={size.includes(option)}
+                  onClick={() => toggleSize(option)}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
             <select
               value={sex}
               onChange={(event) => setFilter('sex', event.target.value)}
@@ -150,6 +200,24 @@ export function PetsPage() {
                 <X size={15} /> Limpar
               </button>
             )}
+          </div>
+          <div className="preferences-row">
+            <button
+              type="button"
+              className="button ghost"
+              onClick={applyPreferences}
+              disabled={!hasPreferences}
+              aria-describedby="preferences-help"
+            >
+              <Sparkles size={16} /> Usar minhas preferências
+            </button>
+            <small id="preferences-help">
+              {profileQuery.isPending
+                ? 'Carregando seu perfil...'
+                : hasPreferences
+                  ? 'Aplica a espécie e o porte informados no seu perfil.'
+                  : 'Informe espécie ou porte de preferência no seu perfil para usar este atalho.'}
+            </small>
           </div>
         </div>
         <div className="results-bar">
