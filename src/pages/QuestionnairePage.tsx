@@ -1,13 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { NotFoundState } from '../components/NotFoundState'
 import { Field } from '../components/UI'
 import {
   adoptionRequestKeys,
   fetchAdoptionRequests,
+  useActiveRequestLookup,
   useCreateAdoptionRequest,
 } from '../hooks/useAdoptionRequests'
 import { usePet } from '../hooks/usePets'
@@ -62,6 +63,7 @@ export function QuestionnairePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createRequest = useCreateAdoptionRequest()
+  const { request: activeRequest, isFetching: isCheckingRequests } = useActiveRequestLookup(petId)
   const [form, setForm] = useState<QuestionnaireAnswers>(initialForm)
   const [errors, setErrors] = useState<FieldErrors<FieldName>>({})
   const [submitError, setSubmitError] = useState<ReactNode>('')
@@ -90,6 +92,16 @@ export function QuestionnairePage() {
         </div>
       </div>
     )
+  }
+
+  // Redireciona só quem ainda não começou a preencher e com a lista já atualizada. Quem digitou,
+  // enviou ou está enviando nunca é desviado: perderia as respostas, e a própria solicitação nova
+  // (ativa depois do envio) atropelaria a navegação para /enviada. O 409 do servidor cobre o resto.
+  const isPristine = (Object.keys(initialForm) as FieldName[]).every(
+    (field) => form[field] === initialForm[field],
+  )
+  if (activeRequest && isPristine && !isCheckingRequests) {
+    return <Navigate to="/solicitacoes" replace />
   }
 
   const pet = petQuery.data

@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { adoptionRequestSchema, adoptionRequestsResponseSchema } from '../schemas/requestSchema'
 import type { QuestionnaireAnswers } from '../types'
+import { isActiveRequest } from '../utils/requestStatus'
 
 export const adoptionRequestKeys = {
   all: ['adoption-requests'] as const,
@@ -18,6 +19,22 @@ export function useAdoptionRequests() {
     queryFn: fetchAdoptionRequests,
   })
 }
+
+/**
+ * Solicitação ainda ativa (nem Cancelada nem Recusada) do pet, se houver.
+ * Enquanto a lista carrega ou se ela falhar devolve `undefined`: o servidor continua barrando com 409.
+ */
+export function useActiveRequestLookup(petId: string | undefined) {
+  const { data, isFetching } = useAdoptionRequests()
+  return {
+    request: data?.find((item) => item.petId === petId && isActiveRequest(item.status)),
+    /** Há uma atualização da lista em andamento: o resultado ainda pode mudar. */
+    isFetching,
+  }
+}
+
+export const useActiveRequestForPet = (petId: string | undefined) =>
+  useActiveRequestLookup(petId).request
 
 export function useAdoptionRequest(requestId: string | undefined) {
   return useQuery({
