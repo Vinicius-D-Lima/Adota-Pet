@@ -241,7 +241,7 @@ export function PetsPage() {
         </div>
 
         {petsQuery.isPending ? (
-          <div className="pet-grid" aria-label="Carregando pets">
+          <div className="pet-grid" role="status" aria-label="Carregando pets">
             {Array.from({ length: PAGE_SIZE }, (_, index) => (
               <PetCardSkeleton key={index} />
             ))}
