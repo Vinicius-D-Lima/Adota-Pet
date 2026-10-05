@@ -63,6 +63,7 @@ describe('ProfilePage', () => {
     resolvePut({ ...savedResponse, name: 'Maria Souza' })
 
     expect(await screen.findByText(/perfil atualizado/i)).toBeInTheDocument()
+    expect(screen.getByText(/perfil atualizado/i).closest('[role=status]')).not.toBeNull()
     expect(saveButton()).toHaveTextContent('Salvar perfil')
     expect(saveButton()).toBeEnabled()
   })

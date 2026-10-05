@@ -121,7 +121,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
           description="Essas informações são usadas para calcular sua compatibilidade e apoiar uma adoção responsável."
         />
         {saved && (
-          <div className="save-message">
+          <div className="save-message" role="status">
             <Check size={18} /> Perfil atualizado. As próximas compatibilidades usarão estes dados.
           </div>
         )}
