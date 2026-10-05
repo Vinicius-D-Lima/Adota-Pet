@@ -16,7 +16,14 @@ export function PetCard({ pet }: PetCardProps) {
   return (
     <article className="pet-card">
       <div className="pet-image-wrap">
-        <img src={pet.image} alt={`${pet.name}, ${pet.breed}`} className="pet-image" />
+        <img
+          src={pet.image}
+          alt={`${pet.name}, ${pet.breed}`}
+          className="pet-image"
+          width={600}
+          height={500}
+          loading="lazy"
+        />
         <button
           className={isFavorite ? 'favorite active' : 'favorite'}
           onClick={toggle}

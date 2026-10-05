@@ -1,39 +1,77 @@
 import { screen } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { fakeFavoritesApi } from '../test/fakeFavoritesApi'
+import { makeRequest } from '../test/fixtures/requests'
 import { petFixture } from '../test/petFixture'
 import { renderWithProviders } from '../test/renderWithProviders'
-import type { Pet } from '../types'
+import type { AdoptionRequest } from '../types'
 import { PetDetailPage } from './PetDetailPage'
 
-const mocks = vi.hoisted(() => ({ get: vi.fn() }))
-vi.mock('../lib/api', () => ({ api: { get: mocks.get } }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), delete: vi.fn() }))
+vi.mock('../lib/api', () => ({ api: mocks }))
 
-const setup = (pet: Pet) => {
-  mocks.get.mockReset()
-  mocks.get.mockImplementation((path: string) =>
-    Promise.resolve(String(path).startsWith('/me/favorites') ? { data: [], total: 0 } : pet),
-  )
-  return renderWithProviders(
+function setup(requests: AdoptionRequest[]) {
+  fakeFavoritesApi(mocks)
+  const favoritesGet = mocks.get.getMockImplementation()
+  mocks.get.mockImplementation((path: string) => {
+    if (path === `/pets/${petFixture.id}`) return Promise.resolve(petFixture)
+    if (path === '/me/requests') return Promise.resolve({ data: requests, total: requests.length })
+    return favoritesGet?.(path)
+  })
+  renderWithProviders(
     <Routes>
       <Route path="/pets/:petId" element={<PetDetailPage />} />
     </Routes>,
-    { route: `/pets/${pet.id}` },
+    { route: `/pets/${petFixture.id}` },
   )
 }
 
-describe('PetDetailPage - saúde do pet', () => {
-  beforeEach(() => mocks.get.mockReset())
+const compatibilityLink = () => screen.queryByRole('link', { name: /ver compatibilidade/i })
 
-  it('mostra vacinação e castração quando verdadeiras', async () => {
-    setup({ ...petFixture, vaccinated: true, neutered: true })
-    expect(await screen.findByText('Vacinado')).toBeInTheDocument()
-    expect(screen.getByText('Castrado')).toBeInTheDocument()
+afterEach(() => {
+  vi.clearAllMocks()
+})
+
+describe('PetDetailPage - solicitação ativa', () => {
+  it('sem solicitação mostra o botão para ver a compatibilidade', async () => {
+    setup([])
+
+    expect(await screen.findByRole('heading', { name: petFixture.name })).toBeInTheDocument()
+    expect(await screen.findByText(/o resultado é orientativo/i)).toBeInTheDocument()
+    expect(compatibilityLink()).toHaveAttribute('href', `/pets/${petFixture.id}/compatibilidade`)
+    expect(screen.queryByText(/você já tem uma solicitação/i)).not.toBeInTheDocument()
   })
 
-  it('mostra os estados negativos quando falsos', async () => {
-    setup({ ...petFixture, vaccinated: false, neutered: false })
-    expect(await screen.findByText('Não vacinado')).toBeInTheDocument()
-    expect(screen.getByText('Não castrado')).toBeInTheDocument()
+  it('com solicitação ativa troca o botão pelo aviso com link para /solicitacoes', async () => {
+    setup([makeRequest({ id: 'SOL-1042', petId: petFixture.id, status: 'Em análise' })])
+
+    const notice = await screen.findByRole('status')
+    expect(notice).toHaveTextContent(
+      `Você já tem uma solicitação em andamento para ${petFixture.name} (SOL-1042 · Em análise)`,
+    )
+    expect(screen.getByRole('link', { name: /ver minhas solicitações/i })).toHaveAttribute(
+      'href',
+      '/solicitacoes',
+    )
+    expect(compatibilityLink()).not.toBeInTheDocument()
+  })
+
+  it.each(['Cancelada', 'Recusada'] as const)(
+    'solicitação %s não bloqueia: o botão continua disponível',
+    async (status) => {
+      setup([makeRequest({ petId: petFixture.id, status })])
+
+      expect(await screen.findByText(/o resultado é orientativo/i)).toBeInTheDocument()
+      expect(compatibilityLink()).toBeInTheDocument()
+      expect(screen.queryByText(/você já tem uma solicitação/i)).not.toBeInTheDocument()
+    },
+  )
+
+  it('solicitação ativa de outro pet não bloqueia', async () => {
+    setup([makeRequest({ petId: 'outro-pet', status: 'Enviada' })])
+
+    expect(await screen.findByText(/o resultado é orientativo/i)).toBeInTheDocument()
+    expect(compatibilityLink()).toBeInTheDocument()
   })
 })

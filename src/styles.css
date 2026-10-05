@@ -1395,6 +1395,13 @@ input {
 .app-feedback.error {
   color: #a33f2d;
 }
+.feedback-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 18px;
+}
 .check-field {
   display: flex;
   align-items: flex-start;
@@ -1707,6 +1714,50 @@ input {
 }
 .text-button.danger {
   color: #a55039;
+}
+.button.danger {
+  background: #a55039;
+  color: white;
+}
+.button.danger:hover {
+  background: #8c4130;
+}
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 42, 31, 0.5);
+}
+.modal {
+  width: min(440px, 100%);
+  padding: 28px;
+  border-radius: 20px;
+  background: white;
+  box-shadow: var(--shadow);
+}
+.modal h2 {
+  margin: 0 0 10px;
+}
+.modal p {
+  margin: 0;
+  color: var(--muted);
+}
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+.info-note a {
+  font-weight: 700;
+  text-decoration: underline;
+}
+.active-request-notice p {
+  font-size: 14px;
 }
 .icon-button {
   width: 38px;
