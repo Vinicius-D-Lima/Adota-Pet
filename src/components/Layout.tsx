@@ -6,10 +6,31 @@ import { useFavoriteIds } from '../hooks/useFavorites'
 import { getInitials } from '../utils/getInitials'
 import { isActiveRequest } from '../utils/requestStatus'
 import { FavoriteNotice } from './FavoriteNotice'
+import { Container, cx } from './ui'
 
 interface LayoutProps {
   children: ReactNode
   profileName: string
+}
+
+function Brand({ light = false, markSize = 21 }: { light?: boolean; markSize?: number }) {
+  return (
+    <Link
+      to="/"
+      className={cx(
+        'inline-flex items-center gap-2.5 font-display text-[23px] font-bold tracking-[-0.04em]',
+        light ? 'text-white' : 'text-forest-900',
+      )}
+      aria-label={light ? undefined : 'AdotaPet — início'}
+    >
+      <span className="grid size-[38px] -rotate-3 place-items-center rounded-[13px_13px_13px_4px] bg-coral text-white">
+        <PawPrint size={markSize} strokeWidth={light ? 2 : 2.5} />
+      </span>
+      <span>
+        Adota<span className="text-coral">Pet</span>
+      </span>
+    </Link>
+  )
 }
 
 export function Layout({ children, profileName }: LayoutProps) {
@@ -31,80 +52,94 @@ export function Layout({ children, profileName }: LayoutProps) {
   ]
 
   return (
-    <div className="app-shell">
-      <header className="site-header">
-        <div className="container header-inner">
-          <Link to="/" className="brand" aria-label="AdotaPet — início">
-            <span className="brand-mark">
-              <PawPrint size={21} strokeWidth={2.5} />
-            </span>
-            <span>
-              Adota<span>Pet</span>
-            </span>
-          </Link>
+    <div className="flex min-h-screen flex-col">
+      <header className="sticky top-0 z-50 h-[68px] border-b border-forest-800/10 bg-white/95 backdrop-blur-xl md:h-[76px]">
+        <Container className="flex h-full items-center gap-[15px] md:gap-9">
+          <Brand />
 
-          <button className="menu-button" onClick={() => setOpen(!open)} aria-label="Abrir menu">
+          <button
+            className="ml-auto grid cursor-pointer border-0 bg-transparent text-forest-800 md:hidden"
+            onClick={() => setOpen(!open)}
+            aria-label="Abrir menu"
+          >
             {open ? <X /> : <Menu />}
           </button>
 
-          <nav className={open ? 'main-nav is-open' : 'main-nav'} aria-label="Navegação principal">
+          <nav
+            className={cx(
+              'absolute inset-x-3.5 top-[61px] rounded-[14px] border border-line bg-white p-2.5 shadow-soft',
+              'md:static md:ml-auto md:flex md:items-center md:gap-[30px] md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none',
+              open ? 'grid' : 'hidden',
+            )}
+            aria-label="Navegação principal"
+          >
             {nav.map(([to, label]) => (
               <NavLink
                 key={to}
                 to={to}
                 onClick={() => setOpen(false)}
-                className={({ isActive }) => (isActive ? 'active' : '')}
+                className={({ isActive }) =>
+                  cx(
+                    'relative flex items-center rounded-[9px] px-3 py-[15px] text-sm font-semibold text-[#52625a] hover:text-forest-800',
+                    'md:rounded-none md:px-0 md:pb-[25px] md:pt-7',
+                    isActive &&
+                      'bg-forest-50 text-forest-800 md:bg-transparent md:after:absolute md:after:inset-x-0 md:after:bottom-4 md:after:h-0.5 md:after:rounded-sm md:after:bg-coral md:after:content-[""]',
+                  )
+                }
               >
                 {label}
-                {to === '/favoritos' && favoriteCount > 0 && (
-                  <span className="nav-count">{favoriteCount}</span>
-                )}
-                {to === '/solicitacoes' && requestCount > 0 && (
-                  <span className="nav-count">{requestCount}</span>
-                )}
+                {to === '/favoritos' && favoriteCount > 0 && <NavCount value={favoriteCount} />}
+                {to === '/solicitacoes' && requestCount > 0 && <NavCount value={requestCount} />}
               </NavLink>
             ))}
           </nav>
 
           {savedName && (
             <Link
-              className="user-chip"
+              className="hidden items-center gap-2 text-forest-800 md:flex"
               to="/perfil"
               aria-label={`Abrir perfil de ${savedName}`}
               title={savedName}
             >
-              <span className="user-avatar" aria-hidden="true">
+              <span
+                className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-100 text-xs font-bold"
+                aria-hidden="true"
+              >
                 {initials}
               </span>
-              <span className="user-greeting">
+              <span className="whitespace-nowrap text-xs font-semibold">
                 Olá,
                 <br />
                 bem-vindo {firstName}
               </span>
             </Link>
           )}
-        </div>
+        </Container>
       </header>
-      <main>{children}</main>
+      <main className="flex-1">{children}</main>
       <FavoriteNotice />
-      <footer className="site-footer">
-        <div className="container footer-inner">
+      <footer className="bg-[#17382c] py-[45px] text-[#cbd8d1]">
+        <Container className="flex flex-col items-start gap-[30px] md:flex-row md:items-center md:justify-between">
           <div>
-            <Link to="/" className="brand brand-footer">
-              <span className="brand-mark">
-                <PawPrint size={20} />
-              </span>
-              <span>
-                Adota<span>Pet</span>
-              </span>
-            </Link>
-            <p>Adoção responsável começa com um bom encontro.</p>
+            <Brand light markSize={20} />
+            <p className="mb-0 mt-3 text-[11px] text-[#9db1a7]">
+              Adoção responsável começa com um bom encontro.
+            </p>
           </div>
-          <p className="footer-note">
-            <Heart size={15} fill="currentColor" /> Feito para aproximar famílias e pets.
+          <p className="mb-0 mt-3 flex items-center gap-1.5 text-[11px] text-[#9db1a7]">
+            <Heart size={15} fill="currentColor" className="text-coral" /> Feito para aproximar
+            famílias e pets.
           </p>
-        </div>
+        </Container>
       </footer>
     </div>
+  )
+}
+
+function NavCount({ value }: { value: number }) {
+  return (
+    <span className="ml-[5px] inline-grid size-[18px] place-items-center rounded-full bg-coral text-[10px] text-white">
+      {value}
+    </span>
   )
 }

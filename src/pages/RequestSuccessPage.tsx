@@ -2,7 +2,7 @@ import { Check, ClipboardList, Heart, Home } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { NotFoundState } from '../components/NotFoundState'
-import { LinkButton } from '../components/ui'
+import { Container, Eyebrow, Feedback, LinkButton, PageSurface } from '../components/ui'
 import { useAdoptionRequest } from '../hooks/useAdoptionRequests'
 import { ApiError } from '../lib/ApiError'
 import { formatRequestDate } from '../utils/formatRequestDate'
@@ -16,23 +16,25 @@ const RequestNotFound = () => (
   />
 )
 
+const nextSteps = [
+  ['Análise do perfil', 'A organização revisa seu perfil, compatibilidade e respostas.'],
+  ['Uma boa conversa', 'Se houver interesse, vocês combinam uma conversa ou visita.'],
+  ['Decisão responsável', 'Após as etapas, a organização registra a decisão no sistema.'],
+]
+
 export function RequestSuccessPage() {
   const { requestId } = useParams()
   const requestQuery = useAdoptionRequest(requestId)
 
   if (requestQuery.isPending) {
-    return <div className="app-feedback">Carregando solicitação...</div>
+    return <Feedback>Carregando solicitação...</Feedback>
   }
 
   if (requestQuery.isError) {
     if (requestQuery.error instanceof ApiError && requestQuery.error.statusCode === 404) {
       return <RequestNotFound />
     }
-    return (
-      <div className="app-feedback error" role="alert">
-        Não foi possível carregar a solicitação. Tente novamente.
-      </div>
-    )
+    return <Feedback error>Não foi possível carregar a solicitação. Tente novamente.</Feedback>
   }
 
   const request = requestQuery.data
@@ -40,54 +42,55 @@ export function RequestSuccessPage() {
   if (!pet) return <RequestNotFound />
 
   return (
-    <div className="page-surface success-page">
-      <section className="container flow-page narrow-flow">
+    <PageSurface className="bg-[linear-gradient(180deg,#edf5ee_0,#fbfaf6_55%)]">
+      <Container as="section" className="max-w-[1080px] pb-[90px] pt-[35px] md:pt-[54px]">
         <FlowSteps current={3} />
-        <div className="success-card-main">
-          <span className="success-icon">
+        <div className="mx-auto max-w-[750px] rounded-3xl border border-line bg-white px-5 py-[34px] text-center shadow-soft md:p-[46px]">
+          <span className="mx-auto mb-5 grid size-[66px] place-items-center rounded-full bg-forest-700 text-white shadow-[0_0_0_8px_var(--color-forest-100)]">
             <Check />
           </span>
-          <span className="eyebrow">Solicitação enviada</span>
-          <h1>Agora é com a equipe que cuida de {pet.name}.</h1>
-          <p>
+          <Eyebrow>Solicitação enviada</Eyebrow>
+          <h1 className="mb-[13px] text-[clamp(37px,4.6vw,52px)] leading-[1.08]">
+            Agora é com a equipe que cuida de {pet.name}.
+          </h1>
+          <p className="mx-auto max-w-[590px] text-sm leading-[1.65] text-muted">
             Sua solicitação <strong>{request.id}</strong> foi enviada para {pet.organization}. Você
             pode acompanhar cada atualização pelo AdotaPet.
           </p>
-          <div className="success-pet">
-            <img src={pet.image} alt={pet.name} width={52} height={52} loading="lazy" />
-            <div>
+          <div className="mx-auto my-[27px] flex max-w-[500px] items-center gap-3 rounded-[14px] bg-cream p-3 text-left">
+            <img
+              className="size-[52px] rounded-[11px] object-cover"
+              src={pet.image}
+              alt={pet.name}
+              width={52}
+              height={52}
+              loading="lazy"
+            />
+            <div className="flex flex-col">
               <strong>{pet.name}</strong>
-              <span>
+              <span className="text-[10px] text-muted">
                 {pet.breed} · {pet.ageLabel}
               </span>
             </div>
-            <span>Enviada em {formatRequestDate(request.date)}</span>
+            <span className="ml-auto hidden text-[10px] font-bold text-forest-700 sm:block">
+              Enviada em {formatRequestDate(request.date)}
+            </span>
           </div>
-          <div className="next-steps">
-            <h2>O que acontece agora?</h2>
-            <div>
-              <span>1</span>
-              <p>
-                <strong>Análise do perfil</strong>A organização revisa seu perfil, compatibilidade e
-                respostas.
-              </p>
-            </div>
-            <div>
-              <span>2</span>
-              <p>
-                <strong>Uma boa conversa</strong>Se houver interesse, vocês combinam uma conversa ou
-                visita.
-              </p>
-            </div>
-            <div>
-              <span>3</span>
-              <p>
-                <strong>Decisão responsável</strong>Após as etapas, a organização registra a decisão
-                no sistema.
-              </p>
-            </div>
+          <div className="border-t border-line pt-[25px] text-left">
+            <h2 className="mb-4 font-sans text-[15px] tracking-normal">O que acontece agora?</h2>
+            {nextSteps.map(([title, text], index) => (
+              <div key={title} className="mt-[13px] flex gap-3">
+                <span className="grid size-7 shrink-0 place-items-center rounded-[9px] bg-forest-100 text-[10px] font-bold text-forest-700">
+                  {index + 1}
+                </span>
+                <p className="mb-0 flex flex-col text-[11px] leading-normal text-muted">
+                  <strong className="text-xs text-ink">{title}</strong>
+                  {text}
+                </p>
+              </div>
+            ))}
           </div>
-          <div className="success-actions">
+          <div className="mt-[30px] flex flex-col justify-center gap-2.5 md:flex-row">
             <LinkButton to="/solicitacoes">
               <ClipboardList size={18} /> Acompanhar solicitação
             </LinkButton>
@@ -96,10 +99,13 @@ export function RequestSuccessPage() {
             </LinkButton>
           </div>
         </div>
-        <Link className="back-home-link" to="/">
+        <Link
+          className="mt-[22px] flex items-center justify-center gap-1.5 text-[11px] text-muted"
+          to="/"
+        >
           <Home size={16} /> Voltar para o início
         </Link>
-      </section>
-    </div>
+      </Container>
+    </PageSurface>
   )
 }

@@ -4,14 +4,15 @@ Linha do tempo do que foi feito, em ordem de mescla na `dev` (datas em UTC, de 2
 
 ## Resumo
 
-| Marco                             | Quando         | O que mudou                                                                     |
-| --------------------------------- | -------------- | ------------------------------------------------------------------------------- |
-| Protótipo em React                | antes de 28/09 | Fluxo completo com dados locais, sem API                                        |
-| TypeScript                        | 28/09          | Todo o frontend migrado de JavaScript                                           |
-| Qualidade e infraestrutura        | 03/10          | ESLint, Prettier, Vitest, CI, cliente de API, TanStack Query e Zod              |
-| API simulada e integração         | 03/10 a 04/10  | json-server, perfil, pets, solicitações e favoritos pela API                    |
-| Qualidade do frontend (épico #46) | 04/10 a 05/10  | Bugs, 404 e Error Boundary, bloqueio de duplicadas, selos de saúde, componentes |
-| Acessibilidade                    | 05/10          | Mesclada e revertida logo em seguida                                            |
+| Marco                             | Quando         | O que mudou                                                                                                                  |
+| --------------------------------- | -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Protótipo em React                | antes de 28/09 | Fluxo completo com dados locais, sem API                                                                                     |
+| TypeScript                        | 28/09          | Todo o frontend migrado de JavaScript                                                                                        |
+| Qualidade e infraestrutura        | 03/10          | ESLint, Prettier, Vitest, CI, cliente de API, TanStack Query e Zod                                                           |
+| API simulada e integração         | 03/10 a 04/10  | json-server, perfil, pets, solicitações e favoritos pela API                                                                 |
+| Qualidade do frontend (épico #46) | 04/10 a 05/10  | Bugs, 404 e Error Boundary, bloqueio de duplicadas, selos de saúde, componentes                                              |
+| Acessibilidade                    | 05/10          | Mesclada e revertida logo em seguida                                                                                         |
+| Tailwind, react-hook-form e docs  | 05/10          | Estilos migrados para Tailwind, formulários com react-hook-form, seed ampliado e manuais (branch `refact/dependencies-docs`) |
 
 ## Pull requests
 
@@ -51,6 +52,10 @@ Linha do tempo do que foi feito, em ordem de mescla na `dev` (datas em UTC, de 2
 | #79 | Extrai componentes reutilizáveis para `src/components/ui`                | #6    | 05/10       |
 
 > **Autoria:** "Vinicius" e "Igor" são as duas pessoas que contribuíram. Vários PRs foram preparados com apoio do Claude Code.
+
+### Branch `refact/dependencies-docs` (em PR para a `dev`)
+
+Migração dos estilos de CSS puro para **Tailwind CSS 4**, dos formulários para **react-hook-form**, seed com 12 pets e 4 solicitações, e os manuais de instalação, operação e do usuário, o plano de projeto, o comparativo "prometido x entregue" e o documento de prototipagem. Ver [Decisões 16 a 18](decisoes.md#16-tailwind-css-em-vez-de-css-puro).
 
 ## O que cada etapa entregou
 

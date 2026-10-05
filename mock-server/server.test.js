@@ -26,24 +26,24 @@ const expectError = (res, statusCode, error) => {
 }
 
 describe('GET /pets', () => {
-  it('retorna { data, total } com os 6 pets do seed e distância calculada', async () => {
+  it('retorna { data, total } com os 12 pets do seed e distância calculada', async () => {
     const res = await request(app).get('/pets')
     expect(res.status).toBe(200)
-    expect(res.body.total).toBe(6)
-    expect(res.body.data).toHaveLength(6)
+    expect(res.body.total).toBe(12)
+    expect(res.body.data).toHaveLength(12)
     expect(res.body.data[0].distanceKm).toEqual(expect.any(Number))
   })
 
   it('aceita o prefixo /api', async () => {
     const res = await request(app).get('/api/pets')
-    expect(res.body.total).toBe(6)
+    expect(res.body.total).toBe(12)
   })
 
   it('filtra por search e por filtros combinados', async () => {
     const byName = await request(app).get('/pets').query({ search: 'beagle' })
     expect(byName.body.data.map((p) => p.id)).toEqual(['bento'])
     const combined = await request(app).get('/pets').query({ species: 'Gato', sex: 'Fêmea' })
-    expect(combined.body.total).toBe(2)
+    expect(combined.body.total).toBe(3)
     expect(combined.body.data.every((p) => p.species === 'Gato' && p.sex === 'Fêmea')).toBe(true)
   })
 
@@ -62,8 +62,8 @@ describe('GET /pets', () => {
 
   it('pagina e informa o total', async () => {
     const res = await request(app).get('/pets').query({ page: 2, limit: 4 })
-    expect(res.body.data).toHaveLength(2)
-    expect(res.body.total).toBe(6)
+    expect(res.body.data).toHaveLength(4)
+    expect(res.body.total).toBe(12)
   })
 
   it('ordena por recent, name e distance', async () => {
@@ -75,7 +75,7 @@ describe('GET /pets', () => {
     const distance = await request(app).get('/pets').query({ sort: 'distance', limit: 3 })
     const km = distance.body.data.map((p) => p.distanceKm)
     expect(km).toEqual([...km].sort((a, b) => a - b))
-    expect(distance.body.total).toBe(6)
+    expect(distance.body.total).toBe(12)
   })
 
   it('retorna 400 com details para parâmetros inválidos', async () => {
@@ -212,7 +212,7 @@ describe('POST /requests', () => {
     })
     expect(Date.parse(res.body.date)).not.toBeNaN()
     const mine = await request(app).get('/me/requests')
-    expect(mine.body.total).toBe(2)
+    expect(mine.body.total).toBe(5)
     expect(mine.body.data[0].id).toBe('SOL-1043')
     expect((await request(app).get('/requests/SOL-1043')).body.pet.name).toBe('Luna')
   })
@@ -278,6 +278,28 @@ describe('POST /requests/:id/transitions', () => {
       400,
       'Bad Request',
     )
+  })
+})
+
+describe('solicitações do seed', () => {
+  it('traz um exemplo de cada status para demonstrar a listagem', async () => {
+    const mine = await request(app).get('/me/requests')
+    expect(mine.body.data.map((r) => r.status).sort()).toEqual([
+      'Aprovada',
+      'Cancelada',
+      'Em análise',
+      'Recusada',
+    ])
+  })
+
+  it('não permite cancelar uma solicitação já aprovada ou recusada (409)', async () => {
+    for (const id of ['SOL-1039', 'SOL-1040']) {
+      expectError(
+        await request(app).post(`/requests/${id}/transitions`).send({ to: 'CANCELADA' }),
+        409,
+        'Conflict',
+      )
+    }
   })
 })
 

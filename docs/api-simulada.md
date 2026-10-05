@@ -8,10 +8,10 @@ O frontend conversa com uma API REST simulada, em `mock-server/`. Ela existe par
 
 ## Dados
 
-| Arquivo                    | Papel                                                                                     |
-| -------------------------- | ----------------------------------------------------------------------------------------- |
-| `mock-server/db.seed.json` | Seed **versionado**: 1 usuário, 6 pets, 1 perfil, 1 favorito e 1 solicitação (`SOL-1042`) |
-| `mock-server/db.json`      | Banco em uso. Criado a partir do seed na primeira execução e **ignorado pelo git**        |
+| Arquivo                    | Papel                                                                                                                        |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `mock-server/db.seed.json` | Seed **versionado**: 1 usuário, 12 pets, 1 perfil, 1 favorito e 4 solicitações (`SOL-1039` a `SOL-1042`, uma de cada status) |
+| `mock-server/db.json`      | Banco em uso. Criado a partir do seed na primeira execução e **ignorado pelo git**                                           |
 
 Os dados (favoritos, perfil e solicitações) **persistem entre recarregamentos e reinícios**, porque ficam no `db.json`.
 
@@ -21,7 +21,9 @@ npm run mock:reset   # copia o seed sobre o db.json e volta aos dados originais
 
 > **Já tinha um `db.json` de uma versão anterior?** Rode `npm run mock:reset`. Sem isso o servidor sobe, mas o perfil aparece com `isComplete: false` (os campos novos `cpf`, `birthDate`, `email`, `phone`, `zipCode` e `address` ficam em `missingFields`), e `POST /requests` responde 422 até o perfil ser preenchido.
 
-Pets do seed: Luna, Bento, Mimi, Fred, Nina e Tobias (cachorros e gatos, de portes Pequeno, Médio e Grande).
+Pets do seed: Luna, Bento, Mimi, Fred, Nina, Tobias, Thor, Amora, Simba, Pipoca, Rex e Maya (8 cachorros e 4 gatos, de portes Pequeno, Médio e Grande).
+
+Solicitações do seed: `SOL-1039` (Fred, `Aprovada`), `SOL-1040` (Nina, `Recusada`), `SOL-1041` (Tobias, `Cancelada`) e `SOL-1042` (Mimi, `Em análise`).
 
 ## Configuração
 
@@ -107,7 +109,7 @@ Parâmetros aceitos: `search`, `species`, `size`, `sex`, `city`, `sort`, `page` 
 2. **404:** pet inexistente.
 3. **422:** perfil incompleto, com `details` listando os campos de `missingFields`.
 4. **409:** já existe solicitação **ativa** (`Enviada`, `Em análise` ou `Aprovada`) para o pet.
-5. **201:** criada. O servidor gera o `id` (`SOL-` mais o maior número existente + 1, a partir de `SOL-1043`), a `date` (ISO), o status `Enviada` e a mensagem.
+5. **201:** criada. O servidor gera o `id` (`SOL-` mais o maior número existente + 1, a partir de `SOL-1043` com o seed atual), a `date` (ISO), o status `Enviada` e a mensagem.
 
 Toda solicitação devolvida traz o **pet embutido** (`pet`, ou `null` se o pet não existir mais) e a data em ISO.
 
@@ -149,7 +151,7 @@ Os dois rodam no ambiente `node` (`// @vitest-environment node`), enquanto os te
 ## Limitações conhecidas
 
 - Um único usuário, sem autenticação nem permissões.
-- Os status `Aprovada` e `Recusada` existem no contrato e na interface, mas o mock não tem como levar uma solicitação até eles (só cria `Enviada` e cancela). A única solicitação `Em análise` vem do seed.
+- Os status `Aprovada` e `Recusada` existem no contrato e na interface, mas o mock não tem como levar uma solicitação até eles (só cria `Enviada` e cancela). As quatro solicitações do seed existem justamente para mostrar esses status.
 - Sem upload de fotos: os pets usam URLs externas.
 - Sem concorrência real: é um arquivo JSON e um processo.
 - A compatibilidade é calculada **no frontend**; o mock não tem rota de recomendação.

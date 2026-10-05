@@ -1,4 +1,4 @@
-import { EmptyState, LinkButton } from './ui'
+import { Container, EmptyState, LinkButton, PageSurface } from './ui'
 
 interface NotFoundStateProps {
   title: string
@@ -9,12 +9,12 @@ interface NotFoundStateProps {
 
 export function NotFoundState({ title, message, to, linkLabel }: NotFoundStateProps) {
   return (
-    <div className="page-surface">
-      <section className="container detail-page">
+    <PageSurface>
+      <Container as="section" className="pb-[90px] pt-[35px] md:pt-[54px]">
         <EmptyState headingAs="h1" title={title} description={message} role="alert">
           <LinkButton to={to}>{linkLabel}</LinkButton>
         </EmptyState>
-      </section>
-    </div>
+      </Container>
+    </PageSurface>
   )
 }
