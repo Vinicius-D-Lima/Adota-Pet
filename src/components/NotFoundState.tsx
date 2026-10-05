@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { EmptyState, LinkButton } from './ui'
 
 interface NotFoundStateProps {
   title: string
@@ -11,13 +11,9 @@ export function NotFoundState({ title, message, to, linkLabel }: NotFoundStatePr
   return (
     <div className="page-surface">
       <section className="container detail-page">
-        <div className="empty-state" role="alert">
-          <h1>{title}</h1>
-          <p>{message}</p>
-          <Link className="button primary" to={to}>
-            {linkLabel}
-          </Link>
-        </div>
+        <EmptyState headingAs="h1" title={title} description={message} role="alert">
+          <LinkButton to={to}>{linkLabel}</LinkButton>
+        </EmptyState>
       </section>
     </div>
   )

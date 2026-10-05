@@ -2,6 +2,7 @@ import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } fro
 import type { CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { ActiveRequestNotice } from '../components/ActiveRequestNotice'
+import { Button, LinkButton } from '../components/ui'
 import { FlowSteps } from '../components/FlowSteps'
 import { NotFoundState } from '../components/NotFoundState'
 import { useAdopterProfile } from '../hooks/useAdopterProfile'
@@ -35,9 +36,9 @@ export function CompatibilityPage() {
       <div className="app-feedback error" role="alert">
         <div>
           <p>Não foi possível carregar o pet.</p>
-          <button className="button ghost" onClick={() => void petQuery.refetch()}>
+          <Button variant="secondary" onClick={() => void petQuery.refetch()}>
             Tentar novamente
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -48,9 +49,9 @@ export function CompatibilityPage() {
       <div className="app-feedback error" role="alert">
         <div>
           <p>Não foi possível carregar seu perfil.</p>
-          <button className="button ghost" onClick={() => void profileQuery.refetch()}>
+          <Button variant="secondary" onClick={() => void profileQuery.refetch()}>
             Tentar novamente
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -165,13 +166,13 @@ export function CompatibilityPage() {
               </p>
             </div>
             <div className="flow-actions">
-              <Link className="button ghost" to={`/pets/${pet.id}`}>
+              <LinkButton variant="secondary" to={`/pets/${pet.id}`}>
                 Rever detalhes
-              </Link>
+              </LinkButton>
               {!activeRequest && (
-                <Link className="button primary" to={`/pets/${pet.id}/questionario`}>
+                <LinkButton to={`/pets/${pet.id}/questionario`}>
                   Continuar para o questionário <ArrowRight size={18} />
-                </Link>
+                </LinkButton>
               )}
             </div>
             {activeRequest && <ActiveRequestNotice request={activeRequest} petName={pet.name} />}

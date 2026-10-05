@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { Button } from './ui'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -39,11 +40,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <h1>Algo deu errado</h1>
           <p>Não foi possível exibir esta página. Tente novamente ou volte ao início.</p>
           <div className="feedback-actions">
-            <button className="button primary" onClick={() => this.setState({ hasError: false })}>
-              Tentar novamente
-            </button>
+            <Button onClick={() => this.setState({ hasError: false })}>Tentar novamente</Button>
             {/* <a> comum de propósito: recarrega o app caso o roteador também tenha quebrado */}
-            <a className="button ghost" href="/">
+            <a className="button secondary" href="/">
               Voltar ao início
             </a>
           </div>

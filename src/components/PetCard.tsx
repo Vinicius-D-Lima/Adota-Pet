@@ -1,3 +1,4 @@
+import { Card } from './ui'
 import { Heart, MapPin } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useFavorite } from '../hooks/useFavorites'
@@ -14,7 +15,7 @@ export function PetCard({ pet }: PetCardProps) {
   const from = `${location.pathname}${location.search}`
 
   return (
-    <article className="pet-card">
+    <Card as="article" className="pet-card">
       <div className="pet-image-wrap">
         <img
           src={pet.image}
@@ -58,13 +59,13 @@ export function PetCard({ pet }: PetCardProps) {
           Conhecer {pet.name} <span aria-hidden="true">→</span>
         </Link>
       </div>
-    </article>
+    </Card>
   )
 }
 
 export function PetCardSkeleton() {
   return (
-    <article className="pet-card pet-card-skeleton" aria-hidden="true">
+    <Card as="article" className="pet-card pet-card-skeleton" aria-hidden="true">
       <div className="pet-image-wrap skeleton-block" />
       <div className="pet-card-body">
         <div className="skeleton-line skeleton-title" />
@@ -72,6 +73,6 @@ export function PetCardSkeleton() {
         <div className="skeleton-line" />
         <div className="skeleton-line skeleton-short" />
       </div>
-    </article>
+    </Card>
   )
 }

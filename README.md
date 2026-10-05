@@ -74,6 +74,32 @@ Para rodar apenas a checagem de tipos:
 npm run typecheck
 ```
 
+## Componentes de UI
+
+Os componentes reutilizáveis ficam em `src/components/ui/` (importe de `../components/ui`) e seus estilos em `src/components/ui/ui.css`. Convenção de props: `variant`, `size`, `disabled`, `loading`, `invalid`/`error`, `fullWidth`.
+
+| Componente                                | Uso                                                                                                                                                |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Button`                                  | `variant`: `primary` (padrão), `secondary`, `cream`, `danger`, `text`, `text-danger` (botões de texto); `size`: `md`, `sm`; `fullWidth`; `loading` |
+| `LinkButton`                              | Link do React Router com a aparência de `Button` (mesmas props visuais)                                                                            |
+| `Field` + `Input` / `Select` / `Textarea` | `Field` traz rótulo, dica e `error`; os controles aceitam `invalid` (define `aria-invalid`)                                                        |
+| `Checkbox`                                | `label`, `description` e `error`                                                                                                                   |
+| `Card`                                    | Superfície base; `as` troca a tag e `className` define o layout                                                                                    |
+| `Badge` / `StatusPill`                    | `Badge tone="review/approved/sent/declined"`; `StatusPill` mapeia o status da solicitação                                                          |
+| `Alert`                                   | Erro de formulário/ação com `role="alert"`                                                                                                         |
+| `EmptyState`                              | Estado vazio ou de erro: `icon`, `title`, `description`, filhos (ação)                                                                             |
+| `Spinner`, `PageIntro`                    | Indicador de carregamento e cabeçalho de página                                                                                                    |
+
+```tsx
+<Field label="Nome" error={errors.name}>
+  <Input value={name} onChange={onChange} invalid={Boolean(errors.name)} />
+</Field>
+<Button type="submit" loading={isPending}>Salvar</Button>
+<LinkButton variant="secondary" to="/pets">Ver pets</LinkButton>
+```
+
+Botões de ícone/alternância (favoritar e menu) seguem com estilo próprio. Modal e Toast ainda não existem porque nenhuma tela os usa.
+
 ## Qualidade de código
 
 | Script                 | O que faz                                                        |

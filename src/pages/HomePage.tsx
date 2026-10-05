@@ -8,6 +8,7 @@ import {
   Sparkles,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { Button, Card, LinkButton } from '../components/ui'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
 import { usePets } from '../hooks/usePets'
 
@@ -32,12 +33,12 @@ export function HomePage() {
               próximo passo.
             </p>
             <div className="hero-actions">
-              <Link className="button primary" to="/pets">
+              <LinkButton to="/pets">
                 Encontrar meu pet <ArrowRight size={18} />
-              </Link>
-              <Link className="button ghost" to="/perfil">
+              </LinkButton>
+              <LinkButton variant="secondary" to="/perfil">
                 Completar meu perfil
-              </Link>
+              </LinkButton>
             </div>
             <div className="trust-row">
               <span>
@@ -109,14 +110,14 @@ export function HomePage() {
                 ],
               ] as [LucideIcon, string, string, string][]
             ).map(([Icon, number, title, text]) => (
-              <article className="how-card" key={number}>
+              <Card as="article" className="how-card" key={number}>
                 <span className="how-number">{number}</span>
                 <span className="icon-tile">
                   <Icon />
                 </span>
                 <h3>{title}</h3>
                 <p>{text}</p>
-              </article>
+              </Card>
             ))}
           </div>
         </div>
@@ -142,9 +143,9 @@ export function HomePage() {
           ) : petsQuery.isError ? (
             <div className="query-state" role="alert">
               <p>Não foi possível carregar os novos amigos.</p>
-              <button className="button ghost" onClick={() => void petsQuery.refetch()}>
+              <Button variant="secondary" onClick={() => void petsQuery.refetch()}>
                 Tentar novamente
-              </button>
+              </Button>
             </div>
           ) : pets.length ? (
             <div className="pet-grid featured-grid">
@@ -165,9 +166,9 @@ export function HomePage() {
           <span className="eyebrow light">Seu perfil faz a diferença</span>
           <h2>Quanto mais sabemos sobre sua rotina, melhor fica o encontro.</h2>
         </div>
-        <Link className="button cream" to="/perfil">
+        <LinkButton variant="cream" to="/perfil">
           Preencher meu perfil <ArrowRight size={18} />
-        </Link>
+        </LinkButton>
       </section>
     </>
   )

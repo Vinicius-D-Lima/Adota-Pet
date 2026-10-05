@@ -245,46 +245,6 @@ main {
   gap: 12px;
   margin-top: 34px;
 }
-.button {
-  min-height: 48px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  padding: 0 20px;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition:
-    transform 0.2s,
-    background 0.2s,
-    border-color 0.2s;
-}
-.button:hover {
-  transform: translateY(-2px);
-}
-.button.primary {
-  background: var(--coral);
-  color: white;
-  box-shadow: 0 10px 22px rgba(210, 95, 59, 0.22);
-}
-.button.primary:hover {
-  background: var(--coral-dark);
-}
-.button.ghost {
-  background: white;
-  border-color: var(--line);
-  color: var(--green-800);
-}
-.button.cream {
-  background: #fffaf0;
-  color: var(--green-900);
-}
-.button.full {
-  width: 100%;
-}
 .trust-row {
   display: flex;
   gap: 24px;
@@ -421,9 +381,6 @@ main {
 .how-card {
   position: relative;
   padding: 30px;
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: white;
 }
 .how-card h3 {
   font-family: 'Fraunces', serif;
@@ -476,9 +433,6 @@ main {
 .pet-card {
   min-width: 0;
   overflow: hidden;
-  background: white;
-  border: 1px solid var(--line);
-  border-radius: 20px;
   transition:
     transform 0.2s,
     box-shadow 0.2s;
@@ -737,19 +691,7 @@ input {
   background: white;
   outline: none;
 }
-.clear-filter,
-.text-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: 0;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 700;
-}
 .clear-filter {
-  color: var(--coral-dark);
   margin-left: auto;
 }
 .location-help {
@@ -771,17 +713,6 @@ input {
 .results-bar p {
   margin: 0;
   color: var(--ink);
-}
-.empty-state {
-  border: 1px dashed #cdd8d1;
-  padding: 70px 20px;
-  border-radius: 20px;
-  text-align: center;
-  color: var(--muted);
-  background: white;
-}
-.empty-state h2 {
-  margin: 16px 0 8px;
 }
 .query-state {
   padding: 34px 20px;
@@ -1325,64 +1256,6 @@ input {
   font-size: 11px;
   margin: 0;
 }
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  min-width: 0;
-}
-.field > span {
-  font-size: 12px;
-  font-weight: 700;
-}
-.field input,
-.field textarea,
-.field select {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fdfdfb;
-  padding: 12px;
-  outline: none;
-  line-height: 1.4;
-  resize: vertical;
-}
-.field select {
-  padding-right: 38px;
-}
-.field input:focus,
-.field textarea:focus,
-.field select:focus {
-  border-color: var(--green-700);
-  box-shadow: 0 0 0 3px rgba(47, 98, 76, 0.09);
-}
-.field small {
-  color: #8b9791;
-  font-size: 9px;
-  text-align: right;
-  margin-bottom: 18px;
-}
-.field-error {
-  color: #a33f2d !important;
-  text-align: left !important;
-  margin-bottom: 18px;
-}
-.check-error {
-  color: #a33f2d !important;
-}
-.field input[aria-invalid='true'],
-.field textarea[aria-invalid='true'],
-.field select[aria-invalid='true'] {
-  border-color: #c4543d;
-  box-shadow: 0 0 0 3px rgba(196, 84, 61, 0.12);
-}
-.button:disabled {
-  cursor: not-allowed;
-  opacity: 0.65;
-  transform: none;
-}
 .app-feedback {
   align-items: center;
   color: var(--muted);
@@ -1401,44 +1274,6 @@ input {
   gap: 12px;
   justify-content: center;
   margin-top: 18px;
-}
-.check-field {
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  padding: 14px;
-  margin-top: 10px;
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  cursor: pointer;
-}
-.check-field input {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--green-700);
-}
-.check-field > span {
-  display: flex;
-  flex-direction: column;
-}
-.check-field strong {
-  font-size: 12px;
-}
-.check-field small {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 10px;
-}
-.form-error {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #a94b32;
-  background: #fff0e9;
-  border-radius: 9px;
-  padding: 11px 13px;
-  font-size: 11px;
-  margin-top: 14px;
 }
 .questionnaire-actions {
   display: flex;
@@ -1638,9 +1473,7 @@ input {
   grid-template-columns: 145px minmax(0, 1fr) auto;
   gap: 20px;
   padding: 16px;
-  border: 1px solid var(--line);
   border-radius: 18px;
-  background: white;
 }
 .request-card > img {
   width: 145px;
@@ -1683,44 +1516,11 @@ input {
   align-items: center;
   gap: 5px;
 }
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 9px;
-  border-radius: 99px;
-  font-size: 10px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.status-review {
-  color: #98620c;
-  background: #fff0d3;
-}
-.status-approved,
-.status-sent {
-  color: var(--green-700);
-  background: var(--green-100);
-}
-.status-declined {
-  color: #9b4b35;
-  background: #fde8e1;
-}
 .request-actions {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
   justify-content: space-between;
-}
-.text-button.danger {
-  color: #a55039;
-}
-.button.danger {
-  background: #a55039;
-  color: white;
-}
-.button.danger:hover {
-  background: #8c4130;
 }
 .modal-backdrop {
   position: fixed;

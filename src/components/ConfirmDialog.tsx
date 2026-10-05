@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { Button } from './ui'
 
 interface ConfirmDialogProps {
   title: string
@@ -30,7 +31,6 @@ export function ConfirmDialog({
   const descriptionId = useId()
   const backdropRef = useRef<HTMLDivElement>(null)
   const dialogRef = useRef<HTMLDivElement>(null)
-  const cancelRef = useRef<HTMLButtonElement>(null)
   // Os handlers mudam a cada render; o efeito de foco/teclado só deve rodar ao abrir e fechar.
   const latest = useRef({ busy, onClose, returnFocus })
   useEffect(() => {
@@ -40,7 +40,7 @@ export function ConfirmDialog({
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
     // O foco inicial vai para a opção segura, não para a destrutiva.
-    cancelRef.current?.focus()
+    dialogRef.current?.querySelector('button')?.focus()
 
     // Deixa o resto da página inerte (leitor de tela e cliques) e trava a rolagem ao fundo.
     const inerted = Array.from(document.body.children).filter(
@@ -118,12 +118,12 @@ export function ConfirmDialog({
         <h2 id={titleId}>{title}</h2>
         <p id={descriptionId}>{description}</p>
         <div className="modal-actions">
-          <button ref={cancelRef} className="button ghost" onClick={onClose} disabled={busy}>
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
             {cancelLabel}
-          </button>
-          <button className="button danger" onClick={onConfirm} disabled={busy}>
+          </Button>
+          <Button variant="danger" onClick={onConfirm} disabled={busy}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,

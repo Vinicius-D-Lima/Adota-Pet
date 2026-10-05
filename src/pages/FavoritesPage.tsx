@@ -1,7 +1,6 @@
 import { Heart } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Button, EmptyState, LinkButton, PageIntro } from '../components/ui'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
-import { PageIntro } from '../components/UI'
 import { useFavoritePets } from '../hooks/useFavorites'
 
 export function FavoritesPage() {
@@ -22,13 +21,13 @@ export function FavoritesPage() {
             ))}
           </div>
         ) : favoritesQuery.isError ? (
-          <div className="empty-state" role="alert">
-            <h2>Não foi possível carregar seus favoritos</h2>
-            <p>Verifique sua conexão com a API simulada e tente novamente.</p>
-            <button className="button primary" onClick={() => void favoritesQuery.refetch()}>
-              Tentar novamente
-            </button>
-          </div>
+          <EmptyState
+            title="Não foi possível carregar seus favoritos"
+            description="Verifique sua conexão com a API simulada e tente novamente."
+            role="alert"
+          >
+            <Button onClick={() => void favoritesQuery.refetch()}>Tentar novamente</Button>
+          </EmptyState>
         ) : favoritesQuery.data.length ? (
           <div className="pet-grid">
             {favoritesQuery.data.map((pet) => (
@@ -36,14 +35,13 @@ export function FavoritesPage() {
             ))}
           </div>
         ) : (
-          <div className="empty-state">
-            <Heart size={36} />
-            <h2>Você ainda não favoritou nenhum pet</h2>
-            <p>Toque no coração de um pet para guardá-lo aqui.</p>
-            <Link className="button primary" to="/pets">
-              Encontrar um pet
-            </Link>
-          </div>
+          <EmptyState
+            icon={<Heart size={36} />}
+            title="Você ainda não favoritou nenhum pet"
+            description="Toque no coração de um pet para guardá-lo aqui."
+          >
+            <LinkButton to="/pets">Encontrar um pet</LinkButton>
+          </EmptyState>
         )}
       </section>
     </div>
