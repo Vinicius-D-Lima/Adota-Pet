@@ -170,15 +170,12 @@ export function HomePage() {
           {profileQuery.data?.isComplete && (
             <PetGrid>
               {recommendedPets.map(({ pet, result }) => (
-                <div key={pet.id} className="relative">
-                  <div className="absolute right-4 top-4 z-10 rounded-lg bg-white px-3 py-2 shadow-md">
-                    <div className="text-sm font-bold text-forest-700">{result.score}%</div>
-                    <div className="text-[10px] text-muted">
-                      Compatibilidade {result.level.toLowerCase()}
-                    </div>
-                  </div>
-                  <PetCard pet={pet} />
-                </div>
+                <PetCard
+                  key={pet.id}
+                  pet={pet}
+                  compatibilityScore={result.score}
+                  compatibilityLevel={result.level}
+                />
               ))}
             </PetGrid>
           )}

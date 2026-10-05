@@ -7,6 +7,8 @@ import { Card, TextLink, cx } from './ui'
 
 interface PetCardProps {
   pet: Pet
+  compatibilityScore?: number
+  compatibilityLevel?: 'Alta' | 'Média' | 'Baixa'
 }
 
 export function TraitList({ traits, large = false }: { traits: string[]; large?: boolean }) {
@@ -27,7 +29,7 @@ export function TraitList({ traits, large = false }: { traits: string[]; large?:
   )
 }
 
-export function PetCard({ pet }: PetCardProps) {
+export function PetCard({ pet, compatibilityScore, compatibilityLevel }: PetCardProps) {
   const { isFavorite, toggle, isPending } = useFavorite(pet.id)
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
@@ -72,6 +74,16 @@ export function PetCard({ pet }: PetCardProps) {
         <p className="text-xs text-muted">
           {pet.breed} · {pet.ageLabel} · {pet.size}
         </p>
+        {compatibilityScore !== undefined && compatibilityLevel && (
+          <div className="mt-3 flex items-center justify-between rounded-lg bg-forest-50 px-3 py-2">
+            <div>
+              <p className="mb-0 text-xs font-semibold text-forest-700">
+                Compatibilidade {compatibilityLevel.toLowerCase()}
+              </p>
+            </div>
+            <span className="text-lg font-bold text-forest-800">{compatibilityScore}%</span>
+          </div>
+        )}
         <HealthBadges pet={pet} />
         <p className="min-h-12 text-sm leading-[1.55] text-[#53635b]">{pet.summary}</p>
         <TraitList traits={pet.traits.slice(0, 3)} />
