@@ -1,6 +1,18 @@
 # AdotaPet Frontend
 
-Protótipo funcional em React + TypeScript do fluxo principal de adoção responsável do AdotaPet. Todos os dados são locais e ficam em variáveis/estado dos componentes, sem API ou banco de dados.
+Frontend em React + TypeScript do fluxo principal de adoção responsável do AdotaPet. Os dados vêm de uma **API REST simulada** (json-server) que persiste em arquivo; ainda não há backend, banco de dados nem autenticação reais.
+
+## Documentação
+
+A documentação completa está em [`docs/`](docs/README.md):
+
+- [Visão geral](docs/visao-geral.md): escopo, o que ficou fora e como executar
+- [Funcionalidades](docs/funcionalidades.md): telas e regras de negócio
+- [Arquitetura](docs/arquitetura.md): stack, pastas, fluxo de dados e cache
+- [API simulada](docs/api-simulada.md): contrato, validações e erros
+- [Componentes](docs/componentes-ui.md): biblioteca de UI e componentes da aplicação
+- [Qualidade, testes e CI](docs/qualidade-e-ci.md): scripts, estratégia de testes e fluxo de PRs
+- [Decisões técnicas](docs/decisoes.md), [Histórico](docs/historico.md) e [Roadmap](docs/roadmap.md)
 
 ## Fluxo implementado
 
@@ -10,8 +22,9 @@ Protótipo funcional em React + TypeScript do fluxo principal de adoção respon
 4. Compatibilidade com o perfil do adotante
 5. Questionário de adoção com validação
 6. Envio e confirmação da solicitação
-7. Acompanhamento e cancelamento de solicitações
-8. Edição do perfil usado na compatibilidade
+7. Acompanhamento e cancelamento de solicitações (com confirmação)
+8. Favoritos
+9. Edição do perfil usado na compatibilidade
 
 ## Executar
 
@@ -60,7 +73,7 @@ O json-server é um processo Node separado. `npm run build && npm run preview` t
 npm test
 ```
 
-Cobre as regras de negócio do `mock-server/server.js` (Vitest + supertest).
+Roda toda a suíte: o frontend (Vitest + Testing Library + jsdom) e a API simulada (Vitest + supertest), incluindo o teste de contrato. Veja [docs/qualidade-e-ci.md](docs/qualidade-e-ci.md).
 
 Para gerar o build de produção (checagem de tipos + build do Vite):
 
@@ -116,8 +129,20 @@ O workflow `.github/workflows/ci.yml` roda em todo PR e em push na `main`:
 
 ## Organização
 
-- `src/components`: componentes reutilizáveis de layout, cards, formulários e etapas
-- `src/pages`: páginas do fluxo principal
-- `src/data/pets.ts`: massa de dados local para pets, perfil e solicitações
-- `src/types.ts`: tipos compartilhados (`Pet`, `Profile`, `AdoptionRequest`, etc.)
-- `src/App.tsx`: rotas e estado principal da simulação
+```
+src/
+├── components/   componentes da aplicação (Layout, PetCard, ConfirmDialog, ErrorBoundary...)
+│   └── ui/       biblioteca de componentes reutilizáveis
+├── pages/        uma página por rota
+├── hooks/        acesso à API com TanStack Query
+├── schemas/      schemas Zod: contrato de dados do frontend
+├── lib/          cliente HTTP, ApiError e QueryClient
+├── utils/        funções puras (compatibilidade, status de solicitação, datas...)
+├── test/         utilitários e fixtures de teste
+├── types.ts      tipos derivados dos schemas
+└── App.tsx       rotas, carregamento sob demanda e Error Boundary
+mock-server/      API simulada (json-server), seed e testes
+docs/             documentação
+```
+
+Detalhes em [docs/arquitetura.md](docs/arquitetura.md).
