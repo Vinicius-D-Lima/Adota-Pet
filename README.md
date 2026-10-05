@@ -1,6 +1,6 @@
 # AdotaPet Frontend
 
-Frontend em React + TypeScript do fluxo principal de adoção responsável do AdotaPet. Os dados vêm de uma **API REST simulada** (json-server) que persiste em arquivo; ainda não há backend, banco de dados nem autenticação reais.
+Frontend em React + TypeScript (Tailwind CSS e react-hook-form) do fluxo principal de adoção responsável do AdotaPet. Os dados vêm de uma **API REST simulada** (json-server) que persiste em arquivo; ainda não há backend, banco de dados nem autenticação reais.
 
 ## Documentação
 
@@ -13,6 +13,8 @@ A documentação completa está em [`docs/`](docs/README.md):
 - [Componentes](docs/componentes-ui.md): biblioteca de UI e componentes da aplicação
 - [Qualidade, testes e CI](docs/qualidade-e-ci.md): scripts, estratégia de testes e fluxo de PRs
 - [Decisões técnicas](docs/decisoes.md), [Histórico](docs/historico.md) e [Roadmap](docs/roadmap.md)
+- Manuais: [instalação](docs/manual-de-instalacao.md), [operação](docs/manual-de-operacao.md) e [usuário](docs/manual-do-usuario.md)
+- Projeto: [Plano de Projeto](docs/plano-de-projeto.md), [escopo prometido x entregue](docs/escopo-prometido-vs-entregue.md) e [prototipagem e refinamento](docs/prototipagem-e-refinamento.md)
 
 ## Fluxo implementado
 
@@ -89,7 +91,7 @@ npm run typecheck
 
 ## Componentes de UI
 
-Os componentes reutilizáveis ficam em `src/components/ui/` (importe de `../components/ui`) e seus estilos em `src/components/ui/ui.css`. Convenção de props: `variant`, `size`, `disabled`, `loading`, `invalid`/`error`, `fullWidth`.
+Os componentes reutilizáveis ficam em `src/components/ui/` (importe de `../components/ui`) e são estilizados com classes do **Tailwind CSS** (tokens em `src/index.css`; `cx` junta classes). Convenção de props: `variant`, `size`, `disabled`, `loading`, `invalid`/`error`, `fullWidth`.
 
 | Componente                                | Uso                                                                                                                                                |
 | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -104,8 +106,8 @@ Os componentes reutilizáveis ficam em `src/components/ui/` (importe de `../comp
 | `Spinner`, `PageIntro`                    | Indicador de carregamento e cabeçalho de página                                                                                                    |
 
 ```tsx
-<Field label="Nome" error={errors.name}>
-  <Input value={name} onChange={onChange} invalid={Boolean(errors.name)} />
+<Field label="Nome" error={errors.name?.message}>
+  <Input {...register('name')} invalid={Boolean(errors.name)} />
 </Field>
 <Button type="submit" loading={isPending}>Salvar</Button>
 <LinkButton variant="secondary" to="/pets">Ver pets</LinkButton>
@@ -139,6 +141,7 @@ src/
 ├── lib/          cliente HTTP, ApiError e QueryClient
 ├── utils/        funções puras (compatibilidade, status de solicitação, datas...)
 ├── test/         utilitários e fixtures de teste
+├── index.css     Tailwind: tokens (@theme) e base
 ├── types.ts      tipos derivados dos schemas
 └── App.tsx       rotas, carregamento sob demanda e Error Boundary
 mock-server/      API simulada (json-server), seed e testes

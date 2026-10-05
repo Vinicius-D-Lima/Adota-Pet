@@ -10,7 +10,7 @@ Importe sempre do índice:
 import { Button, LinkButton, Field, Input, Alert } from '../components/ui'
 ```
 
-Os estilos ficam em `src/components/ui/ui.css`. Convenção de props, igual em todos os componentes: `variant`, `size`, `disabled`, `loading`, `invalid` / `error` e `fullWidth`.
+Os estilos são classes do **Tailwind CSS** escritas no próprio componente (não há mais `ui.css`). `cx(...)` (um `tailwind-merge`) junta classes e deixa a última vencer em caso de conflito, e `buttonClass(...)` devolve as classes de botão para quem precisa de uma âncora ou botão com a mesma aparência. Convenção de props, igual em todos os componentes: `variant`, `size`, `disabled`, `loading`, `invalid` / `error` e `fullWidth`.
 
 | Componente                                | Uso                                                                                                                                                                                  |
 | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -25,12 +25,16 @@ Os estilos ficam em `src/components/ui/ui.css`. Convenção de props, igual em t
 | `EmptyState`                              | Estado vazio ou de erro: `icon`, `title`, `headingAs` (`h1` ou `h2`), `description`, `role="alert"` e filhos (a ação)                                                                |
 | `Spinner`                                 | Indicador de carregamento com `role="status"` e `label`                                                                                                                              |
 | `PageIntro`                               | Cabeçalho de página: `eyebrow`, `title` (o `h1`) e `description`                                                                                                                     |
+| `PageSurface`, `Container`                | Fundo da página e contêiner centralizado (`as` troca a tag e `className` ajusta o espaçamento)                                                                                       |
+| `Eyebrow`, `SectionHeading`, `FlowTitle`  | Sobretítulo, título de seção e título das telas do fluxo                                                                                                                             |
+| `BackLink`, `TextLink`                    | Link de volta com seta e link de texto                                                                                                                                               |
+| `InfoNote`, `Feedback`                    | Nota informativa (aviso de solicitação ativa) e mensagem centralizada de carregamento ou erro                                                                                        |
 
 ### Exemplos
 
 ```tsx
-<Field label="Nome" error={errors.name}>
-  <Input value={name} onChange={onChange} invalid={Boolean(errors.name)} />
+<Field label="Nome" error={errors.name?.message}>
+  <Input {...register('name')} invalid={Boolean(errors.name)} />
 </Field>
 
 <Button type="submit" loading={isPending}>Salvar</Button>
@@ -44,23 +48,26 @@ Os estilos ficam em `src/components/ui/ui.css`. Convenção de props, igual em t
 ### Notas
 
 - O que antes se chamava variante `ghost` agora é **`secondary`**.
+- `Input`, `Select`, `Textarea` e `Checkbox` são `forwardRef`, então funcionam direto com o `register` do react-hook-form (há um teste disso em `ui.test.tsx`).
+- Classes específicas de uma tela vão no `className` do componente; o `cx` resolve o conflito com as classes-base.
 - O ESLint reconhece `Input`, `Select` e `Textarea` como controles de formulário (`jsx-a11y/label-has-associated-control`), então o `Field` envolvendo um deles conta como rótulo associado.
 - **Botões próprios (fora da biblioteca):** o coração de favoritar, o botão do menu e os botões de alternância do filtro de porte têm estilo específico e continuam como `<button>` comuns.
 - Os testes da biblioteca estão em `src/components/ui/ui.test.tsx`.
 
 ## Componentes da aplicação (`src/components`)
 
-| Componente            | O que faz                                                                                                                                           |
-| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Layout`              | Cabeçalho, menu com contadores (favoritos e solicitações ativas), atalho do usuário, rodapé e a região do aviso de favoritos                        |
-| `PetCard`             | Cartão do pet: foto, distância, favoritar, dados, selos de saúde e link para o detalhe. `PetCardSkeleton` é o esqueleto de carregamento             |
-| `HealthBadges`        | Selos de vacinação e castração, sempre nos dois estados ("Vacinado" ou "Não vacinado", "Castrado" ou "Não castrado")                                |
-| `FlowSteps`           | As quatro etapas do fluxo de adoção, com a atual destacada                                                                                          |
-| `ActiveRequestNotice` | Aviso "Você já tem uma solicitação em andamento para {pet} ({código} · {status})", com link para as solicitações                                    |
-| `ConfirmDialog`       | Modal de confirmação acessível (ver abaixo)                                                                                                         |
-| `ErrorBoundary`       | Captura erros de renderização e mostra "Algo deu errado", com "Tentar novamente" e "Voltar ao início"; aceita `resetKeys` para se limpar ao navegar |
-| `NotFoundState`       | Tela de "não encontrado" com título, mensagem e link de volta. Usada na página 404 e para pet e solicitação inexistentes                            |
-| `FavoriteNotice`      | Aviso temporário (5 s) quando favoritar ou desfavoritar falha; é uma região `role="status"`                                                         |
+| Componente            | O que faz                                                                                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Layout`              | Cabeçalho, menu com contadores (favoritos e solicitações ativas), atalho do usuário, rodapé e a região do aviso de favoritos                                                   |
+| `PetCard`             | Cartão do pet: foto, distância, favoritar, dados, selos de saúde e link para o detalhe. `PetCardSkeleton` é o esqueleto de carregamento; `TraitList` mostra as características |
+| `PetGrid`             | Grade responsiva de cartões (1, 2 ou 3 colunas conforme a largura)                                                                                                             |
+| `HealthBadges`        | Selos de vacinação e castração, sempre nos dois estados ("Vacinado" ou "Não vacinado", "Castrado" ou "Não castrado")                                                           |
+| `FlowSteps`           | As quatro etapas do fluxo de adoção, com a atual destacada                                                                                                                     |
+| `ActiveRequestNotice` | Aviso "Você já tem uma solicitação em andamento para {pet} ({código} · {status})", com link para as solicitações                                                               |
+| `ConfirmDialog`       | Modal de confirmação acessível (ver abaixo)                                                                                                                                    |
+| `ErrorBoundary`       | Captura erros de renderização e mostra "Algo deu errado", com "Tentar novamente" e "Voltar ao início"; aceita `resetKeys` para se limpar ao navegar                            |
+| `NotFoundState`       | Tela de "não encontrado" com título, mensagem e link de volta. Usada na página 404 e para pet e solicitação inexistentes                                                       |
+| `FavoriteNotice`      | Aviso temporário (5 s) quando favoritar ou desfavoritar falha; é uma região `role="status"`                                                                                    |
 
 ### `ConfirmDialog`
 

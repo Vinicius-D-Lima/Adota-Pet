@@ -1,10 +1,30 @@
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
-import { type FormEvent, type ReactNode, useState } from 'react'
+import { ArrowLeft, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { type ReactNode, useState } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
 import { NotFoundState } from '../components/NotFoundState'
-import { Alert, Button, Checkbox, Field, Select, Textarea } from '../components/ui'
+import {
+  Alert,
+  BackLink,
+  Button,
+  Card,
+  Checkbox,
+  Container,
+  Eyebrow,
+  Feedback,
+  Field,
+  FlowTitle,
+  InfoNote,
+  PageSurface,
+  SectionHeading,
+  Select,
+  Textarea,
+  cardClass,
+  cx,
+} from '../components/ui'
 import {
   adoptionRequestKeys,
   fetchAdoptionRequests,
@@ -17,7 +37,6 @@ import { questionnaireSchema } from '../schemas/questionnaireSchema'
 import type { QuestionnaireAnswers } from '../types'
 import { profileFieldLabels } from '../utils/profileFieldLabels'
 import { isActiveRequest } from '../utils/requestStatus'
-import { getZodFieldErrors, type FieldErrors } from '../utils/zodFieldErrors'
 
 type FieldName = keyof QuestionnaireAnswers
 
@@ -36,8 +55,8 @@ const ANSWERS_PREFIX = 'answers.'
 const isFormField = (field: string): field is FieldName => field in initialForm
 
 /** Remove o prefixo `answers.` dos campos do servidor e descarta o que não existe no formulário. */
-function toFormErrors(error: ApiError): FieldErrors<FieldName> {
-  const errors: FieldErrors<FieldName> = {}
+function toFormErrors(error: ApiError): Partial<Record<FieldName, string>> {
+  const errors: Partial<Record<FieldName, string>> = {}
   for (const [field, message] of Object.entries(error.toFieldErrors())) {
     const name = field.startsWith(ANSWERS_PREFIX) ? field.slice(ANSWERS_PREFIX.length) : field
     if (isFormField(name)) errors[name] = message
@@ -64,12 +83,26 @@ export function QuestionnairePage() {
   const queryClient = useQueryClient()
   const createRequest = useCreateAdoptionRequest()
   const { request: activeRequest, isFetching: isCheckingRequests } = useActiveRequestLookup(petId)
-  const [form, setForm] = useState<QuestionnaireAnswers>(initialForm)
-  const [errors, setErrors] = useState<FieldErrors<FieldName>>({})
-  const [submitError, setSubmitError] = useState<ReactNode>('')
+  // A mensagem de erro vale só para a versão do formulário que foi enviada: editar a esconde.
+  const [failure, setFailure] = useState<{ message: ReactNode; values: unknown } | null>(null)
   const isSubmitting = createRequest.isPending
 
-  if (petQuery.isPending) return <div className="app-feedback">Carregando questionário...</div>
+  const {
+    register,
+    handleSubmit,
+    setError,
+    control,
+    formState: { errors, isDirty },
+  } = useForm<QuestionnaireAnswers>({
+    resolver: zodResolver(questionnaireSchema),
+    defaultValues: initialForm,
+  })
+
+  const values = useWatch({ control })
+
+  const submitError = failure?.values === values ? failure.message : ''
+
+  if (petQuery.isPending) return <Feedback>Carregando questionário...</Feedback>
   if (petQuery.isError) {
     const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
     if (notFound) {
@@ -83,42 +116,33 @@ export function QuestionnairePage() {
       )
     }
     return (
-      <div className="app-feedback error" role="alert">
+      <Feedback error>
         <div>
           <p>Não foi possível carregar o pet.</p>
           <Button variant="secondary" onClick={() => void petQuery.refetch()}>
             Tentar novamente
           </Button>
         </div>
-      </div>
+      </Feedback>
     )
   }
 
   // Redireciona só quem ainda não começou a preencher e com a lista já atualizada. Quem digitou,
   // enviou ou está enviando nunca é desviado: perderia as respostas, e a própria solicitação nova
   // (ativa depois do envio) atropelaria a navegação para /enviada. O 409 do servidor cobre o resto.
-  const isPristine = (Object.keys(initialForm) as FieldName[]).every(
-    (field) => form[field] === initialForm[field],
-  )
-  if (activeRequest && isPristine && !isCheckingRequests) {
+  if (activeRequest && !isDirty && !isCheckingRequests) {
     return <Navigate to="/solicitacoes" replace />
   }
 
   const pet = petQuery.data
 
-  const update = <K extends FieldName>(key: K, value: QuestionnaireAnswers[K]) => {
-    setForm((current) => ({ ...current, [key]: value }))
-    setErrors((current) => ({ ...current, [key]: undefined }))
-    setSubmitError('')
-  }
-
   const describeFailure = async (error: unknown): Promise<ReactNode> => {
     if (!(error instanceof ApiError)) return GENERIC_ERROR
 
     if (error.statusCode === 400) {
-      const fieldErrors = toFormErrors(error)
-      if (Object.keys(fieldErrors).length === 0) return GENERIC_ERROR
-      setErrors(fieldErrors)
+      const fieldErrors = Object.entries(toFormErrors(error)) as [FieldName, string][]
+      if (fieldErrors.length === 0) return GENERIC_ERROR
+      for (const [field, message] of fieldErrors) setError(field, { type: 'server', message })
       return 'Revise os campos destacados e tente novamente.'
     }
 
@@ -169,170 +193,169 @@ export function QuestionnairePage() {
     return GENERIC_ERROR
   }
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const submit = handleSubmit(async (answers) => {
     if (isSubmitting) return
-    const result = questionnaireSchema.safeParse(form)
-
-    if (!result.success) {
-      setErrors(getZodFieldErrors<FieldName>(result.error))
-      return
-    }
-
-    setErrors({})
-    setSubmitError('')
+    setFailure(null)
 
     try {
-      const request = await createRequest.mutateAsync({ petId: pet.id, answers: result.data })
+      const request = await createRequest.mutateAsync({ petId: pet.id, answers })
       navigate(`/solicitacoes/${request.id}/enviada`)
     } catch (error) {
-      setSubmitError(await describeFailure(error))
+      setFailure({ message: await describeFailure(error), values })
     }
-  }
+  })
+
+  const sideItem = 'flex items-center gap-2 text-[11px] font-semibold text-forest-700'
 
   return (
-    <div className="page-surface">
-      <section className="container flow-page narrow-flow">
-        <Link className="back-link" to={`/pets/${pet.id}/compatibilidade`}>
+    <PageSurface>
+      <Container as="section" className="max-w-[1080px] pb-[90px] pt-[35px] md:pt-[54px]">
+        <BackLink to={`/pets/${pet.id}/compatibilidade`}>
           <ArrowLeft size={17} /> Voltar para compatibilidade
-        </Link>
+        </BackLink>
         <FlowSteps current={2} />
-        <div className="flow-title compact">
-          <span className="eyebrow">Questionário de adoção</span>
-          <h1>Conte um pouco sobre a vida que você imagina com {pet.name}.</h1>
-          <p>
-            Suas respostas ajudam {pet.organization} a entender melhor sua rotina e suas
-            expectativas.
-          </p>
-        </div>
-        <div className="questionnaire-layout">
-          <form className="questionnaire-card" onSubmit={submit} noValidate>
-            <div className="form-section-heading">
-              <span>1</span>
-              <div>
-                <h2>Sua motivação e rotina</h2>
-                <p>Responda com sinceridade. Não existe resposta perfeita.</p>
-              </div>
-            </div>
+        <FlowTitle
+          compact
+          eyebrow="Questionário de adoção"
+          title={`Conte um pouco sobre a vida que você imagina com ${pet.name}.`}
+          description={`Suas respostas ajudam ${pet.organization} a entender melhor sua rotina e suas expectativas.`}
+        />
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <form
+            className={cx(cardClass, 'px-[18px] py-[22px] md:p-[30px]')}
+            onSubmit={submit}
+            noValidate
+          >
+            <SectionHeading
+              number={1}
+              title="Sua motivação e rotina"
+              description="Responda com sinceridade. Não existe resposta perfeita."
+            />
             <Field
               label={`Por que você quer adotar ${pet.name}?`}
-              hint={`${form.motivation.length}/500 caracteres`}
-              error={errors.motivation}
+              hint={`${(values.motivation ?? '').length}/500 caracteres`}
+              error={errors.motivation?.message}
               full
             >
               <Textarea
                 maxLength={500}
                 rows={5}
-                value={form.motivation}
-                onChange={(event) => update('motivation', event.target.value)}
-                aria-invalid={Boolean(errors.motivation)}
+                invalid={Boolean(errors.motivation)}
                 placeholder="Conte o que chamou sua atenção e o que espera dessa adoção..."
+                {...register('motivation')}
               />
             </Field>
             <Field
               label="Como é um dia comum na sua casa?"
-              hint={`${form.routine.length}/500 caracteres`}
-              error={errors.routine}
+              hint={`${(values.routine ?? '').length}/500 caracteres`}
+              error={errors.routine?.message}
               full
             >
               <Textarea
                 maxLength={500}
                 rows={5}
-                value={form.routine}
-                onChange={(event) => update('routine', event.target.value)}
-                aria-invalid={Boolean(errors.routine)}
+                invalid={Boolean(errors.routine)}
                 placeholder="Fale sobre horários, pessoas em casa, passeios e atividades..."
+                {...register('routine')}
               />
             </Field>
-            <Field label="Por quanto tempo o pet ficaria sozinho?" error={errors.aloneTime} full>
-              <Select
-                value={form.aloneTime}
-                onChange={(event) =>
-                  update('aloneTime', event.target.value as QuestionnaireAnswers['aloneTime'])
-                }
-                aria-invalid={Boolean(errors.aloneTime)}
-              >
+            <Field
+              label="Por quanto tempo o pet ficaria sozinho?"
+              error={errors.aloneTime?.message}
+              full
+            >
+              <Select invalid={Boolean(errors.aloneTime)} {...register('aloneTime')}>
                 <option>Até 2 horas</option>
                 <option>Até 4 horas</option>
                 <option>De 4 a 8 horas</option>
                 <option>Mais de 8 horas</option>
               </Select>
             </Field>
-            <div className="form-section-heading second">
-              <span>2</span>
-              <div>
-                <h2>Adaptação e compromisso</h2>
-                <p>A adoção é um compromisso para toda a vida do animal.</p>
-              </div>
-            </div>
+            <SectionHeading
+              separated
+              number={2}
+              title="Adaptação e compromisso"
+              description="A adoção é um compromisso para toda a vida do animal."
+            />
             <Field
               label="Como você pretende conduzir o período de adaptação?"
-              hint={`${form.adaptation.length}/350 caracteres`}
-              error={errors.adaptation}
+              hint={`${(values.adaptation ?? '').length}/350 caracteres`}
+              error={errors.adaptation?.message}
               full
             >
               <Textarea
                 maxLength={350}
                 rows={4}
-                value={form.adaptation}
-                onChange={(event) => update('adaptation', event.target.value)}
-                aria-invalid={Boolean(errors.adaptation)}
+                invalid={Boolean(errors.adaptation)}
                 placeholder="Conte sobre o espaço, a rotina inicial e a adaptação com outros moradores..."
+                {...register('adaptation')}
               />
             </Field>
             <Checkbox
-              checked={form.costs}
-              onChange={(event) => update('costs', event.target.checked)}
               label="Estou ciente dos custos recorrentes"
               description="Alimentação, vacinas, consultas, medicamentos e outros cuidados."
-              error={errors.costs}
+              error={errors.costs?.message}
+              {...register('costs')}
             />
             <Checkbox
-              checked={form.commitment}
-              onChange={(event) => update('commitment', event.target.checked)}
               label="Assumo o compromisso com o bem-estar do pet"
               description="Inclusive em mudanças de rotina, moradia ou composição familiar."
-              error={errors.commitment}
+              error={errors.commitment?.message}
+              {...register('commitment')}
             />
             {submitError && <Alert>{submitError}</Alert>}
-            <div className="questionnaire-actions">
-              <span>Suas respostas ficam salvas apenas nesta simulação.</span>
-              <Button type="submit" loading={isSubmitting}>
+            <div className="mt-[27px] flex flex-col justify-between gap-[15px] md:flex-row md:items-center">
+              <span className="max-w-[220px] text-[9px] text-muted">
+                Suas respostas ficam salvas apenas nesta simulação.
+              </span>
+              <Button type="submit" loading={isSubmitting} className="max-md:w-full">
                 {isSubmitting ? 'Enviando...' : 'Revisar e enviar solicitação'}{' '}
                 {!isSubmitting && <ArrowRight size={18} />}
               </Button>
             </div>
           </form>
-          <aside className="pet-side-summary">
-            <img src={pet.image} alt={pet.name} width={400} height={300} loading="lazy" />
-            <div>
-              <span className="eyebrow">Sua solicitação</span>
-              <h2>{pet.name}</h2>
-              <p>
+          <Card
+            as="aside"
+            className="overflow-hidden md:max-lg:grid md:max-lg:grid-cols-[180px_1fr] lg:sticky lg:top-[100px]"
+          >
+            <img
+              className="h-[210px] w-full object-cover md:max-lg:row-span-3 md:max-lg:h-full lg:h-[180px]"
+              src={pet.image}
+              alt={pet.name}
+              width={400}
+              height={300}
+              loading="lazy"
+            />
+            <div className="px-5 pb-3 pt-5">
+              <Eyebrow>Sua solicitação</Eyebrow>
+              <h2 className="-mt-[7px] mb-0.5 text-[28px]">{pet.name}</h2>
+              <p className="text-[11px] text-muted">
                 {pet.breed} · {pet.ageLabel}
               </p>
             </div>
-            <ul>
-              <li>
+            <ul className="m-0 grid list-none gap-[11px] px-5 pb-[18px] pt-1">
+              <li className={sideItem}>
                 <CheckCircle2 size={16} /> Perfil preenchido
               </li>
-              <li>
+              <li className={sideItem}>
                 <CheckCircle2 size={16} /> Compatibilidade calculada
               </li>
-              <li className="current">
-                <span>3</span> Questionário em andamento
+              <li className={cx(sideItem, 'text-coral-dark')}>
+                <span className="grid size-4 place-items-center rounded-full bg-coral text-[9px] text-white">
+                  3
+                </span>{' '}
+                Questionário em andamento
               </li>
             </ul>
-            <div className="info-note">
-              <Info size={17} />
-              <p>
+            <InfoNote className="mx-[15px] mb-[15px] md:max-lg:col-start-2">
+              <p className="mb-0">
                 Depois do envio, a organização poderá entrar em contato para conversar e agendar uma
                 visita.
               </p>
-            </div>
-          </aside>
+            </InfoNote>
+          </Card>
         </div>
-      </section>
-    </div>
+      </Container>
+    </PageSurface>
   )
 }

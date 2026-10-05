@@ -8,13 +8,15 @@
 | Build e dev server   | Vite 6 (com proxy `/api` → API simulada)                                           |
 | Rotas                | react-router-dom 7                                                                 |
 | Estado do servidor   | TanStack Query v5 (`useQuery`, `useInfiniteQuery`, `useMutation`, devtools em dev) |
+| Estilos              | Tailwind CSS 4 (plugin `@tailwindcss/vite`, tokens no `@theme`), `tailwind-merge`  |
+| Formulários          | react-hook-form 7 + `@hookform/resolvers` (`zodResolver`)                          |
 | Validação em runtime | Zod 4                                                                              |
 | Ícones               | lucide-react                                                                       |
 | API simulada         | json-server 0.17.4 (Express por baixo)                                             |
 | Testes               | Vitest 5, Testing Library, jsdom, supertest (API simulada)                         |
 | Qualidade            | ESLint 9 (flat config), Prettier, GitHub Actions                                   |
 
-Não há biblioteca de estado global nem de CSS: o estado compartilhado vive no cache do TanStack Query, e os estilos são CSS puro (`src/styles.css` e `src/components/ui/ui.css`).
+Não há biblioteca de estado global: o estado compartilhado vive no cache do TanStack Query. Os estilos são classes utilitárias do **Tailwind CSS 4**, com os tokens do projeto (cores, fontes e sombra) declarados em `src/index.css`. Os formulários (questionário e perfil) usam **react-hook-form** com o mesmo schema Zod do contrato.
 
 ## Estrutura de pastas
 
@@ -34,7 +36,7 @@ Não há biblioteca de estado global nem de CSS: o estado compartilhado vive no 
     ├── main.tsx                  # entrada: providers, roteador e Error Boundary raiz
     ├── App.tsx                   # rotas, lazy loading e Error Boundary por rota
     ├── types.ts                  # tipos públicos (derivados dos schemas Zod)
-    ├── styles.css                # estilos globais
+    ├── index.css                 # Tailwind: @import, tokens (@theme) e base
     ├── components/               # componentes da aplicação
     │   └── ui/                   # biblioteca de componentes reutilizáveis
     ├── pages/                    # uma página por rota
@@ -134,11 +136,12 @@ O arquivo `mock-server/contract.test.js` valida as **respostas reais** do servid
 | `formatRequestDate`      | Data ISO em pt-BR (devolve o texto original se a data for inválida)                                                         |
 | `getInitials`            | Iniciais do nome, ignorando "de", "da", "do", "das", "dos" e "e"                                                            |
 | `profileFieldLabels`     | Rótulos amigáveis dos campos do perfil                                                                                      |
-| `zodFieldErrors`         | Converte erros do Zod em `{ campo: mensagem }`                                                                              |
 
 ## Convenções de código
 
 - TypeScript `strict`, com `noUnusedLocals` e `noUnusedParameters`.
+- Estilos: classes do Tailwind direto no JSX; para juntar classes condicionais use `cx` (`tailwind-merge`), e não concatenação de strings. Cores e fontes vêm dos tokens (`bg-forest-800`, `text-muted`, `font-display`), e valores soltos só quando o token não existe.
+- Formulários: `useForm` com `zodResolver(schema)`; campos registrados com `register` nos componentes `Input`, `Select`, `Textarea` e `Checkbox` (que repassam a `ref`); erros de servidor (400) entram com `setError`.
 - Prettier: sem ponto e vírgula, aspas simples, vírgula final, largura 100.
 - Páginas não chamam `fetch`; hooks não conhecem JSX.
 - Respostas da API são lidas com `unknown` e validadas por um schema Zod antes de chegar à tela (o perfil do adotante ainda é convertido à mão por `toAdopterProfile`).

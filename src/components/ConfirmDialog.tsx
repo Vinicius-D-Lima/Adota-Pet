@@ -100,7 +100,7 @@ export function ConfirmDialog({
   return createPortal(
     <div
       ref={backdropRef}
-      className="modal-backdrop"
+      className="fixed inset-0 z-[1000] grid place-items-center bg-[#0f2a1f]/50 p-5"
       role="presentation"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget && !busy) onClose()
@@ -108,16 +108,20 @@ export function ConfirmDialog({
     >
       <div
         ref={dialogRef}
-        className="modal"
+        className="w-[min(440px,100%)] rounded-[20px] bg-white p-7 shadow-soft"
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         tabIndex={-1}
       >
-        <h2 id={titleId}>{title}</h2>
-        <p id={descriptionId}>{description}</p>
-        <div className="modal-actions">
+        <h2 id={titleId} className="mb-2.5 text-2xl">
+          {title}
+        </h2>
+        <p id={descriptionId} className="mb-0 text-muted">
+          {description}
+        </p>
+        <div className="mt-6 flex flex-wrap justify-end gap-3">
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             {cancelLabel}
           </Button>

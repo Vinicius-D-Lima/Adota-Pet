@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
-import { Button } from './ui'
+import { Button, buttonClass } from './ui'
 
 interface ErrorBoundaryProps {
   children: ReactNode
@@ -35,14 +35,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (!this.state.hasError) return this.props.children
 
     return (
-      <div className="app-feedback error" role="alert">
+      <div
+        className="flex min-h-[60vh] items-center justify-center p-8 text-center text-[#a33f2d]"
+        role="alert"
+      >
         <div>
-          <h1>Algo deu errado</h1>
+          <h1 className="text-[32px]">Algo deu errado</h1>
           <p>Não foi possível exibir esta página. Tente novamente ou volte ao início.</p>
-          <div className="feedback-actions">
+          <div className="mt-[18px] flex flex-wrap justify-center gap-3">
             <Button onClick={() => this.setState({ hasError: false })}>Tentar novamente</Button>
             {/* <a> comum de propósito: recarrega o app caso o roteador também tenha quebrado */}
-            <a className="button secondary" href="/">
+            <a className={buttonClass({ variant: 'secondary' })} href="/">
               Voltar ao início
             </a>
           </div>

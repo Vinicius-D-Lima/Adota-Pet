@@ -40,6 +40,10 @@ O workflow `.github/workflows/ci.yml` roda em **todo pull request** e em **push 
 - **Prettier:** sem ponto e vírgula, aspas simples, vírgula final em tudo e largura de 100 colunas. O `eslint-config-prettier` evita conflito entre as duas ferramentas.
 - O Prettier também confere os arquivos Markdown, inclusive esta documentação.
 
+## Tailwind
+
+O Tailwind é processado pelo Vite (`@tailwindcss/vite`), então não há `tailwind.config` nem etapa extra no CI: o `npm run build` falha se `src/index.css` quebrar. Uma classe que não existe simplesmente não aplica, sem erro. Por isso o visual das telas alteradas deve ser conferido no navegador.
+
 ## TypeScript
 
 Modo `strict`, com `noUnusedLocals`, `noUnusedParameters` e `noFallthroughCasesInSwitch`. O `tsconfig.node.json` usa `noEmit`, e os `*.tsbuildinfo` ficam fora do git.
@@ -47,20 +51,20 @@ Modo `strict`, com `noUnusedLocals`, `noUnusedParameters` e `noFallthroughCasesI
 ## Testes
 
 - **Ferramentas:** Vitest 5, Testing Library (`@testing-library/react`, `jest-dom`, `user-event`), jsdom e supertest.
-- **Situação em 05/10/2026:** **165 testes em 24 arquivos**, todos passando na `dev`.
+- **Situação em 05/10/2026:** **169 testes em 24 arquivos**, todos passando na branch `refact/dependencies-docs`.
 - **Onde ficam:** ao lado do código (`Componente.test.tsx`), mais `src/test/` para utilitários e `mock-server/*.test.js` para a API simulada.
 
 ### Estratégia
 
-| Camada                  | O que se testa                                                                                                    |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| Funções puras (`utils`) | Compatibilidade (incluindo 100%, 86%, 71% e 43%), status, datas, iniciais                                         |
-| Hooks                   | Listagem de pets e favoritos (otimista, fila, falha e desfazer)                                                   |
-| Páginas                 | Estados de carregamento, erro e vazio; filtros na URL; questionário; solicitações; perfil; bloqueio de duplicadas |
-| Componentes             | Biblioteca de UI, `ErrorBoundary`, `ConfirmDialog` (foco, Esc, clique fora), `Layout`, `PetCard`                  |
-| Cliente HTTP            | Montagem de URL, listas em `query`, erros e `204`                                                                 |
-| API simulada            | Regras de negócio e todos os códigos de erro                                                                      |
-| **Contrato**            | Respostas reais do mock contra os schemas Zod do frontend                                                         |
+| Camada                  | O que se testa                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Funções puras (`utils`) | Compatibilidade (incluindo 100%, 86%, 71% e 43%), status, datas, iniciais                                                                 |
+| Hooks                   | Listagem de pets e favoritos (otimista, fila, falha e desfazer)                                                                           |
+| Páginas                 | Estados de carregamento, erro e vazio; filtros na URL; questionário; solicitações; perfil; bloqueio de duplicadas                         |
+| Componentes             | Biblioteca de UI (classes do Tailwind, `cx` e repasse de `ref` ao react-hook-form), `ErrorBoundary`, `ConfirmDialog`, `Layout`, `PetCard` |
+| Cliente HTTP            | Montagem de URL, listas em `query`, erros e `204`                                                                                         |
+| API simulada            | Regras de negócio e todos os códigos de erro                                                                                              |
+| **Contrato**            | Respostas reais do mock contra os schemas Zod do frontend                                                                                 |
 
 ### Utilitários de teste (`src/test`)
 

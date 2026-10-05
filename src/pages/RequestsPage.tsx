@@ -6,9 +6,12 @@ import {
   Alert,
   Button,
   Card,
+  Container,
   EmptyState,
+  Feedback,
   LinkButton,
   PageIntro,
+  PageSurface,
   StatusPill,
 } from '../components/ui'
 import { useAdoptionRequests, useCancelAdoptionRequest } from '../hooks/useAdoptionRequests'
@@ -45,23 +48,19 @@ export function RequestsPage() {
   }
 
   if (requestsQuery.isPending) {
-    return <div className="app-feedback">Carregando solicitações...</div>
+    return <Feedback>Carregando solicitações...</Feedback>
   }
 
   // Só é erro de tela cheia se nunca houve dados: um refetch que falha não pode derrubar o modal aberto.
   if (requestsQuery.isLoadingError) {
-    return (
-      <div className="app-feedback error" role="alert">
-        Não foi possível carregar suas solicitações. Tente novamente.
-      </div>
-    )
+    return <Feedback error>Não foi possível carregar suas solicitações. Tente novamente.</Feedback>
   }
 
   const requests = requestsQuery.data
 
   return (
-    <div className="page-surface">
-      <section className="container page-section">
+    <PageSurface>
+      <Container as="section" className="pb-[90px] pt-[35px] md:pt-[54px]">
         <PageIntro
           eyebrow="Acompanhamento"
           title="Minhas solicitações"
@@ -69,41 +68,52 @@ export function RequestsPage() {
         />
         {cancelError && <Alert>{cancelError}</Alert>}
         {requests.length ? (
-          <div className="requests-list">
+          <div className="grid max-w-[930px] gap-3.5">
             {requests.map((request) => {
               const { pet } = request
               return (
                 <Card
                   as="article"
-                  className="request-card"
+                  className="grid grid-cols-[90px_1fr] gap-5 rounded-[18px] p-4 md:grid-cols-[145px_minmax(0,1fr)_auto]"
                   id={`request-${request.id}`}
                   key={request.id}
                   tabIndex={-1}
                 >
                   {pet && (
-                    <img src={pet.image} alt={pet.name} width={145} height={110} loading="lazy" />
+                    <img
+                      className="h-[100px] w-[90px] rounded-[13px] object-cover md:h-[135px] md:w-[145px]"
+                      src={pet.image}
+                      alt={pet.name}
+                      width={145}
+                      height={110}
+                      loading="lazy"
+                    />
                   )}
-                  <div className="request-main">
-                    <div className="request-topline">
+                  <div className="py-[7px]">
+                    <div className="flex flex-col-reverse items-start justify-between gap-[15px] md:flex-row">
                       <div>
-                        <span className="request-code">{request.id}</span>
-                        <h2>{pet ? pet.name : 'Pet indisponível'}</h2>
+                        <span className="text-[9px] font-bold tracking-[0.08em] text-muted">
+                          {request.id}
+                        </span>
+                        <h2 className="mb-2 mt-[3px] text-[27px]">
+                          {pet ? pet.name : 'Pet indisponível'}
+                        </h2>
                       </div>
                       <StatusPill status={request.status} />
                     </div>
-                    <p>{request.message}</p>
-                    <div className="request-meta">
-                      <span>
+                    <p className="text-xs text-muted">{request.message}</p>
+                    <div className="flex flex-wrap gap-[18px] text-[10px] text-muted">
+                      <span className="flex items-center gap-[5px]">
                         <CalendarDays size={16} /> Enviada em {formatRequestDate(request.date)}
                       </span>
                       {pet && (
-                        <span>
+                        <span className="flex items-center gap-[5px]">
                           <MapPin size={16} /> {pet.organization}
                         </span>
                       )}
                     </div>
                   </div>
-                  <div className="request-actions">
+                  <div className="col-span-2 flex items-center justify-between md:col-span-1 md:flex-col md:items-end">
                     {canCancelRequest(request.status) && (
                       <Button
                         variant="text-danger"
@@ -117,7 +127,7 @@ export function RequestsPage() {
                     )}
                     {pet && (
                       <Link
-                        className="icon-button"
+                        className="grid size-[38px] place-items-center rounded-[10px] border border-line text-forest-800"
                         to={`/pets/${pet.id}`}
                         aria-label={`Ver ${pet.name}`}
                       >
@@ -138,7 +148,7 @@ export function RequestsPage() {
             <LinkButton to="/pets">Encontrar um pet</LinkButton>
           </EmptyState>
         )}
-      </section>
+      </Container>
       {toCancel && (
         <ConfirmDialog
           title={`Cancelar a solicitação de ${toCancel.request.pet?.name ?? 'este pet'}?`}
@@ -155,6 +165,6 @@ export function RequestsPage() {
           onClose={() => setToCancel(null)}
         />
       )}
-    </div>
+    </PageSurface>
   )
 }

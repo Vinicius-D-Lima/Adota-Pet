@@ -1,25 +1,26 @@
 import { Heart } from 'lucide-react'
-import { Button, EmptyState, LinkButton, PageIntro } from '../components/ui'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
+import { PetGrid } from '../components/PetGrid'
+import { Button, Container, EmptyState, LinkButton, PageIntro, PageSurface } from '../components/ui'
 import { useFavoritePets } from '../hooks/useFavorites'
 
 export function FavoritesPage() {
   const favoritesQuery = useFavoritePets()
 
   return (
-    <div className="page-surface">
-      <section className="container page-section">
+    <PageSurface>
+      <Container as="section" className="pb-[90px] pt-[35px] md:pt-[54px]">
         <PageIntro
           eyebrow="Seus preferidos"
           title="Favoritos"
           description="Os pets que chamaram sua atenção ficam guardados aqui."
         />
         {favoritesQuery.isPending ? (
-          <div className="pet-grid" aria-label="Carregando favoritos">
+          <PetGrid aria-label="Carregando favoritos">
             {Array.from({ length: 3 }, (_, index) => (
               <PetCardSkeleton key={index} />
             ))}
-          </div>
+          </PetGrid>
         ) : favoritesQuery.isError ? (
           <EmptyState
             title="Não foi possível carregar seus favoritos"
@@ -29,11 +30,11 @@ export function FavoritesPage() {
             <Button onClick={() => void favoritesQuery.refetch()}>Tentar novamente</Button>
           </EmptyState>
         ) : favoritesQuery.data.length ? (
-          <div className="pet-grid">
+          <PetGrid>
             {favoritesQuery.data.map((pet) => (
               <PetCard key={pet.id} pet={pet} />
             ))}
-          </div>
+          </PetGrid>
         ) : (
           <EmptyState
             icon={<Heart size={36} />}
@@ -43,7 +44,7 @@ export function FavoritesPage() {
             <LinkButton to="/pets">Encontrar um pet</LinkButton>
           </EmptyState>
         )}
-      </section>
-    </div>
+      </Container>
+    </PageSurface>
   )
 }

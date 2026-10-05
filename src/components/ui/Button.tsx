@@ -1,18 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Link, type LinkProps } from 'react-router-dom'
+import { buttonClass, type ButtonStyleProps } from './buttonClass'
 import { cx } from './cx'
-
-export type ButtonVariant = 'primary' | 'secondary' | 'cream' | 'danger' | 'text' | 'text-danger'
-export type ButtonSize = 'md' | 'sm'
-
-interface ButtonStyleProps {
-  variant?: ButtonVariant
-  size?: ButtonSize
-  fullWidth?: boolean
-}
-
-const buttonClass = ({ variant = 'primary', size = 'md', fullWidth }: ButtonStyleProps) =>
-  cx('button', variant, size === 'sm' && 'sm', fullWidth && 'full')
 
 interface ButtonProps extends ButtonStyleProps, ButtonHTMLAttributes<HTMLButtonElement> {
   /** Desabilita o botão e mostra um spinner antes do conteúdo. */
@@ -39,7 +28,12 @@ export function Button({
       aria-busy={loading || undefined}
       {...props}
     >
-      {loading && <span className="spinner" aria-hidden="true" />}
+      {loading && (
+        <span
+          className="inline-block size-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+          aria-hidden="true"
+        />
+      )}
       {children}
     </button>
   )
