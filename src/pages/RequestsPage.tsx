@@ -1,6 +1,7 @@
 import { CalendarDays, ChevronRight, ClipboardList, MapPin } from 'lucide-react'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import {
   Alert,
   Button,
@@ -12,6 +13,7 @@ import {
 } from '../components/ui'
 import { useAdoptionRequests, useCancelAdoptionRequest } from '../hooks/useAdoptionRequests'
 import { ApiError } from '../lib/ApiError'
+import type { AdoptionRequest } from '../types'
 import { formatRequestDate } from '../utils/formatRequestDate'
 import { canCancelRequest } from '../utils/requestStatus'
 
@@ -23,11 +25,15 @@ export function RequestsPage() {
   const requestsQuery = useAdoptionRequests()
   const cancelRequest = useCancelAdoptionRequest()
   const [cancelError, setCancelError] = useState('')
+  const [toCancel, setToCancel] = useState<{
+    request: AdoptionRequest
+    opener: HTMLElement
+  } | null>(null)
 
-  const cancel = async (requestId: string) => {
+  const confirmCancel = async (request: AdoptionRequest) => {
     setCancelError('')
     try {
-      await cancelRequest.mutateAsync(requestId)
+      await cancelRequest.mutateAsync(request.id)
     } catch (error) {
       setCancelError(
         error instanceof ApiError && error.statusCode === 409
@@ -35,13 +41,15 @@ export function RequestsPage() {
           : CANCEL_ERROR_MESSAGE,
       )
     }
+    setToCancel(null)
   }
 
   if (requestsQuery.isPending) {
     return <div className="app-feedback">Carregando solicitações...</div>
   }
 
-  if (requestsQuery.isError) {
+  // Só é erro de tela cheia se nunca houve dados: um refetch que falha não pode derrubar o modal aberto.
+  if (requestsQuery.isLoadingError) {
     return (
       <div className="app-feedback error" role="alert">
         Não foi possível carregar suas solicitações. Tente novamente.
@@ -65,8 +73,16 @@ export function RequestsPage() {
             {requests.map((request) => {
               const { pet } = request
               return (
-                <Card as="article" className="request-card" key={request.id}>
-                  {pet && <img src={pet.image} alt={pet.name} />}
+                <Card
+                  as="article"
+                  className="request-card"
+                  id={`request-${request.id}`}
+                  key={request.id}
+                  tabIndex={-1}
+                >
+                  {pet && (
+                    <img src={pet.image} alt={pet.name} width={145} height={110} loading="lazy" />
+                  )}
                   <div className="request-main">
                     <div className="request-topline">
                       <div>
@@ -91,8 +107,10 @@ export function RequestsPage() {
                     {canCancelRequest(request.status) && (
                       <Button
                         variant="text-danger"
-                        disabled={cancelRequest.isPending && cancelRequest.variables === request.id}
-                        onClick={() => void cancel(request.id)}
+                        onClick={(event) => {
+                          setCancelError('')
+                          setToCancel({ request, opener: event.currentTarget })
+                        }}
                       >
                         Cancelar
                       </Button>
@@ -121,6 +139,22 @@ export function RequestsPage() {
           </EmptyState>
         )}
       </section>
+      {toCancel && (
+        <ConfirmDialog
+          title={`Cancelar a solicitação de ${toCancel.request.pet?.name ?? 'este pet'}?`}
+          description="Essa ação não pode ser desfeita."
+          confirmLabel="Cancelar solicitação"
+          busy={cancelRequest.isPending}
+          // O botão "Cancelar" some quando o status muda; nesse caso o foco vai para o cartão.
+          returnFocus={() =>
+            toCancel.opener.isConnected
+              ? toCancel.opener
+              : document.getElementById(`request-${toCancel.request.id}`)
+          }
+          onConfirm={() => void confirmCancel(toCancel.request)}
+          onClose={() => setToCancel(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,7 +1,9 @@
-import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
+import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles, Syringe } from 'lucide-react'
 import { Link, useLocation, useParams } from 'react-router-dom'
+import { ActiveRequestNotice } from '../components/ActiveRequestNotice'
 import { Button, EmptyState, LinkButton } from '../components/ui'
 import { FlowSteps } from '../components/FlowSteps'
+import { useActiveRequestForPet } from '../hooks/useAdoptionRequests'
 import { useFavorite } from '../hooks/useFavorites'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
@@ -10,6 +12,7 @@ export function PetDetailPage() {
   const { petId } = useParams()
   const location = useLocation()
   const petQuery = usePet(petId)
+  const activeRequest = useActiveRequestForPet(petId)
   const { isFavorite, toggle, isPending: isFavoritePending } = useFavorite(petId ?? '')
   const backTo = (location.state as { from?: string } | null)?.from ?? '/pets'
 
@@ -65,9 +68,28 @@ export function PetDetailPage() {
         <div className="detail-grid">
           <div>
             <div className="gallery">
-              <img className="gallery-main" src={gallery[0]} alt={`${pet.name} em destaque`} />
-              <img src={gallery[1]} alt={`${pet.name} em outro momento`} />
-              <img src={gallery[2]} alt={`${pet.name} brincando`} />
+              <img
+                className="gallery-main"
+                src={gallery[0]}
+                alt={`${pet.name} em destaque`}
+                width={800}
+                height={420}
+                loading="lazy"
+              />
+              <img
+                src={gallery[1]}
+                alt={`${pet.name} em outro momento`}
+                width={400}
+                height={205}
+                loading="lazy"
+              />
+              <img
+                src={gallery[2]}
+                alt={`${pet.name} brincando`}
+                width={400}
+                height={205}
+                loading="lazy"
+              />
             </div>
             <div className="detail-content">
               <div className="detail-title-row">
@@ -136,6 +158,24 @@ export function PetDetailPage() {
                       {pet.otherPets ? 'Sim' : 'Prefere ser único pet'}
                     </span>
                   </div>
+                  <div>
+                    <span className="need-icon">
+                      <Syringe />
+                    </span>
+                    <span>
+                      <strong>Vacinação</strong>
+                      {pet.vaccinated ? 'Vacinado' : 'Não vacinado'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="need-icon">
+                      <ShieldCheck />
+                    </span>
+                    <span>
+                      <strong>Castração</strong>
+                      {pet.neutered ? 'Castrado' : 'Não castrado'}
+                    </span>
+                  </div>
                 </div>
               </section>
             </div>
@@ -165,12 +205,18 @@ export function PetDetailPage() {
               Compare sua rotina com as necessidades de {pet.name} e veja os pontos fortes desse
               encontro.
             </p>
-            <LinkButton fullWidth to={`/pets/${pet.id}/compatibilidade`}>
-              Ver compatibilidade <Sparkles size={18} />
-            </LinkButton>
-            <p className="fine-print">
-              O resultado é orientativo e não garante a aprovação da adoção.
-            </p>
+            {activeRequest ? (
+              <ActiveRequestNotice request={activeRequest} petName={pet.name} />
+            ) : (
+              <>
+                <LinkButton fullWidth to={`/pets/${pet.id}/compatibilidade`}>
+                  Ver compatibilidade <Sparkles size={18} />
+                </LinkButton>
+                <p className="fine-print">
+                  O resultado é orientativo e não garante a aprovação da adoção.
+                </p>
+              </>
+            )}
           </aside>
         </div>
       </section>

@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { validProfile } from '../test/fixtures/profile'
 import { petFixtures } from '../test/fixtures/pets'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { PetsPage } from './PetsPage'
@@ -14,10 +15,14 @@ function LocationProbe() {
   return <output data-testid="location">{location.search}</output>
 }
 
+let profileResponse: Record<string, unknown>
+
 beforeEach(() => {
+  profileResponse = { ...validProfile, isComplete: true, missingFields: [] }
   mocks.get.mockReset()
   mocks.get.mockImplementation((path, options) => {
     if (path === '/me/favorites/ids') return Promise.resolve({ data: [], total: 0 })
+    if (path === '/me/adopter-profile') return Promise.resolve(profileResponse)
     const page = Number(options?.query?.page ?? 1)
     const start = (page - 1) * 4
     return Promise.resolve({ data: petFixtures.slice(start, start + 4), total: petFixtures.length })
@@ -47,18 +52,135 @@ describe('PetsPage - consulta e filtros', () => {
   it('inicializa os filtros a partir da URL sem enviar filtros "Todos"', async () => {
     setup('/pets?species=Gato')
     expect(screen.getByLabelText('Filtrar por espécie')).toHaveValue('Gato')
-    await waitFor(() => expect(mocks.get).toHaveBeenCalled())
-    expect(mocks.get.mock.calls[0][1].query).toMatchObject({ species: 'Gato' })
-    expect(mocks.get.mock.calls[0][1].query).not.toHaveProperty('city')
-    expect(mocks.get.mock.calls[0][1].query).not.toHaveProperty('lat')
-    expect(mocks.get.mock.calls[0][1].query).not.toHaveProperty('lng')
+    await waitFor(() => expect(lastPetsCall()).toBeDefined())
+    const query = lastPetsCall()?.[1].query
+    expect(query).toMatchObject({ species: 'Gato' })
+    expect(query).not.toHaveProperty('city')
+    expect(query).not.toHaveProperty('lat')
+    expect(query).not.toHaveProperty('lng')
   })
 
   it('reflete o filtro na URL e faz nova consulta', async () => {
     setup()
     await screen.findByRole('heading', { name: 'Luna' })
-    await userEvent.setup().selectOptions(screen.getByLabelText('Filtrar por porte'), 'Médio')
-    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('size=M%C3%A9dio'))
-    await waitFor(() => expect(lastPetsCall()?.[1]).toMatchObject({ query: { size: 'Médio' } }))
+    await userEvent.setup().selectOptions(screen.getByLabelText('Filtrar por espécie'), 'Gato')
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('species=Gato'))
+    await waitFor(() => expect(lastPetsCall()?.[1]).toMatchObject({ query: { species: 'Gato' } }))
+  })
+
+  it('aceita mais de um porte e reproduz o estado a partir da URL', async () => {
+    const user = userEvent.setup()
+    setup()
+    await screen.findByRole('heading', { name: 'Luna' })
+    await user.click(screen.getByRole('button', { name: 'Pequeno' }))
+    await user.click(screen.getByRole('button', { name: 'Médio' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('size=Pequeno&size=M%C3%A9dio'),
+    )
+    await waitFor(() =>
+      expect(lastPetsCall()?.[1]).toMatchObject({ query: { size: ['Pequeno', 'Médio'] } }),
+    )
+    await user.click(screen.getByRole('button', { name: 'Pequeno' }))
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('?size=M%C3%A9dio'),
+    )
+  })
+
+  it('abre com os portes da URL selecionados', async () => {
+    setup('/pets?size=Pequeno&size=M%C3%A9dio')
+    expect(screen.getByRole('button', { name: 'Pequeno' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Médio' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Grande' })).toHaveAttribute('aria-pressed', 'false')
+    await waitFor(() => expect(mocks.get).toHaveBeenCalled())
+    expect(lastPetsCall()?.[1]).toMatchObject({ query: { size: ['Pequeno', 'Médio'] } })
+  })
+})
+
+describe('PetsPage - preferências do perfil', () => {
+  const useButton = () => screen.findByRole('button', { name: /Usar minhas preferências/ })
+
+  it('aplica espécie e porte do perfil ("Pequeno ou médio") e Limpar volta ao início', async () => {
+    profileResponse = {
+      ...profileResponse,
+      preferredSpecies: 'Gato',
+      preferredSize: 'Pequeno ou médio',
+    }
+    const user = userEvent.setup()
+    setup()
+    const button = await useButton()
+    await waitFor(() => expect(button).toBeEnabled())
+    await user.click(button)
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        'species=Gato&size=Pequeno&size=M%C3%A9dio',
+      ),
+    )
+    await waitFor(() =>
+      expect(lastPetsCall()?.[1]).toMatchObject({
+        query: { species: 'Gato', size: ['Pequeno', 'Médio'] },
+      }),
+    )
+    await user.click(screen.getByRole('button', { name: /Limpar/ }))
+    await waitFor(() => expect(screen.getByTestId('location')).toBeEmptyDOMElement())
+  })
+
+  it('"Médio ou grande" vira Médio + Grande e "Sem preferência" não filtra a espécie', async () => {
+    profileResponse = {
+      ...profileResponse,
+      preferredSpecies: 'Sem preferência',
+      preferredSize: 'Médio ou grande',
+    }
+    const user = userEvent.setup()
+    setup()
+    const button = await useButton()
+    await waitFor(() => expect(button).toBeEnabled())
+    await user.click(button)
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('?size=M%C3%A9dio&size=Grande'),
+    )
+    expect(screen.getByTestId('location')).not.toHaveTextContent('species')
+  })
+
+  it('fica desabilitado, com explicação, quando o perfil não tem preferências', async () => {
+    profileResponse = { ...profileResponse, preferredSpecies: '', preferredSize: '' }
+    setup()
+    const button = await useButton()
+    await waitFor(() =>
+      expect(screen.getByText(/Informe espécie ou porte de preferência/)).toBeInTheDocument(),
+    )
+    expect(button).toBeDisabled()
+  })
+
+  it('fica desabilitado com "Sem preferência" nos dois campos', async () => {
+    profileResponse = {
+      ...profileResponse,
+      preferredSpecies: 'Sem preferência',
+      preferredSize: 'Sem preferência',
+    }
+    setup()
+    const button = await useButton()
+    await waitFor(() => expect(screen.getByText(/Informe espécie ou porte/)).toBeInTheDocument())
+    expect(button).toBeDisabled()
+  })
+})
+
+describe('PetsPage - acessibilidade', () => {
+  it('o campo de busca tem rótulo acessível', async () => {
+    setup()
+
+    expect(
+      await screen.findByRole('textbox', { name: 'Buscar pets por nome, raça ou cidade' }),
+    ).toBeInTheDocument()
+  })
+
+  it('anuncia a contagem de resultados como status, sem anunciar "0" durante o carregamento', async () => {
+    setup()
+
+    const loading = screen.getByText('Buscando pets...')
+    expect(loading).toHaveAttribute('role', 'status')
+    const count = await screen.findByText(/pets encontrados/)
+    expect(count).toHaveAttribute('role', 'status')
+    expect(count).toHaveTextContent(`${petFixtures.length} pets encontrados`)
+    expect(screen.queryByText(/^0 pets encontrados/)).not.toBeInTheDocument()
   })
 })

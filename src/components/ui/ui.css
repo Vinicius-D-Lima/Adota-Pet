@@ -20,12 +20,12 @@
   transform: translateY(-2px);
 }
 .button.primary {
-  background: var(--coral);
+  background: var(--coral-dark);
   color: white;
   box-shadow: 0 10px 22px rgba(210, 95, 59, 0.22);
 }
 .button.primary:hover {
-  background: var(--coral-dark);
+  background: var(--coral-darker);
 }
 .button.secondary {
   background: white;
@@ -75,7 +75,7 @@
   box-shadow: 0 0 0 3px rgba(47, 98, 76, 0.09);
 }
 .field small {
-  color: #8b9791;
+  color: var(--muted);
   font-size: 9px;
   text-align: right;
   margin-bottom: 18px;
@@ -180,11 +180,11 @@
 
 /* Button: tamanhos, variantes extras e carregamento */
 .button.danger {
-  background: #c4543d;
+  background: #a55039;
   color: white;
 }
 .button.danger:hover {
-  background: #a94b32;
+  background: #8c4130;
 }
 .button.text,
 .button.text-danger {

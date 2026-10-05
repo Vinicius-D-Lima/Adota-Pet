@@ -1,9 +1,12 @@
 import { AlertTriangle, ArrowLeft, ArrowRight, Check, Home, Info, Sparkles } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { ActiveRequestNotice } from '../components/ActiveRequestNotice'
 import { Button, LinkButton } from '../components/ui'
 import { FlowSteps } from '../components/FlowSteps'
+import { NotFoundState } from '../components/NotFoundState'
 import { useAdopterProfile } from '../hooks/useAdopterProfile'
+import { useActiveRequestForPet } from '../hooks/useAdoptionRequests'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
@@ -12,21 +15,30 @@ export function CompatibilityPage() {
   const { petId } = useParams()
   const petQuery = usePet(petId)
   const profileQuery = useAdopterProfile()
+  const activeRequest = useActiveRequestForPet(petId)
 
   if (petQuery.isPending || profileQuery.isPending) {
     return <div className="app-feedback">Carregando compatibilidade...</div>
   }
   if (petQuery.isError) {
     const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
+    if (notFound) {
+      return (
+        <NotFoundState
+          title="Pet não encontrado"
+          message="Este pet não está mais disponível ou o endereço está incorreto."
+          to="/pets"
+          linkLabel="Ver outros pets"
+        />
+      )
+    }
     return (
       <div className="app-feedback error" role="alert">
         <div>
-          <p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>
-          {!notFound && (
-            <Button variant="secondary" onClick={() => void petQuery.refetch()}>
-              Tentar novamente
-            </Button>
-          )}
+          <p>Não foi possível carregar o pet.</p>
+          <Button variant="secondary" onClick={() => void petQuery.refetch()}>
+            Tentar novamente
+          </Button>
         </div>
       </div>
     )
@@ -80,7 +92,7 @@ export function CompatibilityPage() {
               Compatibilidade {result.level.toLowerCase()}
             </span>
             <div className="mini-pet">
-              <img src={pet.image} alt={pet.name} />
+              <img src={pet.image} alt={pet.name} width={48} height={48} loading="lazy" />
               <span>
                 <strong>{pet.name}</strong>
                 <small>
@@ -157,10 +169,13 @@ export function CompatibilityPage() {
               <LinkButton variant="secondary" to={`/pets/${pet.id}`}>
                 Rever detalhes
               </LinkButton>
-              <LinkButton to={`/pets/${pet.id}/questionario`}>
-                Continuar para o questionário <ArrowRight size={18} />
-              </LinkButton>
+              {!activeRequest && (
+                <LinkButton to={`/pets/${pet.id}/questionario`}>
+                  Continuar para o questionário <ArrowRight size={18} />
+                </LinkButton>
+              )}
             </div>
+            {activeRequest && <ActiveRequestNotice request={activeRequest} petName={pet.name} />}
           </div>
         </div>
       </section>

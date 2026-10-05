@@ -1,12 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, CheckCircle2, Info } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Alert, Button, Checkbox, Field, Select, Textarea } from '../components/ui'
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { FlowSteps } from '../components/FlowSteps'
+import { NotFoundState } from '../components/NotFoundState'
+import { Alert, Button, Checkbox, Field, Select, Textarea } from '../components/ui'
 import {
   adoptionRequestKeys,
   fetchAdoptionRequests,
+  useActiveRequestLookup,
   useCreateAdoptionRequest,
 } from '../hooks/useAdoptionRequests'
 import { usePet } from '../hooks/usePets'
@@ -61,6 +63,7 @@ export function QuestionnairePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createRequest = useCreateAdoptionRequest()
+  const { request: activeRequest, isFetching: isCheckingRequests } = useActiveRequestLookup(petId)
   const [form, setForm] = useState<QuestionnaireAnswers>(initialForm)
   const [errors, setErrors] = useState<FieldErrors<FieldName>>({})
   const [submitError, setSubmitError] = useState<ReactNode>('')
@@ -69,18 +72,36 @@ export function QuestionnairePage() {
   if (petQuery.isPending) return <div className="app-feedback">Carregando questionário...</div>
   if (petQuery.isError) {
     const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
+    if (notFound) {
+      return (
+        <NotFoundState
+          title="Pet não encontrado"
+          message="Este pet não está mais disponível ou o endereço está incorreto."
+          to="/pets"
+          linkLabel="Ver outros pets"
+        />
+      )
+    }
     return (
       <div className="app-feedback error" role="alert">
         <div>
-          <p>{notFound ? 'Pet não encontrado.' : 'Não foi possível carregar o pet.'}</p>
-          {!notFound && (
-            <Button variant="secondary" onClick={() => void petQuery.refetch()}>
-              Tentar novamente
-            </Button>
-          )}
+          <p>Não foi possível carregar o pet.</p>
+          <Button variant="secondary" onClick={() => void petQuery.refetch()}>
+            Tentar novamente
+          </Button>
         </div>
       </div>
     )
+  }
+
+  // Redireciona só quem ainda não começou a preencher e com a lista já atualizada. Quem digitou,
+  // enviou ou está enviando nunca é desviado: perderia as respostas, e a própria solicitação nova
+  // (ativa depois do envio) atropelaria a navegação para /enviada. O 409 do servidor cobre o resto.
+  const isPristine = (Object.keys(initialForm) as FieldName[]).every(
+    (field) => form[field] === initialForm[field],
+  )
+  if (activeRequest && isPristine && !isCheckingRequests) {
+    return <Navigate to="/solicitacoes" replace />
   }
 
   const pet = petQuery.data
@@ -283,7 +304,7 @@ export function QuestionnairePage() {
             </div>
           </form>
           <aside className="pet-side-summary">
-            <img src={pet.image} alt={pet.name} />
+            <img src={pet.image} alt={pet.name} width={400} height={300} loading="lazy" />
             <div>
               <span className="eyebrow">Sua solicitação</span>
               <h2>{pet.name}</h2>

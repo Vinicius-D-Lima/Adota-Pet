@@ -3,12 +3,15 @@ import { Heart, MapPin } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useFavorite } from '../hooks/useFavorites'
 import type { Pet } from '../types'
+import { HealthBadges } from './HealthBadges'
 
 interface PetCardProps {
   pet: Pet
+  /** Nível do título do cartão: h2 em páginas cujo título é h1, h3 abaixo de uma seção h2. */
+  headingLevel?: 'h2' | 'h3'
 }
 
-export function PetCard({ pet }: PetCardProps) {
+export function PetCard({ pet, headingLevel: Heading = 'h3' }: PetCardProps) {
   const { isFavorite, toggle, isPending } = useFavorite(pet.id)
   const location = useLocation()
   const from = `${location.pathname}${location.search}`
@@ -16,7 +19,14 @@ export function PetCard({ pet }: PetCardProps) {
   return (
     <Card as="article" className="pet-card">
       <div className="pet-image-wrap">
-        <img src={pet.image} alt={`${pet.name}, ${pet.breed}`} className="pet-image" />
+        <img
+          src={pet.image}
+          alt={`${pet.name}, ${pet.breed}`}
+          className="pet-image"
+          width={600}
+          height={500}
+          loading="lazy"
+        />
         <button
           className={isFavorite ? 'favorite active' : 'favorite'}
           onClick={toggle}
@@ -34,12 +44,13 @@ export function PetCard({ pet }: PetCardProps) {
       </div>
       <div className="pet-card-body">
         <div className="pet-card-heading">
-          <h3>{pet.name}</h3>
+          <Heading>{pet.name}</Heading>
           <span>{pet.sex}</span>
         </div>
         <p className="pet-meta">
           {pet.breed} · {pet.ageLabel} · {pet.size}
         </p>
+        <HealthBadges pet={pet} />
         <p className="pet-summary">{pet.summary}</p>
         <div className="trait-list">
           {pet.traits.slice(0, 3).map((trait) => (

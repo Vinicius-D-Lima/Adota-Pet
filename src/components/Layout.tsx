@@ -1,5 +1,5 @@
 import { Heart, Menu, PawPrint, X } from 'lucide-react'
-import { type ReactNode, useState } from 'react'
+import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 import { useAdoptionRequests } from '../hooks/useAdoptionRequests'
 import { useFavoriteIds } from '../hooks/useFavorites'
@@ -17,10 +17,41 @@ export function Layout({ children, profileName }: LayoutProps) {
   const requestCount =
     requestsQuery.data?.filter((item) => isActiveRequest(item.status)).length ?? 0
   const [open, setOpen] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const navRef = useRef<HTMLElement>(null)
+  const mainRef = useRef<HTMLElement>(null)
   const favoriteCount = useFavoriteIds().data?.length ?? 0
   const savedName = profileName.trim()
   const initials = savedName ? getInitials(savedName) : ''
   const firstName = savedName.split(/\s+/)[0]
+
+  useEffect(() => {
+    if (!open) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      setOpen(false)
+      menuButtonRef.current?.focus()
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (navRef.current?.contains(target) || menuButtonRef.current?.contains(target)) return
+      setOpen(false)
+    }
+
+    document.addEventListener('keydown', onKeyDown)
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.removeEventListener('pointerdown', onPointerDown)
+    }
+  }, [open])
+
+  // Sem hash na URL: o <a href="#conteudo"> do BrowserRouter mudaria o endereço.
+  const skipToContent = (event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    mainRef.current?.focus()
+  }
 
   const nav: [string, string][] = [
     ['/', 'Início'],
@@ -32,6 +63,9 @@ export function Layout({ children, profileName }: LayoutProps) {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#conteudo" onClick={skipToContent}>
+        Pular para o conteúdo
+      </a>
       <header className="site-header">
         <div className="container header-inner">
           <Link to="/" className="brand" aria-label="AdotaPet — início">
@@ -43,11 +77,23 @@ export function Layout({ children, profileName }: LayoutProps) {
             </span>
           </Link>
 
-          <button className="menu-button" onClick={() => setOpen(!open)} aria-label="Abrir menu">
+          <button
+            ref={menuButtonRef}
+            className="menu-button"
+            onClick={() => setOpen(!open)}
+            aria-label={open ? 'Fechar menu' : 'Abrir menu'}
+            aria-expanded={open}
+            aria-controls="main-nav"
+          >
             {open ? <X /> : <Menu />}
           </button>
 
-          <nav className={open ? 'main-nav is-open' : 'main-nav'} aria-label="Navegação principal">
+          <nav
+            ref={navRef}
+            id="main-nav"
+            className={open ? 'main-nav is-open' : 'main-nav'}
+            aria-label="Navegação principal"
+          >
             {nav.map(([to, label]) => (
               <NavLink
                 key={to}
@@ -85,7 +131,9 @@ export function Layout({ children, profileName }: LayoutProps) {
           )}
         </div>
       </header>
-      <main>{children}</main>
+      <main id="conteudo" ref={mainRef} tabIndex={-1}>
+        {children}
+      </main>
       <FavoriteNotice />
       <footer className="site-footer">
         <div className="container footer-inner">

@@ -15,7 +15,7 @@ export function FavoritesPage() {
           description="Os pets que chamaram sua atenção ficam guardados aqui."
         />
         {favoritesQuery.isPending ? (
-          <div className="pet-grid" aria-label="Carregando favoritos">
+          <div className="pet-grid" role="status" aria-label="Carregando favoritos">
             {Array.from({ length: 3 }, (_, index) => (
               <PetCardSkeleton key={index} />
             ))}
@@ -31,7 +31,7 @@ export function FavoritesPage() {
         ) : favoritesQuery.data.length ? (
           <div className="pet-grid">
             {favoritesQuery.data.map((pet) => (
-              <PetCard key={pet.id} pet={pet} />
+              <PetCard key={pet.id} pet={pet} headingLevel="h2" />
             ))}
           </div>
         ) : (
