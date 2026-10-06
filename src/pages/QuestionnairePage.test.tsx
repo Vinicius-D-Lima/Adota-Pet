@@ -8,6 +8,7 @@ import { adoptionRequestKeys } from '../hooks/useAdoptionRequests'
 import { api } from '../lib/api'
 import { ApiError } from '../lib/ApiError'
 import { makeRequest } from '../test/fixtures/requests'
+import { validProfile } from '../test/fixtures/profile'
 import { petFixture } from '../test/petFixture'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { QuestionnairePage } from './QuestionnairePage'
@@ -16,14 +17,20 @@ vi.mock('../lib/api', () => ({
   api: { get: vi.fn(), post: vi.fn() },
 }))
 
-const mocks = vi.hoisted(() => ({ usePet: vi.fn() }))
+const mocks = vi.hoisted(() => ({ usePet: vi.fn(), useAdopterProfile: vi.fn() }))
 vi.mock('../hooks/usePets', () => ({ usePet: mocks.usePet }))
+vi.mock('../hooks/useAdopterProfile', () => ({ useAdopterProfile: mocks.useAdopterProfile }))
 
 const getMock = vi.mocked(api.get)
 const postMock = vi.mocked(api.post)
 
 beforeEach(() => {
   mocks.usePet.mockReturnValue({ data: petFixture, isPending: false, isError: false })
+  mocks.useAdopterProfile.mockReturnValue({
+    data: { profile: validProfile, isComplete: true, missingFields: [] },
+    isPending: false,
+    isError: false,
+  })
 })
 
 /** Registra cada vez que a tela de listagem monta, mesmo que dure só um instante. */

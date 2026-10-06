@@ -1,6 +1,6 @@
 import { CalendarDays, ChevronRight, ClipboardList, MapPin } from 'lucide-react'
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import {
   Alert,
@@ -13,10 +13,11 @@ import {
   PageIntro,
   PageSurface,
   StatusPill,
+  cx,
 } from '../components/ui'
 import { useAdoptionRequests, useCancelAdoptionRequest } from '../hooks/useAdoptionRequests'
 import { ApiError } from '../lib/ApiError'
-import type { AdoptionRequest } from '../types'
+import type { AdoptionRequest, RequestStatus } from '../types'
 import { formatRequestDate } from '../utils/formatRequestDate'
 import { canCancelRequest } from '../utils/requestStatus'
 
@@ -24,9 +25,30 @@ const CANCEL_CONFLICT_MESSAGE =
   'Esta solicitação não pode mais ser cancelada porque o status dela mudou.'
 const CANCEL_ERROR_MESSAGE = 'Não foi possível cancelar a solicitação. Tente novamente.'
 
+const REQUEST_STAGES = [
+  { key: 'all', label: 'Todas', statuses: null },
+  { key: 'sent', label: 'Enviadas', statuses: ['Enviada'] },
+  { key: 'review', label: 'Em análise', statuses: ['Em análise'] },
+  { key: 'approved', label: 'Aprovadas', statuses: ['Aprovada'] },
+  { key: 'closed', label: 'Encerradas', statuses: ['Recusada', 'Cancelada'] },
+] as const satisfies ReadonlyArray<{
+  key: string
+  label: string
+  statuses: readonly RequestStatus[] | null
+}>
+
+type RequestStage = (typeof REQUEST_STAGES)[number]['key']
+
+const isRequestStage = (value: string | null): value is RequestStage =>
+  REQUEST_STAGES.some((stage) => stage.key === value)
+
+const inStage = (request: AdoptionRequest, stage: (typeof REQUEST_STAGES)[number]) =>
+  stage.statuses === null || stage.statuses.some((status) => status === request.status)
+
 export function RequestsPage() {
   const requestsQuery = useAdoptionRequests()
   const cancelRequest = useCancelAdoptionRequest()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [cancelError, setCancelError] = useState('')
   const [toCancel, setToCancel] = useState<{
     request: AdoptionRequest
@@ -57,6 +79,19 @@ export function RequestsPage() {
   }
 
   const requests = requestsQuery.data
+  const stageFromUrl = searchParams.get('estagio')
+  const activeStageKey: RequestStage = isRequestStage(stageFromUrl) ? stageFromUrl : 'all'
+  const activeStage = REQUEST_STAGES.find(({ key }) => key === activeStageKey) ?? REQUEST_STAGES[0]
+  const visibleRequests = requests.filter((request) => inStage(request, activeStage))
+
+  const selectStage = (stage: RequestStage) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      if (stage === 'all') next.delete('estagio')
+      else next.set('estagio', stage)
+      return next
+    })
+  }
 
   return (
     <PageSurface>
@@ -68,8 +103,58 @@ export function RequestsPage() {
         />
         {cancelError && <Alert>{cancelError}</Alert>}
         {requests.length ? (
-          <div className="grid max-w-[930px] gap-3.5">
-            {requests.map((request) => {
+          <div className="max-w-[930px]">
+            <div
+              className="mb-7 flex gap-2 overflow-x-auto rounded-2xl border border-line bg-white p-2 shadow-[0_8px_26px_rgba(30,60,48,0.05)]"
+              role="group"
+              aria-label="Filtrar solicitações por estágio"
+            >
+              {REQUEST_STAGES.map((stage) => {
+                const count = requests.filter((request) => inStage(request, stage)).length
+                const selected = stage.key === activeStage.key
+                return (
+                  <button
+                    type="button"
+                    className={cx(
+                      'inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-xl border-0 px-4 text-xs font-bold transition',
+                      selected
+                        ? 'bg-forest-800 text-white shadow-sm'
+                        : 'bg-transparent text-muted hover:bg-forest-50 hover:text-forest-800',
+                    )}
+                    aria-pressed={selected}
+                    aria-label={`${stage.label}: ${count} ${count === 1 ? 'solicitação' : 'solicitações'}`}
+                    onClick={() => selectStage(stage.key)}
+                    key={stage.key}
+                  >
+                    {stage.label}
+                    <span
+                      className={cx(
+                        'grid min-w-6 place-items-center rounded-full px-1.5 py-0.5 text-[10px]',
+                        selected ? 'bg-white/20 text-white' : 'bg-forest-100 text-forest-700',
+                      )}
+                    >
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.1em] text-coral">
+                  Estágio selecionado
+                </p>
+                <h2 className="m-0 text-[26px]">{activeStage.label}</h2>
+              </div>
+              <span className="text-xs text-muted">
+                {visibleRequests.length}{' '}
+                {visibleRequests.length === 1 ? 'solicitação' : 'solicitações'}
+              </span>
+            </div>
+
+            <div className="grid gap-3.5" aria-live="polite">
+            {visibleRequests.map((request) => {
               const { pet } = request
               return (
                 <Card
@@ -138,6 +223,14 @@ export function RequestsPage() {
                 </Card>
               )
             })}
+            {!visibleRequests.length && (
+              <EmptyState
+                icon={<ClipboardList size={36} />}
+                title={`Nenhuma solicitação em “${activeStage.label}”`}
+                description="Selecione outro estágio para acompanhar suas demais solicitações."
+              />
+            )}
+            </div>
           </div>
         ) : (
           <EmptyState

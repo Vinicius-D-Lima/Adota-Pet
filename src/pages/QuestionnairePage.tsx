@@ -31,11 +31,13 @@ import {
   useActiveRequestLookup,
   useCreateAdoptionRequest,
 } from '../hooks/useAdoptionRequests'
+import { useAdopterProfile } from '../hooks/useAdopterProfile'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
 import { questionnaireSchema } from '../schemas/questionnaireSchema'
 import type { QuestionnaireAnswers } from '../types'
 import { profileFieldLabels } from '../utils/profileFieldLabels'
+import { calculateProfileCompletion } from '../utils/profileCompletion'
 import { isActiveRequest } from '../utils/requestStatus'
 
 type FieldName = keyof QuestionnaireAnswers
@@ -79,6 +81,7 @@ function toMissingProfileFields(error: ApiError): string[] {
 export function QuestionnairePage() {
   const { petId } = useParams()
   const petQuery = usePet(petId)
+  const profileQuery = useAdopterProfile()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const createRequest = useCreateAdoptionRequest()
@@ -102,7 +105,8 @@ export function QuestionnairePage() {
 
   const submitError = failure?.values === values ? failure.message : ''
 
-  if (petQuery.isPending) return <Feedback>Carregando questionário...</Feedback>
+  if (petQuery.isPending || profileQuery.isPending)
+    return <Feedback>Carregando questionário...</Feedback>
   if (petQuery.isError) {
     const notFound = petQuery.error instanceof ApiError && petQuery.error.statusCode === 404
     if (notFound) {
@@ -127,6 +131,19 @@ export function QuestionnairePage() {
     )
   }
 
+  if (profileQuery.isError) {
+    return (
+      <Feedback error>
+        <div>
+          <p>Não foi possível carregar seu perfil.</p>
+          <Button variant="secondary" onClick={() => void profileQuery.refetch()}>
+            Tentar novamente
+          </Button>
+        </div>
+      </Feedback>
+    )
+  }
+
   // Redireciona só quem ainda não começou a preencher e com a lista já atualizada. Quem digitou,
   // enviou ou está enviando nunca é desviado: perderia as respostas, e a própria solicitação nova
   // (ativa depois do envio) atropelaria a navegação para /enviada. O 409 do servidor cobre o resto.
@@ -135,6 +152,33 @@ export function QuestionnairePage() {
   }
 
   const pet = petQuery.data
+  const profile = profileQuery.data.profile
+  const profileCompletion = calculateProfileCompletion('adopter', profile)
+
+  if (!profileCompletion.isComplete) {
+    return (
+      <PageSurface>
+        <Container as="section" className="max-w-[760px] pb-[90px] pt-[35px] md:pt-[54px]">
+          <BackLink to={`/pets/${pet.id}`}>
+            <ArrowLeft size={17} /> Voltar para os detalhes
+          </BackLink>
+          <Card className="mt-8 p-6 text-center md:p-10">
+            <h1 className="mb-3 text-[34px]">Seu perfil precisa estar completo</h1>
+            <p className="text-sm leading-6 text-muted">
+              Você concluiu {profileCompletion.percentage}% do perfil. Complete os dados restantes
+              antes de enviar uma solicitação para {pet.name}.
+            </p>
+            <p className="mx-auto max-w-[560px] text-xs text-muted">
+              Faltam: {profileCompletion.missingFields.map(({ label }) => label).join(', ')}.
+            </p>
+            <Link className="mt-4 inline-flex font-bold text-coral-dark" to="/perfil" state={{ from: `/pets/${pet.id}/questionario` }}>
+              Ir para o perfil
+            </Link>
+          </Card>
+        </Container>
+      </PageSurface>
+    )
+  }
 
   const describeFailure = async (error: unknown): Promise<ReactNode> => {
     if (!(error instanceof ApiError)) return GENERIC_ERROR
@@ -226,6 +270,14 @@ export function QuestionnairePage() {
             onSubmit={submit}
             noValidate
           >
+            <InfoNote className="mb-6">
+              <p className="mb-0">
+                <strong>Dados reaproveitados do seu perfil:</strong> {profile.name}, moradia{' '}
+                {profile.housing.toLowerCase()} e disponibilidade de {profile.dailyTime.toLowerCase()}.
+                Eles serão enviados junto com estas respostas e podem ser alterados em{' '}
+                <Link to="/perfil">Meu perfil</Link>.
+              </p>
+            </InfoNote>
             <SectionHeading
               number={1}
               title="Sua motivação e rotina"
@@ -305,8 +357,8 @@ export function QuestionnairePage() {
             />
             {submitError && <Alert>{submitError}</Alert>}
             <div className="mt-[27px] flex flex-col justify-between gap-[15px] md:flex-row md:items-center">
-              <span className="max-w-[220px] text-[9px] text-muted">
-                Suas respostas ficam salvas apenas nesta simulação.
+              <span className="max-w-[260px] text-[9px] text-muted">
+                Revise as respostas antes de enviar. Elas serão associadas ao seu perfil.
               </span>
               <Button type="submit" loading={isSubmitting} className="max-md:w-full">
                 {isSubmitting ? 'Enviando...' : 'Revisar e enviar solicitação'}{' '}

@@ -87,6 +87,18 @@ export const profileSchema = z.object({
 
 export type Profile = z.infer<typeof profileSchema>
 
+export const personalInfoSchema = profileSchema.pick({
+  name: true,
+  cpf: true,
+  birthDate: true,
+  email: true,
+  phone: true,
+  zipCode: true,
+  address: true,
+})
+
+export type PersonalInfo = z.infer<typeof personalInfoSchema>
+
 export type ProfileDraft = {
   [Key in keyof Profile]: Profile[Key] extends boolean
     ? Profile[Key] | ''

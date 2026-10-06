@@ -1,6 +1,6 @@
 import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles, Syringe } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useLocation, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ActiveRequestNotice } from '../components/ActiveRequestNotice'
 import { FlowSteps } from '../components/FlowSteps'
 import { TraitList } from '../components/PetCard'
@@ -18,6 +18,7 @@ import { useActiveRequestForPet } from '../hooks/useAdoptionRequests'
 import { useFavorite } from '../hooks/useFavorites'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
+import { hasDemoAccount } from '../lib/demoAccount'
 
 const pagePadding = 'pb-[90px] pt-[35px] md:pt-[54px]'
 
@@ -38,10 +39,17 @@ function Need({ icon, title, children }: { icon: ReactNode; title: string; child
 export function PetDetailPage() {
   const { petId } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const petQuery = usePet(petId)
   const activeRequest = useActiveRequestForPet(petId)
   const { isFavorite, toggle, isPending: isFavoritePending } = useFavorite(petId ?? '')
   const backTo = (location.state as { from?: string } | null)?.from ?? '/pets'
+  const handleFavorite = () => {
+    if (hasDemoAccount()) toggle()
+    else {
+      navigate('/criar-conta', { state: { from: `${location.pathname}${location.search}` } })
+    }
+  }
 
   if (petQuery.isPending)
     return (
@@ -64,7 +72,7 @@ export function PetDetailPage() {
             description={
               notFound
                 ? 'Este pet não está mais disponível ou o endereço está incorreto.'
-                : 'Verifique a conexão com a API simulada e tente novamente.'
+                : 'Verifique sua conexão e tente novamente.'
             }
             role="alert"
           >
@@ -135,7 +143,7 @@ export function PetDetailPage() {
                       ? 'border-[#f1c3b3] bg-[#fff9f6] text-coral'
                       : 'border-line bg-white text-forest-800',
                   )}
-                  onClick={toggle}
+                  onClick={handleFavorite}
                   aria-pressed={isFavorite}
                   aria-busy={isFavoritePending}
                 >

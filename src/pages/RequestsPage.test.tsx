@@ -22,6 +22,51 @@ afterEach(() => {
 })
 
 describe('RequestsPage', () => {
+  it('divide as solicitações por estágio, mostra contagens e filtra a lista', async () => {
+    getMock.mockResolvedValue(
+      list(
+        makeRequest({ id: 'SOL-1', status: 'Enviada' }),
+        makeRequest({ id: 'SOL-2', status: 'Em análise' }),
+        makeRequest({ id: 'SOL-3', status: 'Aprovada' }),
+        makeRequest({ id: 'SOL-4', status: 'Recusada' }),
+        makeRequest({ id: 'SOL-5', status: 'Cancelada' }),
+      ),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<RequestsPage />)
+
+    expect(await screen.findByRole('button', { name: 'Todas: 5 solicitações' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(
+      screen.getByRole('button', { name: 'Encerradas: 2 solicitações' }),
+    ).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Em análise: 1 solicitação' }))
+    expect(screen.getByText('SOL-2')).toBeInTheDocument()
+    expect(screen.queryByText('SOL-1')).not.toBeInTheDocument()
+    expect(screen.queryByText('SOL-3')).not.toBeInTheDocument()
+    expect(screen.getByText('1 solicitação')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Encerradas: 2 solicitações' }))
+    expect(screen.getByText('SOL-4')).toBeInTheDocument()
+    expect(screen.getByText('SOL-5')).toBeInTheDocument()
+    expect(screen.queryByText('SOL-2')).not.toBeInTheDocument()
+  })
+
+  it('mostra um estado vazio apenas para o estágio selecionado', async () => {
+    getMock.mockResolvedValue(list(makeRequest({ status: 'Enviada' })))
+    const user = userEvent.setup()
+    renderWithProviders(<RequestsPage />)
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Aprovadas: 0 solicitações' }),
+    )
+    expect(screen.getByText('Nenhuma solicitação em “Aprovadas”')).toBeInTheDocument()
+    expect(screen.queryByText('SOL-1042')).not.toBeInTheDocument()
+  })
+
   it('mostra a data em pt-BR, nunca em ISO cru', async () => {
     getMock.mockResolvedValue(list(makeRequest({ date: '2026-09-08T12:00:00.000Z' })))
     renderWithProviders(<RequestsPage />)

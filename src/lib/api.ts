@@ -1,4 +1,5 @@
 import { ApiError } from './ApiError'
+import { getDemoAccountId } from './demoAccount'
 
 type QueryValue = string | number | boolean | undefined | null
 
@@ -33,6 +34,7 @@ async function request<T>(method: string, path: string, options: RequestOptions 
   const { body, query, headers: extraHeaders, ...init } = options
   const headers = new Headers(extraHeaders)
   headers.set('Accept', 'application/json')
+  headers.set('X-Demo-User-Id', getDemoAccountId())
 
   let payload: BodyInit | undefined
   if (body instanceof FormData) {

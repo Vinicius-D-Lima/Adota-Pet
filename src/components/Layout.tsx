@@ -1,8 +1,11 @@
-import { Heart, Menu, PawPrint, X } from 'lucide-react'
-import { type ReactNode, useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
+import { ChevronDown, Heart, LogOut, Menu, PawPrint, UserRound, X } from 'lucide-react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAdoptionRequests } from '../hooks/useAdoptionRequests'
+import { useDemoAccount } from '../hooks/useDemoAccount'
 import { useFavoriteIds } from '../hooks/useFavorites'
+import { useReceivedRequests } from '../hooks/useOrganization'
 import { getInitials } from '../utils/getInitials'
 import { isActiveRequest } from '../utils/requestStatus'
 import { FavoriteNotice } from './FavoriteNotice'
@@ -11,6 +14,7 @@ import { Container, cx } from './ui'
 interface LayoutProps {
   children: ReactNode
   profileName: string
+  profilePath?: string
 }
 
 function Brand({ light = false, markSize = 21 }: { light?: boolean; markSize?: number }) {
@@ -33,23 +37,68 @@ function Brand({ light = false, markSize = 21 }: { light?: boolean; markSize?: n
   )
 }
 
-export function Layout({ children, profileName }: LayoutProps) {
+export function Layout({ children, profileName, profilePath = '/perfil' }: LayoutProps) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const account = useDemoAccount()
+  const isGuardian = account.profilePath === '/perfil?tipo=responsavel'
   const requestsQuery = useAdoptionRequests()
   const requestCount =
     requestsQuery.data?.filter((item) => isActiveRequest(item.status)).length ?? 0
   const [open, setOpen] = useState(false)
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const accountMenuRef = useRef<HTMLDivElement>(null)
   const favoriteCount = useFavoriteIds().data?.length ?? 0
+  const receivedRequestCount =
+    useReceivedRequests(account.isAuthenticated && isGuardian).data?.filter((item) =>
+      ['Enviada', 'Em análise'].includes(item.status),
+    ).length ?? 0
   const savedName = profileName.trim()
   const initials = savedName ? getInitials(savedName) : ''
   const firstName = savedName.split(/\s+/)[0]
 
-  const nav: [string, string][] = [
-    ['/', 'Início'],
-    ['/pets', 'Encontrar pets'],
-    ['/favoritos', 'Favoritos'],
-    ['/solicitacoes', 'Minhas solicitações'],
-    ['/perfil', 'Meu perfil'],
-  ]
+  const nav: [string, string][] =
+    account.isAuthenticated && isGuardian
+      ? [
+          ['/organizacao', 'Painel'],
+          ['/organizacao/pets', 'Meus pets'],
+          ['/organizacao/solicitacoes', 'Solicitações recebidas'],
+          [profilePath, 'Perfil da instituição'],
+        ]
+      : [
+          ['/', 'Início'],
+          ['/pets', 'Encontrar pets'],
+          ...(account.isAuthenticated
+            ? ([
+                ['/favoritos', 'Favoritos'],
+                ['/solicitacoes', 'Minhas solicitações'],
+                [profilePath, 'Meu perfil'],
+              ] as [string, string][])
+            : []),
+        ]
+
+  useEffect(() => {
+    const close = (event: MouseEvent) => {
+      if (!accountMenuRef.current?.contains(event.target as Node)) setAccountMenuOpen(false)
+    }
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setAccountMenuOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', closeWithEscape)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', closeWithEscape)
+    }
+  }, [])
+
+  const logout = () => {
+    account.logout()
+    queryClient.clear()
+    setAccountMenuOpen(false)
+    setOpen(false)
+    navigate('/', { replace: true })
+  }
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -90,28 +139,87 @@ export function Layout({ children, profileName }: LayoutProps) {
                 {label}
                 {to === '/favoritos' && favoriteCount > 0 && <NavCount value={favoriteCount} />}
                 {to === '/solicitacoes' && requestCount > 0 && <NavCount value={requestCount} />}
+                {to === '/organizacao/solicitacoes' && receivedRequestCount > 0 && (
+                  <NavCount value={receivedRequestCount} />
+                )}
               </NavLink>
             ))}
+            {!account.isAuthenticated && (
+              <Link
+                className="rounded-[9px] bg-coral px-4 py-3 text-center text-sm font-bold text-white md:hidden"
+                to="/criar-conta"
+                onClick={() => setOpen(false)}
+              >
+                Entrar ou criar conta
+              </Link>
+            )}
+            {account.isAuthenticated && (
+              <button
+                className="flex border-0 bg-transparent px-3 py-[15px] text-left text-sm font-semibold text-[#52625a] md:hidden"
+                type="button"
+                onClick={logout}
+              >
+                Sair
+              </button>
+            )}
           </nav>
 
-          {savedName && (
-            <Link
-              className="hidden items-center gap-2 text-forest-800 md:flex"
-              to="/perfil"
-              aria-label={`Abrir perfil de ${savedName}`}
-              title={savedName}
-            >
-              <span
-                className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-100 text-xs font-bold"
-                aria-hidden="true"
+          {account.isAuthenticated ? (
+            <div className="relative hidden md:block" ref={accountMenuRef}>
+              <button
+                className="flex items-center gap-2 border-0 bg-transparent text-forest-800"
+                type="button"
+                aria-expanded={accountMenuOpen}
+                aria-haspopup="menu"
+                onClick={() => setAccountMenuOpen((value) => !value)}
               >
-                {initials}
-              </span>
-              <span className="whitespace-nowrap text-xs font-semibold">
-                Olá,
-                <br />
-                bem-vindo {firstName}
-              </span>
+                <span className="grid size-9 shrink-0 place-items-center rounded-full bg-forest-100 text-xs font-bold">
+                  {initials || <UserRound size={17} />}
+                </span>
+                <span className="whitespace-nowrap text-left text-xs font-semibold">
+                  {savedName ? (
+                    <>
+                      <span>Olá,</span>
+                      <br />
+                      <span>bem-vindo {firstName}</span>
+                    </>
+                  ) : (
+                    'Minha conta'
+                  )}
+                </span>
+                <ChevronDown size={15} aria-hidden="true" />
+              </button>
+              {accountMenuOpen && (
+                <div
+                  className="absolute right-0 top-[calc(100%+12px)] z-50 grid min-w-[210px] gap-1 rounded-xl border border-line bg-white p-2 shadow-soft"
+                  role="menu"
+                >
+                  <Link
+                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-forest-800 hover:bg-forest-50"
+                    to={profilePath}
+                    role="menuitem"
+                    onClick={() => setAccountMenuOpen(false)}
+                  >
+                    <UserRound size={17} />{' '}
+                    {isGuardian ? 'Perfil da instituição' : 'Visualizar meu perfil'}
+                  </Link>
+                  <button
+                    className="flex items-center gap-2 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-sm font-semibold text-[#a33f2d] hover:bg-coral-pale"
+                    type="button"
+                    role="menuitem"
+                    onClick={logout}
+                  >
+                    <LogOut size={17} /> Sair
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link
+              className="hidden rounded-lg bg-coral px-4 py-2.5 text-sm font-bold text-white md:inline-flex"
+              to="/criar-conta"
+            >
+              Entrar ou criar conta
             </Link>
           )}
         </Container>

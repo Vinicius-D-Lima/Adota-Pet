@@ -9,6 +9,7 @@ import {
   useForm,
   useWatch,
 } from 'react-hook-form'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   Button,
   Container,
@@ -29,30 +30,20 @@ import {
   useSaveAdopterProfile,
 } from '../hooks/useAdopterProfile'
 import { ApiError } from '../lib/ApiError'
+import { getDemoProfilePath } from '../lib/demoAccount'
 import { profileSchema } from '../schemas/profileSchema'
 import type { Profile, ProfileDraft } from '../types'
+import {
+  adopterRequiredFields,
+  calculateProfileCompletion,
+} from '../utils/profileCompletion'
+import { GuardianProfilePage } from './GuardianProfilePage'
 
 const SAVE_ERROR_MESSAGE = 'Não foi possível salvar. Seus dados foram mantidos.'
 
-const profileFieldLabels: Record<keyof ProfileDraft, string> = {
-  name: 'Nome completo',
-  cpf: 'CPF',
-  birthDate: 'Data de nascimento',
-  email: 'E-mail',
-  phone: 'Telefone/celular',
-  zipCode: 'CEP',
-  address: 'Endereço',
-  housing: 'Tipo de moradia',
-  hasOutdoorArea: 'Área externa segura',
-  dailyTime: 'Tempo disponível por dia',
-  activityLevel: 'Nível de atividade',
-  hasChildren: 'Crianças na residência',
-  hasOtherPets: 'Outros pets na residência',
-  experience: 'Experiência com animais',
-  acceptsSpecialCare: 'Disponibilidade para cuidados especiais',
-  preferredSpecies: 'Espécie desejada',
-  preferredSize: 'Porte desejado',
-}
+const profileFieldLabels = Object.fromEntries(
+  adopterRequiredFields.map(({ key, label }) => [key, label]),
+) as Record<keyof ProfileDraft, string>
 
 const isProfileField = (field: string): field is keyof ProfileDraft => field in profileFieldLabels
 
@@ -141,6 +132,23 @@ function Notice({
 }
 
 export function ProfilePage() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const returnTo = (location.state as { from?: string } | null)?.from
+  const onSaved = () => {
+    if (returnTo) navigate(returnTo, { replace: true })
+    else window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const isGuardianAccount = getDemoProfilePath() === '/perfil?tipo=responsavel'
+
+  return isGuardianAccount ? (
+    <GuardianProfilePage onSaved={onSaved} />
+  ) : (
+    <AdopterProfilePage onSaved={onSaved} />
+  )
+}
+
+function AdopterProfilePage({ onSaved }: { onSaved: () => void }) {
   const profileQuery = useAdopterProfile()
 
   if (profileQuery.isPending) {
@@ -151,14 +159,15 @@ export function ProfilePage() {
     return <Feedback error>Não foi possível carregar seu perfil. Tente novamente.</Feedback>
   }
 
-  return <ProfileForm savedProfile={profileQuery.data} />
+  return <ProfileForm savedProfile={profileQuery.data} onSaved={onSaved} />
 }
 
 interface ProfileFormProps {
   savedProfile: AdopterProfile
+  onSaved: () => void
 }
 
-function ProfileForm({ savedProfile }: ProfileFormProps) {
+function ProfileForm({ savedProfile, onSaved }: ProfileFormProps) {
   const saveProfile = useSaveAdopterProfile()
   // Guarda para qual versão do formulário a confirmação vale: editar qualquer campo a esconde.
   const [savedFor, setSavedFor] = useState<unknown>(null)
@@ -200,7 +209,7 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
     try {
       await saveProfile.mutateAsync(profile)
       setSavedFor(draft)
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      onSaved()
     } catch (error) {
       if (error instanceof ApiError && error.statusCode === 400) {
         const fieldErrors = Object.entries(error.toFieldErrors()).filter(([field]) =>
@@ -217,13 +226,9 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
     }
   })
 
-  const profileEntries = Object.entries(profileFieldLabels) as Array<[keyof ProfileDraft, string]>
-  const missingFields = profileEntries.filter(([key]) => {
-    const value = draft[key]
-    return typeof value !== 'boolean' && value.trim().length === 0
-  })
-  const completedFields = profileEntries.length - missingFields.length
-  const completionPercentage = Math.round((completedFields / profileEntries.length) * 100)
+  const completion = calculateProfileCompletion('adopter', draft)
+  const missingFields = completion.missingFields
+  const completionPercentage = completion.percentage
   const savedMissingFields = savedProfile.missingFields.map((field) =>
     isProfileField(field) ? profileFieldLabels[field] : field,
   )
@@ -267,8 +272,8 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
           <aside className="border-b border-line bg-cream px-6 py-8 text-left md:border-b-0 md:border-r">
             <div className="md:sticky md:top-[100px]">
               <div>
-                <h2 className="mb-[5px] font-sans text-[17px]">Acompanhe seu perfil</h2>
-                <p className="mb-0 text-[11px] text-forest-700">
+                <h2 className="mb-[5px] font-sans text-xl">Acompanhe seu perfil</h2>
+                <p className="mb-0 text-sm text-forest-700">
                   Perfil {completionPercentage}% completo
                 </p>
               </div>
@@ -288,16 +293,16 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
               <div className="mb-[22px]" aria-live="polite">
                 {missingFields.length > 0 ? (
                   <>
-                    <h3 className="mb-2.5 font-sans text-xs">
+                    <h3 className="mb-2.5 font-sans text-sm">
                       {missingFields.length === 1
                         ? 'Falta 1 campo'
                         : `Faltam ${missingFields.length} campos`}
                     </h3>
                     <ul className="m-0 grid list-none gap-[7px] overflow-y-auto p-0 pr-[5px] md:max-h-[calc(100vh-410px)]">
-                      {missingFields.map(([key, label]) => (
+                      {missingFields.map(({ key, label }) => (
                         <li
                           key={key}
-                          className="flex items-start gap-2 text-[10px] leading-[1.35] text-muted before:mt-1 before:size-1.5 before:shrink-0 before:rounded-full before:border before:border-coral before:content-['']"
+                          className="flex items-start gap-2 text-xs leading-[1.45] text-muted before:mt-1 before:size-1.5 before:shrink-0 before:rounded-full before:border before:border-coral before:content-['']"
                         >
                           {label}
                         </li>
@@ -305,12 +310,12 @@ function ProfileForm({ savedProfile }: ProfileFormProps) {
                     </ul>
                   </>
                 ) : (
-                  <p className="mb-0 text-[11px] font-bold text-forest-700">
+                  <p className="mb-0 text-sm font-bold text-forest-700">
                     Todos os campos foram preenchidos.
                   </p>
                 )}
               </div>
-              <InfoNote>
+              <InfoNote large>
                 <p className="mb-0">
                   Seus dados são compartilhados apenas com a organização quando você envia uma
                   solicitação.
