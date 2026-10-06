@@ -154,82 +154,82 @@ export function RequestsPage() {
             </div>
 
             <div className="grid gap-3.5" aria-live="polite">
-            {visibleRequests.map((request) => {
-              const { pet } = request
-              return (
-                <Card
-                  as="article"
-                  className="grid grid-cols-[90px_1fr] gap-5 rounded-[18px] p-4 md:grid-cols-[145px_minmax(0,1fr)_auto]"
-                  id={`request-${request.id}`}
-                  key={request.id}
-                  tabIndex={-1}
-                >
-                  {pet && (
-                    <img
-                      className="h-[100px] w-[90px] rounded-[13px] object-cover md:h-[135px] md:w-[145px]"
-                      src={pet.image}
-                      alt={pet.name}
-                      width={145}
-                      height={110}
-                      loading="lazy"
-                    />
-                  )}
-                  <div className="py-[7px]">
-                    <div className="flex flex-col-reverse items-start justify-between gap-[15px] md:flex-row">
-                      <div>
-                        <span className="text-[9px] font-bold tracking-[0.08em] text-muted">
-                          {request.id}
-                        </span>
-                        <h2 className="mb-2 mt-[3px] text-[27px]">
-                          {pet ? pet.name : 'Pet indisponível'}
-                        </h2>
+              {visibleRequests.map((request) => {
+                const { pet } = request
+                return (
+                  <Card
+                    as="article"
+                    className="grid grid-cols-[90px_1fr] gap-5 rounded-[18px] p-4 md:grid-cols-[145px_minmax(0,1fr)_auto]"
+                    id={`request-${request.id}`}
+                    key={request.id}
+                    tabIndex={-1}
+                  >
+                    {pet && (
+                      <img
+                        className="h-[100px] w-[90px] rounded-[13px] object-cover md:h-[135px] md:w-[145px]"
+                        src={pet.image}
+                        alt={pet.name}
+                        width={145}
+                        height={110}
+                        loading="lazy"
+                      />
+                    )}
+                    <div className="py-[7px]">
+                      <div className="flex flex-col-reverse items-start justify-between gap-[15px] md:flex-row">
+                        <div>
+                          <span className="text-[9px] font-bold tracking-[0.08em] text-muted">
+                            {request.id}
+                          </span>
+                          <h2 className="mb-2 mt-[3px] text-[27px]">
+                            {pet ? pet.name : 'Pet indisponível'}
+                          </h2>
+                        </div>
+                        <StatusPill status={request.status} />
                       </div>
-                      <StatusPill status={request.status} />
-                    </div>
-                    <p className="text-xs text-muted">{request.message}</p>
-                    <div className="flex flex-wrap gap-[18px] text-[10px] text-muted">
-                      <span className="flex items-center gap-[5px]">
-                        <CalendarDays size={16} /> Enviada em {formatRequestDate(request.date)}
-                      </span>
-                      {pet && (
+                      <p className="text-xs text-muted">{request.message}</p>
+                      <div className="flex flex-wrap gap-[18px] text-[10px] text-muted">
                         <span className="flex items-center gap-[5px]">
-                          <MapPin size={16} /> {pet.organization}
+                          <CalendarDays size={16} /> Enviada em {formatRequestDate(request.date)}
                         </span>
+                        {pet && (
+                          <span className="flex items-center gap-[5px]">
+                            <MapPin size={16} /> {pet.organization}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="col-span-2 flex items-center justify-between md:col-span-1 md:flex-col md:items-end">
+                      {canCancelRequest(request.status) && (
+                        <Button
+                          variant="text-danger"
+                          onClick={(event) => {
+                            setCancelError('')
+                            setToCancel({ request, opener: event.currentTarget })
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      )}
+                      {pet && (
+                        <Link
+                          className="grid size-[38px] place-items-center rounded-[10px] border border-line text-forest-800"
+                          to={`/pets/${pet.id}`}
+                          aria-label={`Ver ${pet.name}`}
+                        >
+                          <ChevronRight />
+                        </Link>
                       )}
                     </div>
-                  </div>
-                  <div className="col-span-2 flex items-center justify-between md:col-span-1 md:flex-col md:items-end">
-                    {canCancelRequest(request.status) && (
-                      <Button
-                        variant="text-danger"
-                        onClick={(event) => {
-                          setCancelError('')
-                          setToCancel({ request, opener: event.currentTarget })
-                        }}
-                      >
-                        Cancelar
-                      </Button>
-                    )}
-                    {pet && (
-                      <Link
-                        className="grid size-[38px] place-items-center rounded-[10px] border border-line text-forest-800"
-                        to={`/pets/${pet.id}`}
-                        aria-label={`Ver ${pet.name}`}
-                      >
-                        <ChevronRight />
-                      </Link>
-                    )}
-                  </div>
-                </Card>
-              )
-            })}
-            {!visibleRequests.length && (
-              <EmptyState
-                icon={<ClipboardList size={36} />}
-                title={`Nenhuma solicitação em “${activeStage.label}”`}
-                description="Selecione outro estágio para acompanhar suas demais solicitações."
-              />
-            )}
+                  </Card>
+                )
+              })}
+              {!visibleRequests.length && (
+                <EmptyState
+                  icon={<ClipboardList size={36} />}
+                  title={`Nenhuma solicitação em “${activeStage.label}”`}
+                  description="Selecione outro estágio para acompanhar suas demais solicitações."
+                />
+              )}
             </div>
           </div>
         ) : (

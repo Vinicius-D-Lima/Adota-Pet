@@ -47,9 +47,7 @@ describe('ProfilePage', () => {
     getMock.mockResolvedValue(savedResponse)
     renderWithProviders(<ProfilePage />, { route: '/perfil?tipo=responsavel' })
 
-    expect(
-      await screen.findByRole('heading', { name: /perfil do adotante/i }),
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /perfil do adotante/i })).toBeInTheDocument()
     expect(screen.queryByText(/como você quer usar o adotapet/i)).not.toBeInTheDocument()
     expect(getMock).toHaveBeenCalledWith('/me/adopter-profile')
   })

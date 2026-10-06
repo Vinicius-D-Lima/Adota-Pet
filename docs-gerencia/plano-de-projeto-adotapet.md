@@ -10,18 +10,18 @@
 
 **Números da linha de base**
 
-| O quê | Valor | Onde |
-|---|---:|---|
-| Estimativa de iniciação — ordem de grandeza | 360 h de capacidade efetiva; R$ 9.000,00 (faixa de −25% a +75%: R$ 6.750,00–15.750,00) | Termo de Abertura, seção 10 |
-| Capacidade efetiva dos calendários | 180 h PSW (12 semanas) + 180 h GPTI (9 semanas) = 360 h | 5.1 e 5.3 |
-| Esforço planejado nas atividades | 144 h PSW + 72 h GPTI = 216 h | 5.2, 5.5 e 5.6 |
-| Atividades niveladas | 144 h PSW + 72 h GPTI = 216 h; R$ 5.400,00 | 5.2 e 6.2 |
-| Segunda estimativa, pelo entregável | 156 h PSW + 70 h GPTI = 226 h; diferença líquida de +10 h | 6.2.1 |
-| Contingência, por eventos nomeados | 56 h = 32 h técnica + 24 h de gestão; R$ 1.400,00 | 6.3.3 |
-| Linha de base de custos | 272 h = atividades + contingência; R$ 6.800,00 | 6.4 |
-| Reserva gerencial, fora da linha de base | 7% = R$ 476,00 | 6.4 |
-| Orçamento total simulado | R$ 7.276,00; desembolso real previsto R$ 0,00 | 6.4 |
-| Marcos | M1 na semana letiva 8 (GPTI 05/10; PSW 06/10); M2 na semana letiva 12 (PSW 10/11; aceite GPTI 30/11) | 5.1 e 5.4 |
+| O quê                                       |                                                                                                Valor | Onde                        |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------: | --------------------------- |
+| Estimativa de iniciação — ordem de grandeza |               360 h de capacidade efetiva; R$ 9.000,00 (faixa de −25% a +75%: R$ 6.750,00–15.750,00) | Termo de Abertura, seção 10 |
+| Capacidade efetiva dos calendários          |                                              180 h PSW (12 semanas) + 180 h GPTI (9 semanas) = 360 h | 5.1 e 5.3                   |
+| Esforço planejado nas atividades            |                                                                        144 h PSW + 72 h GPTI = 216 h | 5.2, 5.5 e 5.6              |
+| Atividades niveladas                        |                                                           144 h PSW + 72 h GPTI = 216 h; R$ 5.400,00 | 5.2 e 6.2                   |
+| Segunda estimativa, pelo entregável         |                                            156 h PSW + 70 h GPTI = 226 h; diferença líquida de +10 h | 6.2.1                       |
+| Contingência, por eventos nomeados          |                                                    56 h = 32 h técnica + 24 h de gestão; R$ 1.400,00 | 6.3.3                       |
+| Linha de base de custos                     |                                                       272 h = atividades + contingência; R$ 6.800,00 | 6.4                         |
+| Reserva gerencial, fora da linha de base    |                                                                                       7% = R$ 476,00 | 6.4                         |
+| Orçamento total simulado                    |                                                        R$ 7.276,00; desembolso real previsto R$ 0,00 | 6.4                         |
+| Marcos                                      | M1 na semana letiva 8 (GPTI 05/10; PSW 06/10); M2 na semana letiva 12 (PSW 10/11; aceite GPTI 30/11) | 5.1 e 5.4                   |
 
 A capacidade efetiva do cronograma considera 12 semanas de PSW e nove semanas de GPTI, conforme as datas e os calendários das disciplinas (3 × 5 × 12 + 4 × 5 × 9 = 360 h). A estimativa de iniciação de R$ 9.000,00 representa a valoração preliminar dessa capacidade total; sua faixa de incerteza é de R$ 6.750,00 a R$ 15.750,00. A linha de base detalhada é calculada separadamente a partir das atividades planejadas e das reservas identificadas: 216 h de atividades, 56 h de contingência e reserva gerencial de 7%. Essa distinção explica por que o orçamento detalhado pode ser menor que a estimativa de iniciação: ele não contabiliza as 88 h de capacidade que permanecem sem atividade ou contingência alocada. Os valores são referências acadêmicas para planejamento, não salários, pagamentos aos estudantes nem desembolsos reais; a memória consolidada está na seção 6.4.
 
@@ -132,62 +132,62 @@ O M1, na semana 8, demonstra os fluxos prioritários no frontend com serviços s
 
 Esta matriz conecta o que cada perfil precisa realizar no AdotaPet às funções que a equipe construirá para atender a essa necessidade. O desenho técnico pode evoluir durante o projeto, desde que preserve o resultado esperado e os critérios de aceite.
 
-| ID | Necessidade | Origem | Solução adotada no AdotaPet |
-|---|---|---|---|
-| REQ-01 | Conhecer a proposta e acessar as funções do sistema | Objetivo do produto | Página inicial e navegação responsiva |
-| REQ-02 | Criar usuário para os fluxos demonstrativos | Caso de uso: cadastrar usuário | Cadastro de identidade fictícia, com persistência e papel |
-| REQ-03 | Consultar dados de usuário conforme autorização | Caso de uso: consultar usuário | API com consulta restrita pelo papel |
-| REQ-04 | Atualizar dados permitidos do usuário | Caso de uso: atualizar usuário | API com validação e autorização |
-| REQ-05 | Excluir usuário sem inconsistências | Caso de uso: excluir usuário | Exclusão sujeita a autorização e integridade dos vínculos |
-| REQ-06 | Permitir que responsáveis divulguem pets | Caso de uso: cadastrar pet | CRUD de pets na área do responsável |
-| REQ-07 | Consultar pets e disponibilidade | Caso de uso: consultar pet | Catálogo e detalhes alimentados pela API |
-| REQ-08 | Manter os dados dos pets atualizados | Caso de uso: atualizar pet | Edição autorizada pelo responsável |
-| REQ-09 | Remover pets sem corromper dados relacionados | Caso de uso: excluir pet | Exclusão validada contra solicitações e adoções |
-| REQ-10 | Encontrar pets por texto | Caso de uso: pesquisar pets | Pesquisa por nome, raça ou cidade |
-| REQ-11 | Reduzir resultados por critérios | Caso de uso: filtrar pets | Filtros definidos no contrato; ordenação e paginação complementares |
-| REQ-12 | Conhecer características e necessidades do pet | Caso de uso: visualizar detalhes | Tela de detalhe com história, atributos e disponibilidade |
-| REQ-13 | Guardar pets de interesse | Fluxo complementar do adotante | Favoritos persistidos e sincronizados com o perfil |
-| REQ-14 | Avaliar orientativamente a compatibilidade | Fluxo complementar do adotante | Cálculo determinístico com percentual, classificação e justificativas |
-| REQ-15 | Solicitar adoção com informações suficientes | Caso de uso: solicitar adoção | Questionário validado e criação persistida da solicitação |
-| REQ-16 | Acompanhar pedidos recebidos ou enviados | Caso de uso: consultar solicitações | Consultas separadas e autorizadas por papel |
-| REQ-17 | Aprovar solicitações elegíveis | Caso de uso: aprovar solicitação | Ação disponível a responsável autorizado, sujeita às transições válidas |
-| REQ-18 | Recusar solicitações elegíveis | Caso de uso: recusar solicitação | Ação disponível a responsável autorizado, sujeita às transições válidas |
-| REQ-19 | Desistir de uma solicitação quando permitido | Caso de uso: cancelar solicitação | Cancelamento pelo adotante conforme o estado |
-| REQ-20 | Registrar adoção concluída | Caso de uso: finalizar adoção | Registro persistido e atualização da disponibilidade do pet |
+| ID     | Necessidade                                         | Origem                              | Solução adotada no AdotaPet                                             |
+| ------ | --------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------- |
+| REQ-01 | Conhecer a proposta e acessar as funções do sistema | Objetivo do produto                 | Página inicial e navegação responsiva                                   |
+| REQ-02 | Criar usuário para os fluxos demonstrativos         | Caso de uso: cadastrar usuário      | Cadastro de identidade fictícia, com persistência e papel               |
+| REQ-03 | Consultar dados de usuário conforme autorização     | Caso de uso: consultar usuário      | API com consulta restrita pelo papel                                    |
+| REQ-04 | Atualizar dados permitidos do usuário               | Caso de uso: atualizar usuário      | API com validação e autorização                                         |
+| REQ-05 | Excluir usuário sem inconsistências                 | Caso de uso: excluir usuário        | Exclusão sujeita a autorização e integridade dos vínculos               |
+| REQ-06 | Permitir que responsáveis divulguem pets            | Caso de uso: cadastrar pet          | CRUD de pets na área do responsável                                     |
+| REQ-07 | Consultar pets e disponibilidade                    | Caso de uso: consultar pet          | Catálogo e detalhes alimentados pela API                                |
+| REQ-08 | Manter os dados dos pets atualizados                | Caso de uso: atualizar pet          | Edição autorizada pelo responsável                                      |
+| REQ-09 | Remover pets sem corromper dados relacionados       | Caso de uso: excluir pet            | Exclusão validada contra solicitações e adoções                         |
+| REQ-10 | Encontrar pets por texto                            | Caso de uso: pesquisar pets         | Pesquisa por nome, raça ou cidade                                       |
+| REQ-11 | Reduzir resultados por critérios                    | Caso de uso: filtrar pets           | Filtros definidos no contrato; ordenação e paginação complementares     |
+| REQ-12 | Conhecer características e necessidades do pet      | Caso de uso: visualizar detalhes    | Tela de detalhe com história, atributos e disponibilidade               |
+| REQ-13 | Guardar pets de interesse                           | Fluxo complementar do adotante      | Favoritos persistidos e sincronizados com o perfil                      |
+| REQ-14 | Avaliar orientativamente a compatibilidade          | Fluxo complementar do adotante      | Cálculo determinístico com percentual, classificação e justificativas   |
+| REQ-15 | Solicitar adoção com informações suficientes        | Caso de uso: solicitar adoção       | Questionário validado e criação persistida da solicitação               |
+| REQ-16 | Acompanhar pedidos recebidos ou enviados            | Caso de uso: consultar solicitações | Consultas separadas e autorizadas por papel                             |
+| REQ-17 | Aprovar solicitações elegíveis                      | Caso de uso: aprovar solicitação    | Ação disponível a responsável autorizado, sujeita às transições válidas |
+| REQ-18 | Recusar solicitações elegíveis                      | Caso de uso: recusar solicitação    | Ação disponível a responsável autorizado, sujeita às transições válidas |
+| REQ-19 | Desistir de uma solicitação quando permitido        | Caso de uso: cancelar solicitação   | Cancelamento pelo adotante conforme o estado                            |
+| REQ-20 | Registrar adoção concluída                          | Caso de uso: finalizar adoção       | Registro persistido e atualização da disponibilidade do pet             |
 
 **Requisitos não funcionais**
 
-| ID | Requisito |
-|---|---|
-| RNF-01 | O frontend deve utilizar React + TypeScript e o backend próprio deve utilizar Node.js + Express. |
-| RNF-02 | Usuários, pets, perfis, favoritos, solicitações e adoções de demonstração devem persistir em MongoDB. |
-| RNF-03 | O frontend deve acessar os dados exclusivamente por APIs, sem conexão direta ao banco. |
-| RNF-04 | A API deve validar dados e aplicar autorização por papel no servidor. |
-| RNF-05 | O fluxo OAuth deve ser simulado com identidades fictícias, sem credenciais reais ou provedor externo. |
-| RNF-06 | Endpoints mantidos no `json-server` devem estar identificados no contrato e não substituir a API própria. |
-| RNF-07 | A interface deve ser responsiva e os elementos interativos devem possuir identificação acessível. |
+| ID     | Requisito                                                                                                                              |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| RNF-01 | O frontend deve utilizar React + TypeScript e o backend próprio deve utilizar Node.js + Express.                                       |
+| RNF-02 | Usuários, pets, perfis, favoritos, solicitações e adoções de demonstração devem persistir em MongoDB.                                  |
+| RNF-03 | O frontend deve acessar os dados exclusivamente por APIs, sem conexão direta ao banco.                                                 |
+| RNF-04 | A API deve validar dados e aplicar autorização por papel no servidor.                                                                  |
+| RNF-05 | O fluxo OAuth deve ser simulado com identidades fictícias, sem credenciais reais ou provedor externo.                                  |
+| RNF-06 | Endpoints mantidos no `json-server` devem estar identificados no contrato e não substituir a API própria.                              |
+| RNF-07 | A interface deve ser responsiva e os elementos interativos devem possuir identificação acessível.                                      |
 | RNF-08 | O sistema deve apresentar mensagens compreensíveis para carregamento, ausência de dados, validação, falhas de rede e erros de negócio. |
-| RNF-09 | Regras de negócio e contratos devem possuir testes funcionais, de API e de contrato. |
-| RNF-10 | A solução deve ser executável no ambiente de desenvolvimento definido pela equipe, sem implantação em produção. |
-| RNF-11 | Não devem ser utilizados dados pessoais reais, serviços externos ou integração com sistemas de terceiros. |
-| RNF-12 | A compatibilidade deve ser determinística, reproduzível e apresentada como orientativa. |
+| RNF-09 | Regras de negócio e contratos devem possuir testes funcionais, de API e de contrato.                                                   |
+| RNF-10 | A solução deve ser executável no ambiente de desenvolvimento definido pela equipe, sem implantação em produção.                        |
+| RNF-11 | Não devem ser utilizados dados pessoais reais, serviços externos ou integração com sistemas de terceiros.                              |
+| RNF-12 | A compatibilidade deve ser determinística, reproduzível e apresentada como orientativa.                                                |
 
 ### 4.3 Matriz de rastreabilidade
 
-| ID | EAP | Aceite observável |
-|---|---|---|
-| REQ-01 | 1.4 | A página inicial explica a proposta e oferece acesso às funções do sistema. |
-| REQ-02–REQ-05 | 1.5 | As operações de usuário persistem e respeitam papel, autorização e vínculos. |
-| REQ-06, REQ-08, REQ-09 | 1.5 | O responsável autorizado administra pets próprios; operações incompatíveis com dados relacionados são recusadas com erro compreensível. |
-| REQ-07, REQ-10–REQ-12 | 1.4–1.6 | Consulta, pesquisa, filtros, ordenação, paginação e detalhes exibem resultados coerentes com os dados e a disponibilidade. |
-| REQ-13–REQ-14 | 1.5–1.6 | Perfil e favoritos persistem; a compatibilidade retorna resultado determinístico e orientativo. |
-| REQ-15 | 1.5–1.6 | Questionário inválido não cria solicitação; questionário válido gera solicitação persistida e confirmação com identificador. |
-| REQ-16 | 1.5–1.6 | Adotante e responsável consultam apenas as solicitações autorizadas ao seu papel. |
-| REQ-17–REQ-18 | 1.5–1.6 | Aprovação e recusa somente ocorrem por responsável autorizado e em estados elegíveis. |
-| REQ-19 | 1.5–1.6 | Cancelamento permitido muda e persiste o estado; transição não permitida é recusada. |
-| REQ-20 | 1.5–1.6 | A conclusão registra a adoção e torna o pet indisponível para novas solicitações. |
-| RNF-01–RNF-06 | 1.3, 1.6 | Frontend, API, banco, autorização e endpoints simulados seguem a arquitetura e contratos aprovados. |
-| RNF-07–RNF-12 | 1.4–1.7 | Interface responsiva e acessível, erros compreensíveis, testes reproduzíveis, dados fictícios e compatibilidade orientativa. |
+| ID                     | EAP      | Aceite observável                                                                                                                       |
+| ---------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| REQ-01                 | 1.4      | A página inicial explica a proposta e oferece acesso às funções do sistema.                                                             |
+| REQ-02–REQ-05          | 1.5      | As operações de usuário persistem e respeitam papel, autorização e vínculos.                                                            |
+| REQ-06, REQ-08, REQ-09 | 1.5      | O responsável autorizado administra pets próprios; operações incompatíveis com dados relacionados são recusadas com erro compreensível. |
+| REQ-07, REQ-10–REQ-12  | 1.4–1.6  | Consulta, pesquisa, filtros, ordenação, paginação e detalhes exibem resultados coerentes com os dados e a disponibilidade.              |
+| REQ-13–REQ-14          | 1.5–1.6  | Perfil e favoritos persistem; a compatibilidade retorna resultado determinístico e orientativo.                                         |
+| REQ-15                 | 1.5–1.6  | Questionário inválido não cria solicitação; questionário válido gera solicitação persistida e confirmação com identificador.            |
+| REQ-16                 | 1.5–1.6  | Adotante e responsável consultam apenas as solicitações autorizadas ao seu papel.                                                       |
+| REQ-17–REQ-18          | 1.5–1.6  | Aprovação e recusa somente ocorrem por responsável autorizado e em estados elegíveis.                                                   |
+| REQ-19                 | 1.5–1.6  | Cancelamento permitido muda e persiste o estado; transição não permitida é recusada.                                                    |
+| REQ-20                 | 1.5–1.6  | A conclusão registra a adoção e torna o pet indisponível para novas solicitações.                                                       |
+| RNF-01–RNF-06          | 1.3, 1.6 | Frontend, API, banco, autorização e endpoints simulados seguem a arquitetura e contratos aprovados.                                     |
+| RNF-07–RNF-12          | 1.4–1.7  | Interface responsiva e acessível, erros compreensíveis, testes reproduzíveis, dados fictícios e compatibilidade orientativa.            |
 
 ## 5. Processo de elaboração do cronograma
 
@@ -204,20 +204,20 @@ O cronograma foi elaborado a partir da EAP, integrado às capacidades das duas e
 - **Atualização:** progresso medido por esforço realizado, esforço restante e entrega aceita, e não por percentual subjetivo.
 - **Limites de controle:** variação prevista acima de 10% de uma atividade, consumo da folga de um marco ou previsão acima de 216 h de atividades exige análise; uso da contingência é limitado aos eventos e horas aprovados na seção 6.3.3. Mudança de escopo, prazo ou orçamento exige controle de mudanças.
 
-| Semana | GPTI | PSW |
-|---:|---|---|
-| 1 | 03/08 | 04/08 |
-| 2 | 10/08 | 18/08 |
-| 3 | 17/08 | 25/08 |
-| 4 | 24/08 | 01/09 |
-| 5 | 31/08 | 08/09 |
-| 6 | 14/09 | 15/09 |
-| 7 | 21/09 | 22/09 |
+|     Semana | GPTI  | PSW   |
+| ---------: | ----- | ----- |
+|          1 | 03/08 | 04/08 |
+|          2 | 10/08 | 18/08 |
+|          3 | 17/08 | 25/08 |
+|          4 | 24/08 | 01/09 |
+|          5 | 31/08 | 08/09 |
+|          6 | 14/09 | 15/09 |
+|          7 | 21/09 | 22/09 |
 | 8 — M1/AV1 | 05/10 | 06/10 |
-| 9 | 26/10 | 13/10 |
-| 10 | 09/11 | 27/10 |
-| 11 | 16/11 | 03/11 |
-| 12 — M2 | 30/11 | 10/11 |
+|          9 | 26/10 | 13/10 |
+|         10 | 09/11 | 27/10 |
+|         11 | 16/11 | 03/11 |
+|    12 — M2 | 30/11 | 10/11 |
 
 As datas acima seguem o calendário acadêmico descrito no Termo de Abertura. O plano controla o prazo por semana letiva e não pressupõe trabalho em dias sem aula.
 
@@ -227,36 +227,36 @@ As atividades derivam dos pacotes da EAP. FS significa término–início; ativi
 
 #### Atividades de produto — equipes PSW e GPTI
 
-| ID | Atividade/saída verificável | Predecessora | Janela | Duração | Esforço | Responsável principal | Custo estimado |
-|---|---|---|---:|---:|---:|---|---:|
-| D01 | Refinar casos de uso, regras e contrato da API | — | S1–S3 | 3 sem. | 10 h | PSW | R$ 250,00 |
-| D02 | Completar os fluxos prioritários do frontend para M1 | D01 (SS) | S1–S7 | 7 sem. | 8 h | PSW | R$ 200,00 |
-| D03 | Preparar Express, conexão MongoDB, validação e erros | D01 (FS) | S3–S5 | 3 sem. | 12 h | PSW | R$ 300,00 |
-| D04 | Implementar cadastro, consulta, atualização e exclusão de usuários | D03 (SS) | S4–S7 | 4 sem. | 12 h | PSW | R$ 300,00 |
-| D05 | Implementar CRUD de pets e regras de propriedade/disponibilidade | D03 (SS) | S4–S8 | 5 sem. | 12 h | PSW | R$ 300,00 |
-| D06 | Implementar catálogo, pesquisa, filtros e paginação | D05 (SS) | S5–S8 | 4 sem. | 10 h | PSW | R$ 250,00 |
-| D07 | Integrar perfil, compatibilidade e favoritos | D03 (FS), D04 (SS) | S5–S8 | 4 sem. | 10 h | PSW | R$ 250,00 |
-| D08 | Implementar questionário e criação de solicitações | D04–D07 (SS) | S6–S9 | 4 sem. | 12 h | PSW | R$ 300,00 |
-| D09 | Implementar consulta, aprovação, recusa e cancelamento | D08 (SS) | S7–S10 | 4 sem. | 14 h | PSW | R$ 350,00 |
-| D10 | Implementar conclusão da adoção e atualizar disponibilidade | D09 (SS) | S9–S10 | 2 sem. | 8 h | PSW | R$ 200,00 |
-| D11 | Implementar telas da área do responsável | D05, D09 (SS) | S7–S10 | 4 sem. | 10 h | PSW | R$ 250,00 |
-| D12 | Preparar seed e mocks delimitados para todos os papéis | D01, D03 (SS) | S3–S6 | 4 sem. | 6 h | PSW | R$ 150,00 |
-| D13 | Executar testes técnicos e corrigir defeitos prioritários | D03 (SS) | S5–S11 | 7 sem. | 14 h | PSW | R$ 350,00 |
-| D14 | Integrar fluxos, validar persistência e preparar demonstração M2 | D09, D10, D12 (FS); D11, D13 (SS) | S10–S12 | 3 sem. | 6 h | PSW | R$ 150,00 |
-| **Subtotal PSW** |  |  | **S1–S12** |  | **144 h** |  | **R$ 3.600,00** |
+| ID               | Atividade/saída verificável                                        | Predecessora                      |     Janela | Duração |   Esforço | Responsável principal |  Custo estimado |
+| ---------------- | ------------------------------------------------------------------ | --------------------------------- | ---------: | ------: | --------: | --------------------- | --------------: |
+| D01              | Refinar casos de uso, regras e contrato da API                     | —                                 |      S1–S3 |  3 sem. |      10 h | PSW                   |       R$ 250,00 |
+| D02              | Completar os fluxos prioritários do frontend para M1               | D01 (SS)                          |      S1–S7 |  7 sem. |       8 h | PSW                   |       R$ 200,00 |
+| D03              | Preparar Express, conexão MongoDB, validação e erros               | D01 (FS)                          |      S3–S5 |  3 sem. |      12 h | PSW                   |       R$ 300,00 |
+| D04              | Implementar cadastro, consulta, atualização e exclusão de usuários | D03 (SS)                          |      S4–S7 |  4 sem. |      12 h | PSW                   |       R$ 300,00 |
+| D05              | Implementar CRUD de pets e regras de propriedade/disponibilidade   | D03 (SS)                          |      S4–S8 |  5 sem. |      12 h | PSW                   |       R$ 300,00 |
+| D06              | Implementar catálogo, pesquisa, filtros e paginação                | D05 (SS)                          |      S5–S8 |  4 sem. |      10 h | PSW                   |       R$ 250,00 |
+| D07              | Integrar perfil, compatibilidade e favoritos                       | D03 (FS), D04 (SS)                |      S5–S8 |  4 sem. |      10 h | PSW                   |       R$ 250,00 |
+| D08              | Implementar questionário e criação de solicitações                 | D04–D07 (SS)                      |      S6–S9 |  4 sem. |      12 h | PSW                   |       R$ 300,00 |
+| D09              | Implementar consulta, aprovação, recusa e cancelamento             | D08 (SS)                          |     S7–S10 |  4 sem. |      14 h | PSW                   |       R$ 350,00 |
+| D10              | Implementar conclusão da adoção e atualizar disponibilidade        | D09 (SS)                          |     S9–S10 |  2 sem. |       8 h | PSW                   |       R$ 200,00 |
+| D11              | Implementar telas da área do responsável                           | D05, D09 (SS)                     |     S7–S10 |  4 sem. |      10 h | PSW                   |       R$ 250,00 |
+| D12              | Preparar seed e mocks delimitados para todos os papéis             | D01, D03 (SS)                     |      S3–S6 |  4 sem. |       6 h | PSW                   |       R$ 150,00 |
+| D13              | Executar testes técnicos e corrigir defeitos prioritários          | D03 (SS)                          |     S5–S11 |  7 sem. |      14 h | PSW                   |       R$ 350,00 |
+| D14              | Integrar fluxos, validar persistência e preparar demonstração M2   | D09, D10, D12 (FS); D11, D13 (SS) |    S10–S12 |  3 sem. |       6 h | PSW                   |       R$ 150,00 |
+| **Subtotal PSW** |                                                                    |                                   | **S1–S12** |         | **144 h** |                       | **R$ 3.600,00** |
 
 #### Atividades de gerenciamento — equipe GPTI
 
-| ID | Atividade/saída verificável | Predecessora | Janela | Duração | Esforço | Responsável principal | Custo estimado |
-|---|---|---|---:|---:|---:|---|---:|
-| G01 | Elaborar Business Case, Termo de Abertura e plano inicial | — | S4–S5 | 2 sem. | 8 h | GPTI | R$ 200,00 |
-| G02 | Detalhar escopo, EAP, requisitos e rastreabilidade | G01 (SS) | S4–S6 | 3 sem. | 10 h | GPTI | R$ 250,00 |
-| G03 | Elaborar cronograma, recursos, responsabilidades e orçamento | G02 (SS) | S5–S7 | 3 sem. | 10 h | GPTI | R$ 250,00 |
-| G04 | Planejar riscos, qualidade, comunicação e stakeholders | G02 (SS) | S5–S8 | 4 sem. | 8 h | GPTI | R$ 200,00 |
-| G05 | Revisar M1 e registrar aceite/pendências da AV1 | G01–G03 (FS), G04 (SS) | S7–S8 | 2 sem. | 4 h | GPTI | R$ 100,00 |
-| G06 | Monitorar e controlar cronograma, recursos e riscos | G01 (SS) | S4–S12 | 9 sem. | 16 h | GPTI | R$ 400,00 |
-| G07 | Elaborar relatórios, encerramento e lições aprendidas | G05 (FS) | S8–S12 | 5 sem. | 16 h | GPTI | R$ 400,00 |
-| **Subtotal GPTI** |  |  | **S4–S12** |  | **72 h** |  | **R$ 1.800,00** |
+| ID                | Atividade/saída verificável                                  | Predecessora           |     Janela | Duração |  Esforço | Responsável principal |  Custo estimado |
+| ----------------- | ------------------------------------------------------------ | ---------------------- | ---------: | ------: | -------: | --------------------- | --------------: |
+| G01               | Elaborar Business Case, Termo de Abertura e plano inicial    | —                      |      S4–S5 |  2 sem. |      8 h | GPTI                  |       R$ 200,00 |
+| G02               | Detalhar escopo, EAP, requisitos e rastreabilidade           | G01 (SS)               |      S4–S6 |  3 sem. |     10 h | GPTI                  |       R$ 250,00 |
+| G03               | Elaborar cronograma, recursos, responsabilidades e orçamento | G02 (SS)               |      S5–S7 |  3 sem. |     10 h | GPTI                  |       R$ 250,00 |
+| G04               | Planejar riscos, qualidade, comunicação e stakeholders       | G02 (SS)               |      S5–S8 |  4 sem. |      8 h | GPTI                  |       R$ 200,00 |
+| G05               | Revisar M1 e registrar aceite/pendências da AV1              | G01–G03 (FS), G04 (SS) |      S7–S8 |  2 sem. |      4 h | GPTI                  |       R$ 100,00 |
+| G06               | Monitorar e controlar cronograma, recursos e riscos          | G01 (SS)               |     S4–S12 |  9 sem. |     16 h | GPTI                  |       R$ 400,00 |
+| G07               | Elaborar relatórios, encerramento e lições aprendidas        | G05 (FS)               |     S8–S12 |  5 sem. |     16 h | GPTI                  |       R$ 400,00 |
+| **Subtotal GPTI** |                                                              |                        | **S4–S12** |         | **72 h** |                       | **R$ 1.800,00** |
 
 **Total das atividades detalhadas:** 216 h, sendo 144 h de produto (PSW) e 72 h de gerenciamento (GPTI), equivalentes a R$ 5.400,00. A contingência de riscos é estimada separadamente na seção 6.3.3 e não está incluída nas horas das atividades.
 
@@ -264,11 +264,11 @@ As atividades derivam dos pacotes da EAP. FS significa término–início; ativi
 
 As durações são janelas de calendário e não equivalem ao esforço total da atividade. As estimativas consideram aprendizagem das tecnologias, integração progressiva, revisão cruzada e testes durante o desenvolvimento. A carga de cada participante não pode exceder 5 h em uma semana.
 
-| Recurso | Capacidade semanal máxima | Capacidade efetiva no calendário | Esforço planejado | Utilização média | Capacidade não alocada |
-|---|---:|---:|---:|---:|---:|
-| PSW — 3 alunos, 12 semanas | 5 h/aluno | 180 h | 144 h | 80% (4 h/aluno/semana) | 36 h |
-| GPTI — 4 alunos, semanas 4–12 | 5 h/aluno | 180 h | 72 h | 40% (2 h/aluno/semana) | 108 h |
-| **Total** |  | **360 h** | **216 h** | **60%** | **144 h** |
+| Recurso                       | Capacidade semanal máxima | Capacidade efetiva no calendário | Esforço planejado |       Utilização média | Capacidade não alocada |
+| ----------------------------- | ------------------------: | -------------------------------: | ----------------: | ---------------------: | ---------------------: |
+| PSW — 3 alunos, 12 semanas    |                 5 h/aluno |                            180 h |             144 h | 80% (4 h/aluno/semana) |                   36 h |
+| GPTI — 4 alunos, semanas 4–12 |                 5 h/aluno |                            180 h |              72 h | 40% (2 h/aluno/semana) |                  108 h |
+| **Total**                     |                           |                        **360 h** |         **216 h** |                **60%** |              **144 h** |
 
 A utilização é calculada dividindo o esforço planejado pela capacidade efetiva do grupo no calendário (5 h × número de alunos × semanas de participação), não pela capacidade de uma única semana. Assim, PSW utiliza 144/(3 × 5 × 12) = 80%, e GPTI utiliza 72/(4 × 5 × 9) = 40%. As médias equivalem a 4 h por aluno de PSW por semana e 2 h por aluno de GPTI nas nove semanas de participação (S4–S12); a carga real varia por semana conforme as atividades. Esses percentuais medem a ocupação média da capacidade, não uma meta que precise ser preenchida: 5 h por pessoa é o limite semanal, e não uma quota de esforço. Não se acrescentam horas sem atividades e entregas justificadas. GPTI não implementa o produto; suas horas são de gestão, requisitos, validação, testes e documentação.
 
@@ -276,10 +276,10 @@ A utilização é calculada dividindo o esforço planejado pela capacidade efeti
 
 As dependências seguem a tabela 5.2. Os testes incrementais (D13) começam quando a base técnica (D03) é iniciada e continuam em paralelo ao desenvolvimento. A integração final (D14) aguarda a conclusão de D09, D10 e D12 e pode avançar em paralelo a D11 e D13. O encerramento GPTI (G07) começa após a revisão do M1 (G05) e prossegue até a semana 12; a janela inclui relatórios e encerramento, não trabalho em semanas sem aula.
 
-| Marco | Saída | Prazo |
-|---|---|---|
-| M1 | Frontend dos fluxos prioritários demonstrável com serviços simulados; aceite acadêmico de GPTI/PSW | Semana 8: GPTI 05/10; PSW 06/10 |
-| M2 | Sistema integrado à API Express e MongoDB, 17 casos de uso demonstráveis, testes e documentação | Semana 12: PSW 10/11; aceite GPTI 30/11 |
+| Marco | Saída                                                                                              | Prazo                                   |
+| ----- | -------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| M1    | Frontend dos fluxos prioritários demonstrável com serviços simulados; aceite acadêmico de GPTI/PSW | Semana 8: GPTI 05/10; PSW 06/10         |
+| M2    | Sistema integrado à API Express e MongoDB, 17 casos de uso demonstráveis, testes e documentação    | Semana 12: PSW 10/11; aceite GPTI 30/11 |
 
 **Atividades de atenção crítica ao M2:** D09, D10, D13, D14 e G07 têm pouca margem até o marco e devem concluir no prazo. D11 e D12 também precisam terminar dentro de suas janelas para cobrir a área do responsável e preparar dados repetíveis. O contorno vermelho do Gantt destaca a cadeia principal e as frentes paralelas de teste e encerramento; não significa que todas as atividades obrigatórias sejam uma sequência serial.
 
@@ -315,52 +315,52 @@ No Gantt geral, as setas ligam as atividades às suas predecessoras FS/SS; nos G
 
 Cada aluno de PSW tem limite de 5 h/semana. A alocação deriva das horas das atividades e de suas janelas; as tarefas são compartilhadas quando necessário para que cada aluno tenha uma atividade em todas as 12 semanas, sem aumentar o esforço planejado. Os totais individuais somam 144 h para a equipe.
 
-| Semana | Igor Pereira | Marcos Vinícius Silvestre | Lucas Ferreira | Total PSW | Foco |
-|---:|---:|---:|---:|---:|---|
-| 1 | 3 h | 3 h | 2 h | 8 h | Requisitos e frontend prioritário |
-| 2 | 3 h | 2 h | 3 h | 8 h | Modelo, contratos e frontend |
-| 3 | 3 h | 4 h | 3 h | 10 h | API e estrutura |
-| 4 | 5 h | 4 h | 5 h | 14 h | CRUDs e seed |
-| 5 | 4 h | 5 h | 5 h | 14 h | Usuários, pets e catálogo |
-| 6 | 5 h | 5 h | 4 h | 14 h | Perfil, questionário e testes |
-| 7 | 5 h | 5 h | 5 h | 15 h | Solicitações e área do responsável |
-| 8 | 5 h | 5 h | 5 h | 15 h | M1, regras e validação |
-| 9 | 5 h | 5 h | 5 h | 15 h | Decisões e conclusão |
-| 10 | 5 h | 5 h | 5 h | 15 h | Integração e persistência |
-| 11 | 3 h | 3 h | 4 h | 10 h | Testes e correções |
-| 12 | 2 h | 2 h | 2 h | 6 h | M2 e entrega técnica |
-| **Total** | **48 h** | **48 h** | **48 h** | **144 h** | |
+|    Semana | Igor Pereira | Marcos Vinícius Silvestre | Lucas Ferreira | Total PSW | Foco                               |
+| --------: | -----------: | ------------------------: | -------------: | --------: | ---------------------------------- |
+|         1 |          3 h |                       3 h |            2 h |       8 h | Requisitos e frontend prioritário  |
+|         2 |          3 h |                       2 h |            3 h |       8 h | Modelo, contratos e frontend       |
+|         3 |          3 h |                       4 h |            3 h |      10 h | API e estrutura                    |
+|         4 |          5 h |                       4 h |            5 h |      14 h | CRUDs e seed                       |
+|         5 |          4 h |                       5 h |            5 h |      14 h | Usuários, pets e catálogo          |
+|         6 |          5 h |                       5 h |            4 h |      14 h | Perfil, questionário e testes      |
+|         7 |          5 h |                       5 h |            5 h |      15 h | Solicitações e área do responsável |
+|         8 |          5 h |                       5 h |            5 h |      15 h | M1, regras e validação             |
+|         9 |          5 h |                       5 h |            5 h |      15 h | Decisões e conclusão               |
+|        10 |          5 h |                       5 h |            5 h |      15 h | Integração e persistência          |
+|        11 |          3 h |                       3 h |            4 h |      10 h | Testes e correções                 |
+|        12 |          2 h |                       2 h |            2 h |       6 h | M2 e entrega técnica               |
+| **Total** |     **48 h** |                  **48 h** |       **48 h** | **144 h** |                                    |
 
 ### 5.6 Alocação semanal individual — GPTI
 
 Nas semanas 1–3, a equipe GPTI acompanha conteúdo e prática da disciplina, sem produzir entregas do projeto; esse tempo não integra as 72 h planejadas nem o orçamento. Da semana 4 à 12, cada integrante recebe 2 h semanais de atividades de gestão, requisitos, riscos, validação ou encerramento. A distribuição soma 72 h e permanece abaixo do teto de 5 h semanais por pessoa.
 
-| Semana | Pedro Pimentel Nunes | Ana Isabel Matias da Silva Basilio | Beatriz Cardoso Abdias | Tamires Barbosa dos Santos | Total GPTI |
-|---:|---:|---:|---:|---:|---:|
-| 1 | 0 h | 0 h | 0 h | 0 h | 0 h |
-| 2 | 0 h | 0 h | 0 h | 0 h | 0 h |
-| 3 | 0 h | 0 h | 0 h | 0 h | 0 h |
-| 4 | 2 h | 2 h | 2 h | 2 h | 8 h |
-| 5 | 2 h | 2 h | 2 h | 2 h | 8 h |
-| 6 | 2 h | 2 h | 2 h | 2 h | 8 h |
-| 7 | 2 h | 2 h | 2 h | 2 h | 8 h |
-| 8 | 2 h | 2 h | 2 h | 2 h | 8 h |
-| 9 | 2 h | 2 h | 2 h | 2 h | 8 h |
-| 10 | 2 h | 2 h | 2 h | 2 h | 8 h |
-| 11 | 2 h | 2 h | 2 h | 2 h | 8 h |
-| 12 | 2 h | 2 h | 2 h | 2 h | 8 h |
-| **Total** | **18 h** | **18 h** | **18 h** | **18 h** | **72 h** |
+|    Semana | Pedro Pimentel Nunes | Ana Isabel Matias da Silva Basilio | Beatriz Cardoso Abdias | Tamires Barbosa dos Santos | Total GPTI |
+| --------: | -------------------: | ---------------------------------: | ---------------------: | -------------------------: | ---------: |
+|         1 |                  0 h |                                0 h |                    0 h |                        0 h |        0 h |
+|         2 |                  0 h |                                0 h |                    0 h |                        0 h |        0 h |
+|         3 |                  0 h |                                0 h |                    0 h |                        0 h |        0 h |
+|         4 |                  2 h |                                2 h |                    2 h |                        2 h |        8 h |
+|         5 |                  2 h |                                2 h |                    2 h |                        2 h |        8 h |
+|         6 |                  2 h |                                2 h |                    2 h |                        2 h |        8 h |
+|         7 |                  2 h |                                2 h |                    2 h |                        2 h |        8 h |
+|         8 |                  2 h |                                2 h |                    2 h |                        2 h |        8 h |
+|         9 |                  2 h |                                2 h |                    2 h |                        2 h |        8 h |
+|        10 |                  2 h |                                2 h |                    2 h |                        2 h |        8 h |
+|        11 |                  2 h |                                2 h |                    2 h |                        2 h |        8 h |
+|        12 |                  2 h |                                2 h |                    2 h |                        2 h |        8 h |
+| **Total** |             **18 h** |                           **18 h** |               **18 h** |                   **18 h** |   **72 h** |
 
 ### 5.7 Matriz de responsabilidades e fazer ou comprar
 
-| Entrega | A — aprovação/conta | R — execução |
-|---|---|---|
-| 1.1 Gestão e coordenação | Pedro Pimentel Nunes | Equipe GPTI |
-| 1.2 Requisitos e desenho | Pedro Pimentel Nunes | Equipes GPTI e PSW |
-| 1.3 Base técnica e ambientes | Equipe PSW | Equipe PSW |
-| 1.4 Marco 1/frontend prioritário | Equipe PSW | Equipe PSW |
-| 1.5 Backend e regras de negócio | Equipe PSW | Equipe PSW |
-| 1.6 Integração frontend/API | Equipe PSW | Equipe PSW |
+| Entrega                                      | A — aprovação/conta  | R — execução       |
+| -------------------------------------------- | -------------------- | ------------------ |
+| 1.1 Gestão e coordenação                     | Pedro Pimentel Nunes | Equipe GPTI        |
+| 1.2 Requisitos e desenho                     | Pedro Pimentel Nunes | Equipes GPTI e PSW |
+| 1.3 Base técnica e ambientes                 | Equipe PSW           | Equipe PSW         |
+| 1.4 Marco 1/frontend prioritário             | Equipe PSW           | Equipe PSW         |
+| 1.5 Backend e regras de negócio              | Equipe PSW           | Equipe PSW         |
+| 1.6 Integração frontend/API                  | Equipe PSW           | Equipe PSW         |
 | 1.7 Verificação, demonstração e encerramento | Pedro Pimentel Nunes | Equipes GPTI e PSW |
 
 O produto será desenvolvido pela equipe. MongoDB, bibliotecas e serviços de desenvolvimento são recursos técnicos; não serão adquiridos sistemas de adoção prontos, provedores externos de identidade ou serviços de produção. `json-server` permanece apenas nos endpoints definidos como simulados.
@@ -379,21 +379,21 @@ O produto será desenvolvido pela equipe. MongoDB, bibliotecas e serviços de de
 
 ### 6.2 Distribuição semanal da linha de base das atividades
 
-| Semana | PSW | GPTI | Total | Custo econômico | Saída principal |
-|---:|---:|---:|---:|---:|---|
-| 1 | 8 h | 0 h | 8 h | R$ 200,00 | Requisitos e frontend inicial |
-| 2 | 8 h | 0 h | 8 h | R$ 200,00 | Casos de uso e fluxos M1 |
-| 3 | 10 h | 0 h | 10 h | R$ 250,00 | Contratos, API e seed |
-| 4 | 14 h | 8 h | 22 h | R$ 550,00 | Base técnica, CRUDs e planejamento |
-| 5 | 14 h | 8 h | 22 h | R$ 550,00 | Usuários, pets, catálogo e requisitos |
-| 6 | 14 h | 8 h | 22 h | R$ 550,00 | Perfil, questionário e cronograma |
-| 7 | 15 h | 8 h | 23 h | R$ 575,00 | Solicitações, testes e preparação M1 |
-| 8 | 15 h | 8 h | 23 h | R$ 575,00 | M1/AV1, aceite e gestão de riscos |
-| 9 | 15 h | 8 h | 23 h | R$ 575,00 | Decisões, conclusão e relatórios |
-| 10 | 15 h | 8 h | 23 h | R$ 575,00 | Integração de fluxos e persistência |
-| 11 | 10 h | 8 h | 18 h | R$ 450,00 | Testes, correções e acompanhamento |
-| 12 | 6 h | 8 h | 14 h | R$ 350,00 | M2 e encerramento |
-| **Total de atividades** | **144 h** | **72 h** | **216 h** | **R$ 5.400,00** | |
+|                  Semana |       PSW |     GPTI |     Total | Custo econômico | Saída principal                       |
+| ----------------------: | --------: | -------: | --------: | --------------: | ------------------------------------- |
+|                       1 |       8 h |      0 h |       8 h |       R$ 200,00 | Requisitos e frontend inicial         |
+|                       2 |       8 h |      0 h |       8 h |       R$ 200,00 | Casos de uso e fluxos M1              |
+|                       3 |      10 h |      0 h |      10 h |       R$ 250,00 | Contratos, API e seed                 |
+|                       4 |      14 h |      8 h |      22 h |       R$ 550,00 | Base técnica, CRUDs e planejamento    |
+|                       5 |      14 h |      8 h |      22 h |       R$ 550,00 | Usuários, pets, catálogo e requisitos |
+|                       6 |      14 h |      8 h |      22 h |       R$ 550,00 | Perfil, questionário e cronograma     |
+|                       7 |      15 h |      8 h |      23 h |       R$ 575,00 | Solicitações, testes e preparação M1  |
+|                       8 |      15 h |      8 h |      23 h |       R$ 575,00 | M1/AV1, aceite e gestão de riscos     |
+|                       9 |      15 h |      8 h |      23 h |       R$ 575,00 | Decisões, conclusão e relatórios      |
+|                      10 |      15 h |      8 h |      23 h |       R$ 575,00 | Integração de fluxos e persistência   |
+|                      11 |      10 h |      8 h |      18 h |       R$ 450,00 | Testes, correções e acompanhamento    |
+|                      12 |       6 h |      8 h |      14 h |       R$ 350,00 | M2 e encerramento                     |
+| **Total de atividades** | **144 h** | **72 h** | **216 h** | **R$ 5.400,00** |                                       |
 
 Os valores semanais são arredondados para centavos; o total é calculado sobre as horas agregadas. A distribuição decorre das atividades e de suas janelas, não de uma quota semanal fixa.
 
@@ -401,37 +401,37 @@ Os valores semanais são arredondados para centavos; o total é calculado sobre 
 
 A carga das atividades varia conforme as janelas: PSW planeja de 6 a 15 h por semana, com máximo de 5 h por aluno; GPTI planeja 8 h semanais entre S4 e S12, também abaixo do limite de 5 h por pessoa. A capacidade não utilizada em cada semana não é esforço de atividade automaticamente comprometido.
 
-| Grupo | Capacidade efetiva no calendário | Atividades niveladas | Margem antes de contingência |
-|---|---:|---:|---:|
-| PSW | 180 h | 144 h | 36 h |
-| GPTI | 180 h | 72 h | 108 h |
-| **Total** | **360 h** | **216 h** | **144 h** |
+| Grupo     | Capacidade efetiva no calendário | Atividades niveladas | Margem antes de contingência |
+| --------- | -------------------------------: | -------------------: | ---------------------------: |
+| PSW       |                            180 h |                144 h |                         36 h |
+| GPTI      |                            180 h |                 72 h |                        108 h |
+| **Total** |                        **360 h** |            **216 h** |                    **144 h** |
 
 O calendário nivelado é uma estimativa de esforço das atividades, não o preenchimento integral da capacidade. A segunda estimativa independente pelo entregável é 226 h: 156 h PSW e 70 h GPTI, diferença líquida de +10 h em relação ao calendário. A contingência de 56 h é calculada separadamente e não deve ser somada à segunda estimativa; ambas são verificações/respostas, não trabalho simultâneo.
 
-| Pacote da EAP | Atividades da linha de base | PSW | GPTI | Total |
-|---|---|---:|---:|---:|
-| 1.1 Gestão e coordenação do projeto | G01, G03, G04, G06 | 0 h | 42 h | 42 h |
-| 1.2 Requisitos e desenho funcional | D01, G02 | 10 h | 10 h | 20 h |
-| 1.3 Base técnica e ambientes | D03, D12 | 18 h | 0 h | 18 h |
-| 1.4 Marco 1 — frontend prioritário | D02 | 8 h | 0 h | 8 h |
-| 1.5 Backend e regras de negócio | D04–D11 | 88 h | 0 h | 88 h |
-| 1.6 Integração frontend, API e persistência | D14 | 6 h | 0 h | 6 h |
-| 1.7 Verificação, demonstração e encerramento | D13, G05, G07 | 14 h | 20 h | 34 h |
-| **Total** |  | **144 h** | **72 h** | **216 h** |
+| Pacote da EAP                                | Atividades da linha de base |       PSW |     GPTI |     Total |
+| -------------------------------------------- | --------------------------- | --------: | -------: | --------: |
+| 1.1 Gestão e coordenação do projeto          | G01, G03, G04, G06          |       0 h |     42 h |      42 h |
+| 1.2 Requisitos e desenho funcional           | D01, G02                    |      10 h |     10 h |      20 h |
+| 1.3 Base técnica e ambientes                 | D03, D12                    |      18 h |      0 h |      18 h |
+| 1.4 Marco 1 — frontend prioritário           | D02                         |       8 h |      0 h |       8 h |
+| 1.5 Backend e regras de negócio              | D04–D11                     |      88 h |      0 h |      88 h |
+| 1.6 Integração frontend, API e persistência  | D14                         |       6 h |      0 h |       6 h |
+| 1.7 Verificação, demonstração e encerramento | D13, G05, G07               |      14 h |     20 h |      34 h |
+| **Total**                                    |                             | **144 h** | **72 h** | **216 h** |
 
 **Segunda estimativa por entregável (independente do calendário):**
 
-| Pacote da EAP | Premissa resumida da estimativa independente | PSW | GPTI | Total | Diferença para a linha de base |
-|---|---|---:|---:|---:|---:|
-| 1.1 Gestão e coordenação do projeto | Planejamento, governança, riscos e acompanhamento | 0 h | 44 h | 44 h | +2 h |
-| 1.2 Requisitos e desenho funcional | Fluxos, regras, critérios, contratos e rastreabilidade | 14 h | 8 h | 22 h | +2 h |
-| 1.3 Base técnica e ambientes | Express, MongoDB, validação, permissões e seed | 22 h | 0 h | 22 h | +4 h |
-| 1.4 Marco 1 — frontend prioritário | Navegação, telas prioritárias e mocks demonstráveis | 12 h | 0 h | 12 h | +4 h |
-| 1.5 Backend e regras de negócio | CRUDs, pesquisa, perfil, solicitações, estados e conclusão | 84 h | 0 h | 84 h | −4 h |
-| 1.6 Integração frontend, API e persistência | Conexão dos fluxos, persistência e respostas da API | 8 h | 0 h | 8 h | +2 h |
-| 1.7 Verificação, demonstração e encerramento | Testes, aceite, evidências, documentação e encerramento | 16 h | 18 h | 34 h | 0 h |
-| **Total por entregável** | **Estimativa independente do calendário** | **156 h** | **70 h** | **226 h** | **+10 h (4,6%)** |
+| Pacote da EAP                                | Premissa resumida da estimativa independente               |       PSW |     GPTI |     Total | Diferença para a linha de base |
+| -------------------------------------------- | ---------------------------------------------------------- | --------: | -------: | --------: | -----------------------------: |
+| 1.1 Gestão e coordenação do projeto          | Planejamento, governança, riscos e acompanhamento          |       0 h |     44 h |      44 h |                           +2 h |
+| 1.2 Requisitos e desenho funcional           | Fluxos, regras, critérios, contratos e rastreabilidade     |      14 h |      8 h |      22 h |                           +2 h |
+| 1.3 Base técnica e ambientes                 | Express, MongoDB, validação, permissões e seed             |      22 h |      0 h |      22 h |                           +4 h |
+| 1.4 Marco 1 — frontend prioritário           | Navegação, telas prioritárias e mocks demonstráveis        |      12 h |      0 h |      12 h |                           +4 h |
+| 1.5 Backend e regras de negócio              | CRUDs, pesquisa, perfil, solicitações, estados e conclusão |      84 h |      0 h |      84 h |                           −4 h |
+| 1.6 Integração frontend, API e persistência  | Conexão dos fluxos, persistência e respostas da API        |       8 h |      0 h |       8 h |                           +2 h |
+| 1.7 Verificação, demonstração e encerramento | Testes, aceite, evidências, documentação e encerramento    |      16 h |     18 h |      34 h |                            0 h |
+| **Total por entregável**                     | **Estimativa independente do calendário**                  | **156 h** | **70 h** | **226 h** |               **+10 h (4,6%)** |
 
 A segunda estimativa independente por entregável é 10 h maior que a linha de base: PSW 156 h e GPTI 70 h, contra 144 h e 72 h niveladas. O aumento líquido concentra-se em requisitos, base técnica e preparação do M1, parcialmente compensado pela estimativa menor do backend; verificação e encerramento mantêm a estimativa de 34 h. A linha de base continua sendo 216 h e cabe no calendário nivelado; as 10 h de diferença são sinal de atenção, não contingência automática.
 
@@ -449,18 +449,18 @@ Probabilidades e impactos são estimativas iniciais e serão revistos nos acompa
 
 #### 6.3.2 Registro e respostas aos riscos
 
-| ID | Risco e impacto | Probabilidade | Impacto | Prioridade | Mitigação preventiva | Gatilho e contingência | Responsável |
-|---|---|---:|---:|---|---|---|---|
-| RT01 | Aprendizagem em React, Express ou MongoDB exigir mais esforço e ameaçar M1/M2 | 35% — média | 20 h — alto | Alta | Incrementos pequenos, pareamento e revisão técnica | Atraso de atividade técnica acima de 10%; reordenar trabalho e consumir margem aprovada | Equipe PSW |
-| RT02 | Defeitos em compatibilidade ou validação do questionário | 30% — média | 12 h — médio | Média | Testes determinísticos no cliente e servidor | Falha em cenário de aceite; corrigir e executar regressão | Equipe PSW |
-| RT03 | Divergência entre frontend, API e dados MongoDB atrasar integração | 40% — média | 20 h — alto | Alta | Contratos e testes de API desde o início; integração incremental | Teste de contrato falha ou endpoint não disponível; priorizar adaptação e fluxo crítico | Equipe PSW |
-| RT04 | Estados inválidos permitirem decisão/cancelamento/conclusão indevidos | 25% — baixa | 20 h — alto | Média | Matriz de transições e testes de autorização | Transição proibida aceita; bloquear demonstração até correção | Equipe PSW |
-| RT05 | Seed não cobrir perfis, papéis, estados e casos de erro | 20% — baixa | 10 h — médio | Baixa | Dados fictícios variados e repetíveis | Cenário de teste sem dados; completar seed e repetir teste | PSW + GPTI |
-| RT06 | Conflito ou perda de alterações no repositório | 30% — média | 17 h — alto | Alta | Commits frequentes, branches e revisões | Conflito compromete integração; recuperar histórico e reaplicar mudanças revisadas | Equipe PSW |
-| RG01 | Regras de negócio insuficientes causarem retrabalho entre os fluxos | 30% — média | 16 h — médio | Média | Detalhar estados, permissões e critérios antes de implementar | Regra ambígua bloqueia atividade; registrar decisão e atualizar requisito/contrato | Equipe GPTI |
-| RG02 | Amplitude do escopo exceder a capacidade no prazo acadêmico | 40% — média | 20 h — alto | Alta | Acompanhar caminho crítico e margem semanal | Previsão ameaça M2; propor replanejamento formal sem excluir casos silenciosamente | Gerente do projeto |
-| RG03 | Sistema acadêmico ser confundido com solução pronta para operação real | 20% — baixa | 17 h — alto | Média | Identificar dados fictícios, OAuth mockado e ausência de produção | Usuário interpretar como serviço real; reforçar limitações na documentação/demonstração | Equipe GPTI |
-| RG04 | Endpoints mockados permanecerem sem delimitação clara | 30% — média | 12 h — médio | Média | Registrar endpoint, finalidade e contrato de cada mock | Integração ambígua; corrigir documentação ou migrar o fluxo para API própria | PSW + GPTI |
+| ID   | Risco e impacto                                                               | Probabilidade |      Impacto | Prioridade | Mitigação preventiva                                              | Gatilho e contingência                                                                  | Responsável        |
+| ---- | ----------------------------------------------------------------------------- | ------------: | -----------: | ---------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------ |
+| RT01 | Aprendizagem em React, Express ou MongoDB exigir mais esforço e ameaçar M1/M2 |   35% — média |  20 h — alto | Alta       | Incrementos pequenos, pareamento e revisão técnica                | Atraso de atividade técnica acima de 10%; reordenar trabalho e consumir margem aprovada | Equipe PSW         |
+| RT02 | Defeitos em compatibilidade ou validação do questionário                      |   30% — média | 12 h — médio | Média      | Testes determinísticos no cliente e servidor                      | Falha em cenário de aceite; corrigir e executar regressão                               | Equipe PSW         |
+| RT03 | Divergência entre frontend, API e dados MongoDB atrasar integração            |   40% — média |  20 h — alto | Alta       | Contratos e testes de API desde o início; integração incremental  | Teste de contrato falha ou endpoint não disponível; priorizar adaptação e fluxo crítico | Equipe PSW         |
+| RT04 | Estados inválidos permitirem decisão/cancelamento/conclusão indevidos         |   25% — baixa |  20 h — alto | Média      | Matriz de transições e testes de autorização                      | Transição proibida aceita; bloquear demonstração até correção                           | Equipe PSW         |
+| RT05 | Seed não cobrir perfis, papéis, estados e casos de erro                       |   20% — baixa | 10 h — médio | Baixa      | Dados fictícios variados e repetíveis                             | Cenário de teste sem dados; completar seed e repetir teste                              | PSW + GPTI         |
+| RT06 | Conflito ou perda de alterações no repositório                                |   30% — média |  17 h — alto | Alta       | Commits frequentes, branches e revisões                           | Conflito compromete integração; recuperar histórico e reaplicar mudanças revisadas      | Equipe PSW         |
+| RG01 | Regras de negócio insuficientes causarem retrabalho entre os fluxos           |   30% — média | 16 h — médio | Média      | Detalhar estados, permissões e critérios antes de implementar     | Regra ambígua bloqueia atividade; registrar decisão e atualizar requisito/contrato      | Equipe GPTI        |
+| RG02 | Amplitude do escopo exceder a capacidade no prazo acadêmico                   |   40% — média |  20 h — alto | Alta       | Acompanhar caminho crítico e margem semanal                       | Previsão ameaça M2; propor replanejamento formal sem excluir casos silenciosamente      | Gerente do projeto |
+| RG03 | Sistema acadêmico ser confundido com solução pronta para operação real        |   20% — baixa |  17 h — alto | Média      | Identificar dados fictícios, OAuth mockado e ausência de produção | Usuário interpretar como serviço real; reforçar limitações na documentação/demonstração | Equipe GPTI        |
+| RG04 | Endpoints mockados permanecerem sem delimitação clara                         |   30% — média | 12 h — médio | Média      | Registrar endpoint, finalidade e contrato de cada mock            | Integração ambígua; corrigir documentação ou migrar o fluxo para API própria            | PSW + GPTI         |
 
 Oportunidades: reutilizar componentes reduz retrabalho; tipagem e contratos compartilhados reduzem erros; dados fictícios persistidos permitem demonstrações reproduzíveis; integração incremental antecipa problemas.
 
@@ -468,37 +468,37 @@ Oportunidades: reutilizar componentes reduz retrabalho; tipagem e contratos comp
 
 As exposições esperadas são calculadas por probabilidade × impacto: 30,7 h para riscos técnicos e 19,8 h para riscos de gestão, totalizando 50,5 h (aproximadamente 51 h). A reserva de 56 h arredonda esses valores para blocos executáveis pelas equipes: 32 h técnicas (24 h PSW + 8 h GPTI em testes/validação) e 24 h de gestão (GPTI). A reserva não é atividade planejada; só pode ser consumida quando o evento nomeado ocorrer e após registro/aprovação.
 
-| Evento de risco | Fatia máxima | Quem executa |
-|---|---:|---|
-| RT01 — dificuldade técnica além da estimativa | 8 h | PSW |
-| RT02 — questionário/compatibilidade falha em teste | 4 h | PSW |
-| RT03 — integração Express/MongoDB atrasa | 8 h | PSW 6 h + GPTI 2 h |
-| RT04 — transição inválida ou autorização incorreta | 6 h | PSW 4 h + GPTI 2 h |
-| RT05 — seed não cobre cenário necessário | 2 h | GPTI |
-| RT06 — conflito ou perda de alterações no repositório | 4 h | PSW 2 h + GPTI 2 h |
-| **Subtotal técnico** | **32 h** | **PSW 24 h + GPTI 8 h** |
-| RG01 — regra/critério precisa de nova decisão | 6 h | GPTI |
-| RG02 — previsão de escopo ameaça o prazo/capacidade | 8 h | GPTI |
-| RG03 — limitações do produto acadêmico são mal interpretadas | 6 h | GPTI |
-| RG04 — delimitação de endpoint mock exige revisão | 6 h | GPTI |
-| **Subtotal de gestão** | **24 h** | **GPTI 24 h** |
-| **Total** | **56 h** | **PSW 24 h + GPTI 32 h** |
+| Evento de risco                                              | Fatia máxima | Quem executa             |
+| ------------------------------------------------------------ | -----------: | ------------------------ |
+| RT01 — dificuldade técnica além da estimativa                |          8 h | PSW                      |
+| RT02 — questionário/compatibilidade falha em teste           |          4 h | PSW                      |
+| RT03 — integração Express/MongoDB atrasa                     |          8 h | PSW 6 h + GPTI 2 h       |
+| RT04 — transição inválida ou autorização incorreta           |          6 h | PSW 4 h + GPTI 2 h       |
+| RT05 — seed não cobre cenário necessário                     |          2 h | GPTI                     |
+| RT06 — conflito ou perda de alterações no repositório        |          4 h | PSW 2 h + GPTI 2 h       |
+| **Subtotal técnico**                                         |     **32 h** | **PSW 24 h + GPTI 8 h**  |
+| RG01 — regra/critério precisa de nova decisão                |          6 h | GPTI                     |
+| RG02 — previsão de escopo ameaça o prazo/capacidade          |          8 h | GPTI                     |
+| RG03 — limitações do produto acadêmico são mal interpretadas |          6 h | GPTI                     |
+| RG04 — delimitação de endpoint mock exige revisão            |          6 h | GPTI                     |
+| **Subtotal de gestão**                                       |     **24 h** | **GPTI 24 h**            |
+| **Total**                                                    |     **56 h** | **PSW 24 h + GPTI 32 h** |
 
 Com a contingência totalmente utilizada, PSW consome 168 h de 180 h disponíveis (93,3%) e GPTI 104 h de 180 h disponíveis (57,8%). Restariam 12 h de capacidade PSW e 76 h GPTI, sem transferência automática entre equipes. A menor utilização GPTI não significa, por si só, atividade faltante: as 72 h planejadas correspondem ao trabalho de gestão estimado, e a contingência só é consumida se os riscos ocorrerem. Nenhum aluno ultrapassa o teto de 5 h/semana. Necessidade acima dessas fatias exige replanejamento formal, sem horas extras presumidas.
 
 ### 6.4 Linha de base de custos e orçamento
 
-| Componente | Base da estimativa | Valor simulado |
-|---|---|---:|
-| Atividades PSW | Esforço planejado: 144 h | R$ 3.600,00 |
-| Atividades GPTI | Esforço planejado: 72 h | R$ 1.800,00 |
-| **Custo das atividades** | **Esforço planejado: 216 h** | **R$ 5.400,00** |
-| Contingência técnica — PSW | Reserva para riscos identificados: 24 h | R$ 600,00 |
-| Contingência técnica — GPTI (apoio/testes) | Reserva para riscos identificados: 8 h | R$ 200,00 |
-| Contingência de gestão — GPTI | Reserva para riscos identificados: 24 h | R$ 600,00 |
-| **Linha de base de custos** | **Atividades + contingência: 272 h** | **R$ 6.800,00** |
-| Reserva gerencial | 7% da linha de base | R$ 476,00 |
-| **Orçamento total simulado** | **Linha de base + reserva gerencial** | **R$ 7.276,00** |
+| Componente                                 | Base da estimativa                      |  Valor simulado |
+| ------------------------------------------ | --------------------------------------- | --------------: |
+| Atividades PSW                             | Esforço planejado: 144 h                |     R$ 3.600,00 |
+| Atividades GPTI                            | Esforço planejado: 72 h                 |     R$ 1.800,00 |
+| **Custo das atividades**                   | **Esforço planejado: 216 h**            | **R$ 5.400,00** |
+| Contingência técnica — PSW                 | Reserva para riscos identificados: 24 h |       R$ 600,00 |
+| Contingência técnica — GPTI (apoio/testes) | Reserva para riscos identificados: 8 h  |       R$ 200,00 |
+| Contingência de gestão — GPTI              | Reserva para riscos identificados: 24 h |       R$ 600,00 |
+| **Linha de base de custos**                | **Atividades + contingência: 272 h**    | **R$ 6.800,00** |
+| Reserva gerencial                          | 7% da linha de base                     |       R$ 476,00 |
+| **Orçamento total simulado**               | **Linha de base + reserva gerencial**   | **R$ 7.276,00** |
 
 O orçamento total simulado da linha de base detalhada é de **R$ 7.276,00**, inferior à estimativa preliminar de iniciação de R$ 9.000,00 porque considera somente o esforço das atividades e as reservas aprovadas, não toda a capacidade disponível. Representa valor econômico estimado para planejamento; desembolso real previsto: **R$ 0,00**. Não se mantém provisão para ferramentas, pois o Termo de Abertura prevê recursos gratuitos ou já disponíveis.
 
@@ -510,48 +510,48 @@ O patrocinador acompanha os marcos e decisões relevantes. GPTI planeja, acompan
 
 ### 7.2 Matriz de avaliação do engajamento
 
-| Stakeholder | Atual | Desejado |
-|---|---|---|
-| Prof. Diogo Mendonça — patrocinador | Neutro | Apoiador e ciente dos marcos |
-| Pedro Pimentel Nunes — gerente do projeto | Apoiador | Líder |
-| Equipe GPTI | Apoiador | Líder em gestão e validação interna |
-| Equipe PSW | Apoiador | Líder na execução técnica |
-| Adotantes potenciais | Neutro | Apoiador por demonstração interna |
-| Responsáveis por pets | Neutro | Fluxo representado e validado internamente |
-| Organizações externas | Neutro | Neutro; sem participação presumida |
+| Stakeholder                               | Atual    | Desejado                                   |
+| ----------------------------------------- | -------- | ------------------------------------------ |
+| Prof. Diogo Mendonça — patrocinador       | Neutro   | Apoiador e ciente dos marcos               |
+| Pedro Pimentel Nunes — gerente do projeto | Apoiador | Líder                                      |
+| Equipe GPTI                               | Apoiador | Líder em gestão e validação interna        |
+| Equipe PSW                                | Apoiador | Líder na execução técnica                  |
+| Adotantes potenciais                      | Neutro   | Apoiador por demonstração interna          |
+| Responsáveis por pets                     | Neutro   | Fluxo representado e validado internamente |
+| Organizações externas                     | Neutro   | Neutro; sem participação presumida         |
 
 ### 7.2.1 Poder, interesse e estratégia
 
-| Stakeholder | Poder | Interesse | Impacto | Estratégia |
-|---|---|---|---|---|
-| Patrocinador | Alto | Alto | Alto | Gerenciar de perto e solicitar decisão nos marcos |
-| Gerente do projeto | Alto | Alto | Alto | Coordenar planejamento e escalonamento |
-| GPTI | Alto | Alto | Alto | Manter envolvida na gestão, riscos e validação |
-| PSW | Alto | Alto | Alto | Manter envolvida na implementação e integração |
-| Adotante potencial | Baixo | Alto | Médio | Considerar nos cenários demonstrativos |
-| Responsável por pet | Baixo | Alto | Alto | Cobrir seus fluxos com identidade fictícia |
-| Organizações externas | Baixo | Médio | Futuro | Não presumir validação nem compromisso |
+| Stakeholder           | Poder | Interesse | Impacto | Estratégia                                        |
+| --------------------- | ----- | --------- | ------- | ------------------------------------------------- |
+| Patrocinador          | Alto  | Alto      | Alto    | Gerenciar de perto e solicitar decisão nos marcos |
+| Gerente do projeto    | Alto  | Alto      | Alto    | Coordenar planejamento e escalonamento            |
+| GPTI                  | Alto  | Alto      | Alto    | Manter envolvida na gestão, riscos e validação    |
+| PSW                   | Alto  | Alto      | Alto    | Manter envolvida na implementação e integração    |
+| Adotante potencial    | Baixo | Alto      | Médio   | Considerar nos cenários demonstrativos            |
+| Responsável por pet   | Baixo | Alto      | Alto    | Cobrir seus fluxos com identidade fictícia        |
+| Organizações externas | Baixo | Médio     | Futuro  | Não presumir validação nem compromisso            |
 
 ### 7.3 Plano breve de engajamento
 
-| Stakeholder | Objetivo | Ação | Frequência | Responsável |
-|---|---|---|---|---|
-| Patrocinador | Acompanhar progresso e decisões | Demonstração e registro de aceite | M1/S8 e M2/S12 | Pedro Pimentel Nunes |
-| Equipe de projeto | Manter alinhamento de atividades | Reunião e atualização do quadro | Semanal | Gerente do projeto |
-| Desenvolvedores PSW | Integrar e revisar entregas técnicas | Revisão de código e testes | Contínuo | Equipe PSW |
-| GPTI | Validar requisitos, riscos e evidências | Revisão interna e relatório | Semanal e nos marcos | Equipe GPTI |
-| Usuários potenciais | Verificar compreensão dos fluxos | Demonstrações com dados fictícios | M1 e M2 | GPTI + PSW |
+| Stakeholder         | Objetivo                                | Ação                              | Frequência           | Responsável          |
+| ------------------- | --------------------------------------- | --------------------------------- | -------------------- | -------------------- |
+| Patrocinador        | Acompanhar progresso e decisões         | Demonstração e registro de aceite | M1/S8 e M2/S12       | Pedro Pimentel Nunes |
+| Equipe de projeto   | Manter alinhamento de atividades        | Reunião e atualização do quadro   | Semanal              | Gerente do projeto   |
+| Desenvolvedores PSW | Integrar e revisar entregas técnicas    | Revisão de código e testes        | Contínuo             | Equipe PSW           |
+| GPTI                | Validar requisitos, riscos e evidências | Revisão interna e relatório       | Semanal e nos marcos | Equipe GPTI          |
+| Usuários potenciais | Verificar compreensão dos fluxos        | Demonstrações com dados fictícios | M1 e M2              | GPTI + PSW           |
 
 ### 7.4 Cadência de comunicação
 
-| Comunicação | Público | Canal | Frequência | Responsável |
-|---|---|---|---|---|
-| Reunião de acompanhamento | Equipe | Reunião/chat | Semanal | Gerente do projeto |
-| Atualização de tarefas e horas | Equipe | Quadro/repositório | Semanal | Todos |
-| Registro de decisões | Equipe e patrocinador | Documento/repositório | Quando necessário | Gerente + GPTI |
-| Relatório de progresso | Patrocinador | Documento | Quinzenal | Gerente do projeto |
-| Demonstrações | Patrocinador e equipe | Apresentação | M1/S8 e M2/S12 | GPTI + PSW |
-| Registro de riscos e impedimentos | Equipe | Quadro/documento | Semanal | GPTI |
+| Comunicação                       | Público               | Canal                 | Frequência        | Responsável        |
+| --------------------------------- | --------------------- | --------------------- | ----------------- | ------------------ |
+| Reunião de acompanhamento         | Equipe                | Reunião/chat          | Semanal           | Gerente do projeto |
+| Atualização de tarefas e horas    | Equipe                | Quadro/repositório    | Semanal           | Todos              |
+| Registro de decisões              | Equipe e patrocinador | Documento/repositório | Quando necessário | Gerente + GPTI     |
+| Relatório de progresso            | Patrocinador          | Documento             | Quinzenal         | Gerente do projeto |
+| Demonstrações                     | Patrocinador e equipe | Apresentação          | M1/S8 e M2/S12    | GPTI + PSW         |
+| Registro de riscos e impedimentos | Equipe                | Quadro/documento      | Semanal           | GPTI               |
 
 ### 7.5 Monitoramento do engajamento
 

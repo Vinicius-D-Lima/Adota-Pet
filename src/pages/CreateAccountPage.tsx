@@ -141,11 +141,19 @@ export function CreateAccountPage() {
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="flex cursor-pointer gap-3 rounded-xl border border-line p-4">
                   <input type="radio" value="adopter" {...register('accountType')} />
-                  <span><strong className="block text-sm">Quero adotar</strong><small className="text-muted">Encontre e favorite pets para conhecer.</small></span>
+                  <span>
+                    <strong className="block text-sm">Quero adotar</strong>
+                    <small className="text-muted">Encontre e favorite pets para conhecer.</small>
+                  </span>
                 </label>
                 <label className="flex cursor-pointer gap-3 rounded-xl border border-line p-4">
                   <input type="radio" value="guardian" {...register('accountType')} />
-                  <span><strong className="block text-sm">Quero divulgar pets</strong><small className="text-muted">Para instituições e protetores independentes.</small></span>
+                  <span>
+                    <strong className="block text-sm">Quero divulgar pets</strong>
+                    <small className="text-muted">
+                      Para instituições e protetores independentes.
+                    </small>
+                  </span>
                 </label>
               </div>
             </fieldset>
@@ -167,64 +175,130 @@ export function CreateAccountPage() {
             </div>
 
             <div className="grid gap-5 md:grid-cols-2">
-            {accountType === 'adopter' ? (
-              <>
-                <Field label="Nome completo" error={errors.name?.message} tight>
-                  <Input autoComplete="name" placeholder="Ex.: Maria da Silva" invalid={Boolean(errors.name)} {...register('name')} />
-                </Field>
-                <Field label="Data de nascimento" error={errors.birthDate?.message} tight>
-                  <Input type="date" autoComplete="bday" invalid={Boolean(errors.birthDate)} {...register('birthDate')} />
-                </Field>
-                <Field label="CPF" error={errors.cpf?.message} tight>
-                  <Input inputMode="numeric" maxLength={11} placeholder="Ex.: 52998224725" invalid={Boolean(errors.cpf)} {...register('cpf', digits('cpf', 11))} />
-                </Field>
-              </>
-            ) : (
-              <>
-                <Field label="Nome da instituição" error={errors.organizationName?.message} tight>
-                  <Input placeholder="Ex.: Instituto Patinhas" invalid={Boolean(errors.organizationName)} {...register('organizationName')} />
-                </Field>
-                <Field label="Nome do responsável" error={errors.responsibleName?.message} tight>
-                  <Input autoComplete="name" placeholder="Ex.: Ana Maria de Souza" invalid={Boolean(errors.responsibleName)} {...register('responsibleName')} />
-                </Field>
-                <Field label="CNPJ" error={errors.document?.message} tight>
-                  <Input inputMode="numeric" maxLength={14} placeholder="Ex.: 11222333000181" invalid={Boolean(errors.document)} {...register('document', digits('document', 14))} />
-                </Field>
-                <Field label="Cidade" error={errors.city?.message} tight>
-                  <Input placeholder="Ex.: São Paulo" invalid={Boolean(errors.city)} {...register('city')} />
-                </Field>
-                <Field label="Estado" error={errors.state?.message} tight>
-                  <Input maxLength={2} placeholder="Ex.: SP" invalid={Boolean(errors.state)} {...register('state')} />
-                </Field>
-              </>
-            )}
-            <Field label="E-mail" error={errors.email?.message} tight>
-              <Input
-                type="email"
-                autoComplete="email"
-                placeholder="Ex.: maria@exemplo.com"
-                invalid={Boolean(errors.email)}
-                {...register('email')}
-              />
-            </Field>
-            <Field label="Celular" error={errors.phone?.message} tight>
-              <Input type="tel" inputMode="numeric" maxLength={11} autoComplete="tel" placeholder="Ex.: 11999999999" invalid={Boolean(errors.phone)} {...register('phone', digits('phone', 11))} />
-            </Field>
-            <Field label="CEP" error={errors.zipCode?.message} tight>
-              <Input inputMode="numeric" maxLength={8} autoComplete="postal-code" placeholder="Ex.: 01310100" invalid={Boolean(errors.zipCode)} {...register('zipCode', digits('zipCode', 8))} />
-            </Field>
-            <Field label="Endereço completo" error={errors.address?.message} tight full>
-              <Input autoComplete="street-address" placeholder="Ex.: Avenida Paulista, 1000" invalid={Boolean(errors.address)} {...register('address')} />
-            </Field>
-            <Field label="Senha" error={errors.password?.message} hint="Use pelo menos 8 caracteres." tight full>
-              <Input
-                type="password"
-                autoComplete="new-password"
-                placeholder="Crie uma senha"
-                invalid={Boolean(errors.password)}
-                {...register('password')}
-              />
-            </Field>
+              {accountType === 'adopter' ? (
+                <>
+                  <Field label="Nome completo" error={errors.name?.message} tight>
+                    <Input
+                      autoComplete="name"
+                      placeholder="Ex.: Maria da Silva"
+                      invalid={Boolean(errors.name)}
+                      {...register('name')}
+                    />
+                  </Field>
+                  <Field label="Data de nascimento" error={errors.birthDate?.message} tight>
+                    <Input
+                      type="date"
+                      autoComplete="bday"
+                      invalid={Boolean(errors.birthDate)}
+                      {...register('birthDate')}
+                    />
+                  </Field>
+                  <Field label="CPF" error={errors.cpf?.message} tight>
+                    <Input
+                      inputMode="numeric"
+                      maxLength={11}
+                      placeholder="Ex.: 52998224725"
+                      invalid={Boolean(errors.cpf)}
+                      {...register('cpf', digits('cpf', 11))}
+                    />
+                  </Field>
+                </>
+              ) : (
+                <>
+                  <Field label="Nome da instituição" error={errors.organizationName?.message} tight>
+                    <Input
+                      placeholder="Ex.: Instituto Patinhas"
+                      invalid={Boolean(errors.organizationName)}
+                      {...register('organizationName')}
+                    />
+                  </Field>
+                  <Field label="Nome do responsável" error={errors.responsibleName?.message} tight>
+                    <Input
+                      autoComplete="name"
+                      placeholder="Ex.: Ana Maria de Souza"
+                      invalid={Boolean(errors.responsibleName)}
+                      {...register('responsibleName')}
+                    />
+                  </Field>
+                  <Field label="CNPJ" error={errors.document?.message} tight>
+                    <Input
+                      inputMode="numeric"
+                      maxLength={14}
+                      placeholder="Ex.: 11222333000181"
+                      invalid={Boolean(errors.document)}
+                      {...register('document', digits('document', 14))}
+                    />
+                  </Field>
+                  <Field label="Cidade" error={errors.city?.message} tight>
+                    <Input
+                      placeholder="Ex.: São Paulo"
+                      invalid={Boolean(errors.city)}
+                      {...register('city')}
+                    />
+                  </Field>
+                  <Field label="Estado" error={errors.state?.message} tight>
+                    <Input
+                      maxLength={2}
+                      placeholder="Ex.: SP"
+                      invalid={Boolean(errors.state)}
+                      {...register('state')}
+                    />
+                  </Field>
+                </>
+              )}
+              <Field label="E-mail" error={errors.email?.message} tight>
+                <Input
+                  type="email"
+                  autoComplete="email"
+                  placeholder="Ex.: maria@exemplo.com"
+                  invalid={Boolean(errors.email)}
+                  {...register('email')}
+                />
+              </Field>
+              <Field label="Celular" error={errors.phone?.message} tight>
+                <Input
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={11}
+                  autoComplete="tel"
+                  placeholder="Ex.: 11999999999"
+                  invalid={Boolean(errors.phone)}
+                  {...register('phone', digits('phone', 11))}
+                />
+              </Field>
+              <Field label="CEP" error={errors.zipCode?.message} tight>
+                <Input
+                  inputMode="numeric"
+                  maxLength={8}
+                  autoComplete="postal-code"
+                  placeholder="Ex.: 01310100"
+                  invalid={Boolean(errors.zipCode)}
+                  {...register('zipCode', digits('zipCode', 8))}
+                />
+              </Field>
+              <Field label="Endereço completo" error={errors.address?.message} tight full>
+                <Input
+                  autoComplete="street-address"
+                  placeholder="Ex.: Avenida Paulista, 1000"
+                  invalid={Boolean(errors.address)}
+                  {...register('address')}
+                />
+              </Field>
+              <Field
+                label="Senha"
+                error={errors.password?.message}
+                hint="Use pelo menos 8 caracteres."
+                tight
+                full
+              >
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Crie uma senha"
+                  invalid={Boolean(errors.password)}
+                  {...register('password')}
+                />
+              </Field>
             </div>
 
             <Button type="submit" fullWidth className="mt-2" loading={isSubmitting}>

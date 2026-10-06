@@ -117,17 +117,18 @@ Recomenda-se desenvolver o AdotaPet como protótipo acadêmico, dentro do escopo
 O projeto tem 12 semanas letivas efetivas, entre 03/08 e 30/11/2026, com sete alunos: três de PSW e quatro de GPTI. O calendário considera 12 semanas de participação de PSW e nove semanas de trabalho de GPTI, totalizando 360 horas de capacidade efetiva. M1 demonstra os fluxos prioritários do frontend na semana 8; M2 demonstra o sistema integrado na semana 12. A viabilidade avaliada é a conclusão dessas entregas acadêmicas, não a operação em produção.
 
 ### 12.2 Esforço e recursos estimados
+
 O Termo de Abertura registra uma estimativa preliminar de iniciação de R$ 9.000,00, baseada na capacidade efetiva de 360 horas e com faixa de −25% a +75% (R$ 6.750,00 a R$ 15.750,00). Essa estimativa de ordem de grandeza não pressupõe uso de toda a capacidade.
 
 O Plano do Projeto detalha uma linha de base diferente, derivada do trabalho planejado:
 
-| Componente | Esforço | Valor econômico simulado |
-|---|---:|---:|
-| Atividades planejadas (144 h PSW + 72 h GPTI) | 216 h | R$ 5.400,00 |
-| Contingência para riscos identificados | 56 h | R$ 1.400,00 |
-| **Linha de base de custos** | **272 h** | **R$ 6.800,00** |
-| Reserva gerencial (7%) | — | R$ 476,00 |
-| **Orçamento total simulado** | **272 h + reserva** | **R$ 7.276,00** |
+| Componente                                    |             Esforço | Valor econômico simulado |
+| --------------------------------------------- | ------------------: | -----------------------: |
+| Atividades planejadas (144 h PSW + 72 h GPTI) |               216 h |              R$ 5.400,00 |
+| Contingência para riscos identificados        |                56 h |              R$ 1.400,00 |
+| **Linha de base de custos**                   |           **272 h** |          **R$ 6.800,00** |
+| Reserva gerencial (7%)                        |                   — |                R$ 476,00 |
+| **Orçamento total simulado**                  | **272 h + reserva** |          **R$ 7.276,00** |
 
 A diferença é intencional: R$ 9.000,00 é a estimativa preliminar da capacidade disponível; R$ 7.276,00 é a linha de base detalhada de atividades e reservas. A contingência só é usada para riscos identificados. Nenhum valor representa pagamento aos alunos; o desembolso real previsto é R$ 0,00. Ferramentas e infraestrutura são gratuitas ou já disponíveis; operação e produção não estão orçadas.
 

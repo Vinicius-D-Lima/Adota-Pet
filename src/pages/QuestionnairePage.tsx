@@ -171,7 +171,11 @@ export function QuestionnairePage() {
             <p className="mx-auto max-w-[560px] text-xs text-muted">
               Faltam: {profileCompletion.missingFields.map(({ label }) => label).join(', ')}.
             </p>
-            <Link className="mt-4 inline-flex font-bold text-coral-dark" to="/perfil" state={{ from: `/pets/${pet.id}/questionario` }}>
+            <Link
+              className="mt-4 inline-flex font-bold text-coral-dark"
+              to="/perfil"
+              state={{ from: `/pets/${pet.id}/questionario` }}
+            >
               Ir para o perfil
             </Link>
           </Card>
@@ -273,9 +277,9 @@ export function QuestionnairePage() {
             <InfoNote className="mb-6">
               <p className="mb-0">
                 <strong>Dados reaproveitados do seu perfil:</strong> {profile.name}, moradia{' '}
-                {profile.housing.toLowerCase()} e disponibilidade de {profile.dailyTime.toLowerCase()}.
-                Eles serão enviados junto com estas respostas e podem ser alterados em{' '}
-                <Link to="/perfil">Meu perfil</Link>.
+                {profile.housing.toLowerCase()} e disponibilidade de{' '}
+                {profile.dailyTime.toLowerCase()}. Eles serão enviados junto com estas respostas e
+                podem ser alterados em <Link to="/perfil">Meu perfil</Link>.
               </p>
             </InfoNote>
             <SectionHeading

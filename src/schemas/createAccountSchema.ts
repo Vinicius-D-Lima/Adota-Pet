@@ -4,10 +4,7 @@ import { profileSchema } from './profileSchema'
 const phone = z
   .string()
   .trim()
-  .refine(
-    (value) => /^\d{10,11}$/.test(value.replace(/\D/g, '')),
-    'Informe um telefone com DDD.',
-  )
+  .refine((value) => /^\d{10,11}$/.test(value.replace(/\D/g, '')), 'Informe um telefone com DDD.')
 
 const base = {
   email: z.string().trim().email('Informe um e-mail válido.'),

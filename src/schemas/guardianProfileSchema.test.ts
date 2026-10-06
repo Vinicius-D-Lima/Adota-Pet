@@ -42,7 +42,11 @@ describe('guardianProfileSchema', () => {
   })
 
   it('rejeita documento incompatível e termo não confirmado', () => {
-    const result = guardianProfileSchema.safeParse({ ...base, document: '11111111111', acceptsTerms: false })
+    const result = guardianProfileSchema.safeParse({
+      ...base,
+      document: '11111111111',
+      acceptsTerms: false,
+    })
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(result.error.issues.map((issue) => issue.path[0])).toEqual(

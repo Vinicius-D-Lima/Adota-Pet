@@ -2,10 +2,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { petSchema, petsResponseSchema } from '../schemas/petSchema'
 
-export type PetSort =
-  | 'recent'
-  | 'name'
-  | 'distance'
+export type PetSort = 'recent' | 'name' | 'distance'
 export interface PetFilters {
   search?: string
   species?: string

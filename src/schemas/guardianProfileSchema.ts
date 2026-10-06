@@ -20,7 +20,9 @@ const isValidCnpj = (value: string) => {
   const cnpj = digitsOnly(value)
   if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false
   const digit = (base: string, weights: number[]) => {
-    const sum = base.split('').reduce((total, number, index) => total + Number(number) * weights[index], 0)
+    const sum = base
+      .split('')
+      .reduce((total, number, index) => total + Number(number) * weights[index], 0)
     const remainder = sum % 11
     return remainder < 2 ? 0 : 11 - remainder
   }
@@ -46,10 +48,7 @@ export const guardianProfileSchema = z
       .refine((value) => /^\d{8}$/.test(digitsOnly(value)), 'Informe um CEP válido.'),
     address: z.string().trim().min(5, 'Informe o endereço do responsável.'),
     city: z.string().trim().min(2, 'Informe a cidade e o estado.'),
-    description: z
-      .string()
-      .trim()
-      .min(20, 'Conte um pouco sobre o trabalho de proteção animal.'),
+    description: z.string().trim().min(20, 'Conte um pouco sobre o trabalho de proteção animal.'),
     acceptsTerms: z.boolean().refine(Boolean, 'Confirme a responsabilidade pelas informações.'),
   })
   .superRefine((profile, context) => {

@@ -17,7 +17,9 @@ describe('perfil responsável', () => {
     vi.mocked(api.get).mockResolvedValue({ isComplete: false, missingFields: [] })
     renderWithProviders(<ProfilePage />, { route: '/perfil' })
 
-    expect(await screen.findByRole('heading', { name: /quem coloca pets para adoção/i })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: /quem coloca pets para adoção/i }),
+    ).toBeInTheDocument()
     expect(api.get).toHaveBeenCalledWith('/me/guardian-profile')
     expect(screen.queryByText(/como você quer usar o adotapet/i)).not.toBeInTheDocument()
   })
