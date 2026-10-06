@@ -3,10 +3,20 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
 import { PetGrid } from '../components/PetGrid'
-import { Button, Container, EmptyState, PageIntro, PageSurface, Select, cx } from '../components/ui'
+import {
+  Button,
+  Container,
+  EmptyState,
+  LinkButton,
+  PageIntro,
+  PageSurface,
+  Select,
+  cx,
+} from '../components/ui'
 import { useAdopterProfile } from '../hooks/useAdopterProfile'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePets, type PetSort } from '../hooks/usePets'
+import { calculateCompatibility } from '../utils/calculateCompatibility'
 
 export const PAGE_SIZE = 4
 
@@ -14,7 +24,7 @@ const allowed = {
   species: ['Cachorro', 'Gato'],
   size: ['Pequeno', 'Médio', 'Grande'],
   sex: ['Fêmea', 'Macho'],
-  sort: ['recent', 'name', 'distance'],
+  sort: ['recent', 'name', 'distance', 'compatibility'],
 } as const
 
 type PetSize = (typeof allowed.size)[number]
@@ -35,13 +45,23 @@ export function PetsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const searchFromUrl = searchParams.get('search') ?? ''
   const [searchState, setSearchState] = useState({ source: searchFromUrl, value: searchFromUrl })
+  const [visibleCompatibilityPage, setVisibleCompatibilityPage] = useState({
+    key: '',
+    count: PAGE_SIZE,
+  })
   const searchInput = searchState.source === searchFromUrl ? searchState.value : searchFromUrl
   const debouncedSearch = useDebouncedValue(searchInput, 300)
 
   const species = readParam(searchParams, 'species')
   const size = allowed.size.filter((option) => searchParams.getAll('size').includes(option))
+  const sizeKey = size.join(',')
   const sex = readParam(searchParams, 'sex')
-  const sort = (readParam(searchParams, 'sort') || 'recent') as PetSort
+  const sort = (readParam(searchParams, 'sort') || 'recent') as PetSort | 'compatibility'
+  const compatibilityPageKey = [debouncedSearch.trim(), species, sizeKey, sex, sort].join('|')
+  const visibleCompatibilityCount =
+    visibleCompatibilityPage.key === compatibilityPageKey
+      ? visibleCompatibilityPage.count
+      : PAGE_SIZE
 
   const setFilter = (key: string, value: string, replace = false) => {
     setSearchParams(
@@ -112,8 +132,8 @@ export function PetsPage() {
       species: species || undefined,
       size: size.length ? size : undefined,
       sex: sex || undefined,
-      sort,
-      limit: PAGE_SIZE,
+      sort: sort === 'compatibility' ? 'recent' : sort,
+      limit: sort === 'compatibility' ? 100 : PAGE_SIZE,
     }),
     [debouncedSearch, sex, size, sort, species],
   )
@@ -123,8 +143,32 @@ export function PetsPage() {
     const unique = new Map(
       petsQuery.data?.pages.flatMap((page) => page.data).map((pet) => [pet.id, pet]),
     )
-    return Array.from(unique.values())
-  }, [petsQuery.data])
+    const data = Array.from(unique.values())
+
+    if (sort === 'compatibility' && profileQuery.data?.isComplete) {
+      return data
+        .map((pet) => ({
+          pet,
+          score: calculateCompatibility(pet, profileQuery.data.profile).score,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map((item) => item.pet)
+    }
+
+    return data
+  }, [petsQuery.data, sort, profileQuery.data])
+  const recommendedPets = useMemo(() => {
+    if (sort !== 'compatibility' || !profileQuery.data?.isComplete) return []
+
+    return pets.map((pet) => ({
+      pet,
+      result: calculateCompatibility(pet, profileQuery.data.profile),
+    }))
+  }, [pets, profileQuery.data, sort])
+  const hasMorePets =
+    sort === 'compatibility'
+      ? visibleCompatibilityCount < recommendedPets.length || petsQuery.hasNextPage
+      : petsQuery.hasNextPage
   const total = petsQuery.data?.pages[0]?.total ?? 0
   const hasFilters = Boolean(searchFromUrl || species || size.length || sex || sort !== 'recent')
 
@@ -206,6 +250,9 @@ export function PetsPage() {
               <option value="recent">Mais recentes</option>
               <option value="name">Nome A–Z</option>
               <option value="distance">Mais próximos</option>
+              <option value="compatibility" disabled={!profileQuery.data?.isComplete}>
+                Compatibilidade
+              </option>
             </Select>
             {hasFilters && (
               <Button variant="text" className="sm:ml-auto" onClick={clearFilters}>
@@ -240,7 +287,9 @@ export function PetsPage() {
               ? 'Ordenados por distância'
               : sort === 'name'
                 ? 'Ordenados por nome'
-                : 'Mais recentes primeiro'}
+                : sort === 'compatibility'
+                  ? 'Ordenados por compatibilidade'
+                  : 'Mais recentes primeiro'}
           </span>
         </div>
 
@@ -258,22 +307,48 @@ export function PetsPage() {
           >
             <Button onClick={() => void petsQuery.refetch()}>Tentar novamente</Button>
           </EmptyState>
+        ) : sort === 'compatibility' && !profileQuery.data?.isComplete ? (
+          <EmptyState
+            title="Complete seu perfil para ordenar por compatibilidade"
+            description="Precisamos conhecer sua rotina e preferências para calcular as melhores combinações."
+          >
+            <LinkButton to="/perfil">Completar perfil</LinkButton>
+          </EmptyState>
         ) : pets.length ? (
           <>
             <PetGrid>
-              {pets.map((pet) => (
-                <PetCard key={pet.id} pet={pet} />
-              ))}
-              {petsQuery.isFetchingNextPage &&
+              {sort === 'compatibility'
+                ? recommendedPets
+                    .slice(0, visibleCompatibilityCount)
+                    .map(({ pet, result }) => (
+                      <PetCard
+                        key={pet.id}
+                        pet={pet}
+                        compatibilityScore={result.score}
+                        compatibilityLevel={result.level}
+                      />
+                    ))
+                : pets.map((pet) => <PetCard key={pet.id} pet={pet} />)}
+              {sort !== 'compatibility' &&
+                petsQuery.isFetchingNextPage &&
                 Array.from({ length: PAGE_SIZE }, (_, index) => (
                   <PetCardSkeleton key={`next-${index}`} />
                 ))}
             </PetGrid>
-            {petsQuery.hasNextPage && (
+            {hasMorePets && (
               <div className="flex justify-center pt-[34px]">
                 <Button
                   variant="secondary"
-                  onClick={() => void petsQuery.fetchNextPage()}
+                  onClick={() => {
+                    if (sort === 'compatibility' && visibleCompatibilityCount < pets.length) {
+                      setVisibleCompatibilityPage({
+                        key: compatibilityPageKey,
+                        count: visibleCompatibilityCount + PAGE_SIZE,
+                      })
+                    } else if (petsQuery.hasNextPage) {
+                      void petsQuery.fetchNextPage()
+                    }
+                  }}
                   disabled={petsQuery.isFetchingNextPage}
                 >
                   {petsQuery.isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
