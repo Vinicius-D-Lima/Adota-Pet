@@ -10,7 +10,7 @@
     "typecheck": "tsc -b --noEmit",
     "mock": "node mock-server/server.js",
     "mock:reset": "node mock-server/reset.js",
-    "dev:mock": "concurrently -n web,mock -c cyan,yellow \"npm:dev\" \"npm:mock\"",
+    "dev:mock": "node scripts/dev-mock.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

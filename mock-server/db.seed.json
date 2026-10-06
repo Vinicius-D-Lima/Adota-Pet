@@ -2,11 +2,28 @@
   "users": [
     {
       "id": "demo",
-      "name": "Luquinhas Ferreira",
+      "name": "Lucas Ferreira",
       "email": "demo@adotapet.local",
       "role": "ADOTANTE",
+      "roles": ["ADOPTER"],
       "lat": -23.5505,
       "lng": -46.6333
+    },
+    {
+      "id": "demo-organization",
+      "name": "Instituto Patinhas",
+      "email": "contato@institutopatinhas.org",
+      "role": "RESPONSAVEL",
+      "roles": ["GUARDIAN"],
+      "lat": -23.5614,
+      "lng": -46.6559
+    },
+    {
+      "id": "demo-empty",
+      "name": "",
+      "email": "",
+      "role": "ADOTANTE",
+      "roles": ["ADOPTER"]
     }
   ],
   "pets": [
@@ -342,7 +359,7 @@
     }
   ],
   "profile": {
-    "name": "Luquinhas Ferreira",
+    "name": "Lucas Ferreira",
     "cpf": "52998224725",
     "birthDate": "1995-05-20",
     "email": "demo@adotapet.local",
@@ -360,6 +377,20 @@
     "preferredSpecies": "Sem preferência",
     "preferredSize": "Pequeno ou médio",
     "userId": "demo"
+  },
+  "guardianProfile": {
+    "guardianType": "ORGANIZATION",
+    "displayName": "Instituto Patinhas",
+    "legalName": "Instituto Patinhas de Proteção Animal",
+    "document": "11222333000181",
+    "email": "contato@institutopatinhas.org",
+    "phone": "11955554444",
+    "zipCode": "01310100",
+    "address": "Avenida Paulista, 1000 - Bela Vista",
+    "city": "São Paulo, SP",
+    "description": "Organização dedicada ao resgate, cuidado e adoção responsável de cães e gatos.",
+    "acceptsTerms": true,
+    "userId": "demo-organization"
   },
   "favorites": [
     {

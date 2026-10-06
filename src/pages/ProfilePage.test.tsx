@@ -43,6 +43,17 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('textbox', { name: /cpf/i })).toHaveValue(validProfile.cpf)
   })
 
+  it('ignora a tentativa de trocar o tipo do perfil pela URL', async () => {
+    getMock.mockResolvedValue(savedResponse)
+    renderWithProviders(<ProfilePage />, { route: '/perfil?tipo=responsavel' })
+
+    expect(
+      await screen.findByRole('heading', { name: /perfil do adotante/i }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/como você quer usar o adotapet/i)).not.toBeInTheDocument()
+    expect(getMock).toHaveBeenCalledWith('/me/adopter-profile')
+  })
+
   it('mostra "Salvando…" com o botão desabilitado e só confirma após o 200', async () => {
     let resolvePut: (value: unknown) => void = () => {}
     putMock.mockReturnValue(new Promise((resolve) => (resolvePut = resolve)))
@@ -121,9 +132,15 @@ describe('ProfilePage', () => {
 
   it('remove o aviso de incompleto depois de salvar um perfil completo', async () => {
     putMock.mockResolvedValue(savedResponse)
-    const user = await setup({ ...savedResponse, isComplete: false, missingFields: [] })
+    const user = await setup({
+      ...savedResponse,
+      housing: undefined,
+      isComplete: false,
+      missingFields: ['housing'],
+    })
 
     expect(screen.getByText(/seu perfil salvo está incompleto/i)).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Tipo de moradia'), 'Casa')
     await user.click(saveButton())
 
     await waitFor(() =>

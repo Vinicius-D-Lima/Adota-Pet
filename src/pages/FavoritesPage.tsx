@@ -24,7 +24,7 @@ export function FavoritesPage() {
         ) : favoritesQuery.isError ? (
           <EmptyState
             title="Não foi possível carregar seus favoritos"
-            description="Verifique sua conexão com a API simulada e tente novamente."
+            description="Verifique sua conexão e tente novamente."
             role="alert"
           >
             <Button onClick={() => void favoritesQuery.refetch()}>Tentar novamente</Button>

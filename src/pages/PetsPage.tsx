@@ -302,7 +302,7 @@ export function PetsPage() {
         ) : petsQuery.isError ? (
           <EmptyState
             title="Não foi possível carregar os pets"
-            description="Verifique sua conexão com a API simulada e tente novamente."
+            description="Verifique sua conexão e tente novamente."
             role="alert"
           >
             <Button onClick={() => void petsQuery.refetch()}>Tentar novamente</Button>

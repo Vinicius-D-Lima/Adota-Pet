@@ -21,6 +21,7 @@ import { useActiveRequestForPet } from '../hooks/useAdoptionRequests'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
+import { calculateProfileCompletion } from '../utils/profileCompletion'
 
 const levelTone = {
   Alta: 'bg-forest-100 text-forest-700',
@@ -125,6 +126,40 @@ export function CompatibilityPage() {
 
   const pet = petQuery.data
   const { profile } = profileQuery.data
+  const profileCompletion = calculateProfileCompletion('adopter', profile)
+
+  if (!profileCompletion.isComplete) {
+    return (
+      <PageSurface>
+        <Container as="section" className="max-w-[760px] pb-[90px] pt-[35px] md:pt-[54px]">
+          <BackLink to={`/pets/${pet.id}`}>
+            <ArrowLeft size={17} /> Voltar para os detalhes
+          </BackLink>
+          <Card className="mt-8 p-6 text-center md:p-10">
+            <span className="mx-auto mb-5 grid size-14 place-items-center rounded-full bg-[#fff1dc] text-[#ba7716]">
+              <AlertTriangle size={26} />
+            </span>
+            <h1 className="mb-3 text-[34px]">Complete seu perfil para ver a compatibilidade</h1>
+            <p className="mx-auto max-w-[580px] text-sm leading-6 text-muted">
+              Seu perfil está {profileCompletion.percentage}% completo. Precisamos das informações
+              restantes para calcular um resultado confiável, sem assumir respostas por você.
+            </p>
+            <div className="mx-auto my-6 max-w-[520px] rounded-xl bg-cream p-4 text-left">
+              <strong className="text-sm">Campos que ainda faltam:</strong>
+              <ul className="mb-0 mt-3 grid gap-2 pl-5 text-xs text-muted sm:grid-cols-2">
+                {profileCompletion.missingFields.map(({ key, label }) => (
+                  <li key={key}>{label}</li>
+                ))}
+              </ul>
+            </div>
+            <LinkButton to="/perfil" state={{ from: `/pets/${pet.id}/compatibilidade` }}>
+              Completar meu perfil <ArrowRight size={18} />
+            </LinkButton>
+          </Card>
+        </Container>
+      </PageSurface>
+    )
+  }
   const result = calculateCompatibility(pet, profile)
 
   return (

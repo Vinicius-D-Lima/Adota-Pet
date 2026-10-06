@@ -7,7 +7,7 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 export const SEED_PATH = path.join(here, 'db.seed.json')
 export const DB_PATH = path.join(here, 'db.json')
 
-const DEMO_USER_ID = 'demo'
+const DEFAULT_DEMO_USER_ID = process.env.DEMO_USER_ID ?? 'demo'
 const DEFAULT_LIMIT = 12
 const MAX_LIMIT = 100
 const ACTIVE_STATUSES = ['Enviada', 'Em análise', 'Aprovada']
@@ -43,6 +43,46 @@ const PROFILE_FIELDS = [
   'preferredSpecies',
   'preferredSize',
 ]
+const GUARDIAN_TYPES = ['INDIVIDUAL', 'ORGANIZATION']
+const GUARDIAN_FIELDS = [
+  'guardianType',
+  'displayName',
+  'legalName',
+  'document',
+  'email',
+  'phone',
+  'zipCode',
+  'address',
+  'city',
+  'description',
+  'acceptsTerms',
+]
+const GUARDIAN_DIGITS = ['document', 'phone', 'zipCode']
+const ORGANIZATION_REQUEST_TRANSITIONS = {
+  EM_ANALISE: 'Em análise',
+  APROVADA: 'Aprovada',
+  RECUSADA: 'Recusada',
+}
+const ORGANIZATION_PET_FIELDS = [
+  'name',
+  'species',
+  'breed',
+  'age',
+  'size',
+  'sex',
+  'city',
+  'image',
+  'summary',
+  'description',
+  'traits',
+  'energy',
+  'space',
+  'children',
+  'otherPets',
+  'specialCare',
+  'vaccinated',
+  'neutered',
+]
 
 const digitsOnly = (value) => value.replace(/\D/g, '')
 
@@ -58,6 +98,21 @@ function isValidCpf(value) {
     return remainder === 10 ? 0 : remainder
   }
   return calculateDigit(9) === Number(cpf[9]) && calculateDigit(10) === Number(cpf[10])
+}
+
+function isValidCnpj(value) {
+  const cnpj = digitsOnly(value)
+  if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false
+  const digit = (base, weights) => {
+    const sum = base
+      .split('')
+      .reduce((total, number, index) => total + Number(number) * weights[index], 0)
+    const remainder = sum % 11
+    return remainder < 2 ? 0 : 11 - remainder
+  }
+  const first = digit(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+  const second = digit(`${cnpj.slice(0, 12)}${first}`, [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+  return first === Number(cnpj[12]) && second === Number(cnpj[13])
 }
 
 function isAdult(value) {
@@ -111,8 +166,43 @@ const missingProfileFields = (profile) =>
     return value === undefined || value === null || profileFieldError(key, value) !== null
   })
 
+function guardianFieldError(key, value, profile) {
+  if (key === 'acceptsTerms')
+    return typeof value === 'boolean' ? null : 'acceptsTerms deve ser booleano'
+  if (typeof value !== 'string') return `${key} deve ser um texto`
+  if (key === 'guardianType')
+    return GUARDIAN_TYPES.includes(value) ? null : 'Escolha o tipo de responsável.'
+  if (key === 'displayName' && profile.guardianType === 'INDIVIDUAL') return null
+  if (key === 'document') {
+    const valid = profile.guardianType === 'ORGANIZATION' ? isValidCnpj(value) : isValidCpf(value)
+    return valid
+      ? null
+      : `Informe um ${profile.guardianType === 'ORGANIZATION' ? 'CNPJ' : 'CPF'} válido.`
+  }
+  if (key === 'email')
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? null : 'Informe um e-mail válido.'
+  if (key === 'phone')
+    return /^\d{10,11}$/.test(digitsOnly(value)) ? null : 'Informe um telefone com DDD.'
+  if (key === 'zipCode') return /^\d{8}$/.test(digitsOnly(value)) ? null : 'Informe um CEP válido.'
+  const minimum = key === 'description' ? 20 : key === 'city' ? 2 : key === 'address' ? 5 : 3
+  return value.trim().length >= minimum
+    ? null
+    : key === 'description'
+      ? 'Conte um pouco sobre o trabalho de proteção animal.'
+      : `Preencha ${key}.`
+}
+
+const missingGuardianFields = (profile) =>
+  GUARDIAN_FIELDS.filter((key) => {
+    if (key === 'displayName' && profile.guardianType === 'INDIVIDUAL') return false
+    const value = profile[key]
+    if (key === 'acceptsTerms') return value !== true
+    return value === undefined || value === null || guardianFieldError(key, value, profile) !== null
+  })
+
 const STATUS_NAMES = {
   400: 'Bad Request',
+  403: 'Forbidden',
   404: 'Not Found',
   409: 'Conflict',
   422: 'Unprocessable Entity',
@@ -162,22 +252,95 @@ export function createApp({
   const router = jsonServer.router(db)
   const store = router.db
 
-  const demoUser = () => store.get('users').find({ id: DEMO_USER_ID }).value()
+  const currentUserId = (req) => {
+    const requested = req.get('X-Demo-User-Id')
+    return requested && store.get('users').find({ id: requested }).value()
+      ? requested
+      : DEFAULT_DEMO_USER_ID
+  }
+  const demoUser = (userId = DEFAULT_DEMO_USER_ID) =>
+    store.get('users').find({ id: userId }).value()
   const findPet = (id) => store.get('pets').find({ id }).value()
-  const myRequests = () => store.get('requests').filter({ userId: DEMO_USER_ID }).value()
+  const myRequests = (userId) => store.get('requests').filter({ userId }).value()
   const withPet = (request) => ({
     ...request,
     pet: findPet(request.petId) ?? null,
   })
-  const getProfile = () => {
+  const getProfile = (userId) => {
     const profile = store.get('profile').value() ?? {}
+    if (profile.userId !== userId) {
+      const missingFields = missingProfileFields({})
+      return { userId, isComplete: false, missingFields }
+    }
     const missingFields = missingProfileFields(profile)
     return { ...profile, isComplete: missingFields.length === 0, missingFields }
+  }
+  const getGuardianProfile = (userId) => {
+    const profile = store.get('guardianProfile').value() ?? {}
+    if (profile.userId !== userId) {
+      const missingFields = missingGuardianFields({})
+      return { userId, isComplete: false, missingFields }
+    }
+    const missingFields = missingGuardianFields(profile)
+    return { ...profile, isComplete: missingFields.length === 0, missingFields }
+  }
+  const requireGuardian = (req, res) => {
+    const user = demoUser(currentUserId(req))
+    if (user?.roles?.includes('GUARDIAN')) return true
+    sendError(res, 403, 'Esta área é exclusiva para instituições e protetores')
+    return false
+  }
+
+  const organizationIdentity = (userId) => {
+    const user = demoUser(userId) ?? {}
+    const profile = getGuardianProfile(userId)
+    const name =
+      profile.displayName ||
+      profile.legalName ||
+      user.organizationName ||
+      user.name ||
+      'Instituição'
+    const initials = name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join('')
+    return { name, initials: initials || 'IN', user }
+  }
+  const organizationPets = (userId) => {
+    const { name } = organizationIdentity(userId)
+    return store.get('pets').filter({ organization: name }).value()
+  }
+  const presentOrganizationPet = (pet) => ({ ...pet, distance: null, distanceKm: null })
+  const withReceivedRequest = (request) => {
+    const user = demoUser(request.userId) ?? {}
+    const profile = getProfile(request.userId)
+    const completed = PROFILE_FIELDS.length - profile.missingFields.length
+    return {
+      ...withPet(request),
+      adopter: {
+        id: request.userId,
+        name: profile.name || user.name || '',
+        email: profile.email || user.email || '',
+        phone: profile.phone || user.phone || '',
+        completion: Math.round((completed / PROFILE_FIELDS.length) * 100),
+        housing: profile.housing,
+        dailyTime: profile.dailyTime,
+        experience: profile.experience,
+        hasChildren: profile.hasChildren,
+        hasOtherPets: profile.hasOtherPets,
+      },
+    }
   }
 
   const presentPet = (pet) => {
     const user = demoUser()
-    const hasCoords = user && typeof pet.lat === 'number' && typeof pet.lng === 'number'
+    const hasCoords =
+      typeof user?.lat === 'number' &&
+      typeof user?.lng === 'number' &&
+      typeof pet.lat === 'number' &&
+      typeof pet.lng === 'number'
     const distanceKm = hasCoords
       ? Math.round(haversineKm(user.lat, user.lng, pet.lat, pet.lng) * 10) / 10
       : null
@@ -199,14 +362,96 @@ export function createApp({
   server.use((_req, _res, next) => (delay > 0 ? setTimeout(next, delay) : next()))
 
   // --- Usuário e perfil -----------------------------------------------------
-  server.get('/me', (_req, res) => {
-    const { lat: _lat, lng: _lng, ...user } = demoUser()
+  server.get('/me', (req, res) => {
+    const { lat: _lat, lng: _lng, ...user } = demoUser(currentUserId(req))
     res.json(user)
   })
 
-  server.get('/me/adopter-profile', (_req, res) => res.json(getProfile()))
+  server.put('/me/account', (req, res) => {
+    const userId = currentUserId(req)
+    const body = req.body
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return sendError(res, 400, 'Corpo da requisição inválido', [
+        { field: 'body', message: 'Envie um objeto JSON' },
+      ])
+    }
+
+    const details = []
+    const normalized = {}
+    const guardian = body.accountType === 'guardian'
+    if (guardian) {
+      const required = [
+        'organizationName',
+        'responsibleName',
+        'document',
+        'email',
+        'phone',
+        'zipCode',
+        'address',
+        'city',
+        'state',
+      ]
+      for (const key of required) {
+        const value = body[key]
+        if (typeof value !== 'string' || !value.trim()) {
+          details.push({ field: key, message: `Preencha ${key}.` })
+          continue
+        }
+        if (['organizationName', 'responsibleName'].includes(key) && value.trim().length < 3)
+          details.push({ field: key, message: `Preencha ${key}.` })
+        else if (key === 'document' && !isValidCnpj(value))
+          details.push({ field: key, message: 'Informe um CNPJ válido.' })
+        else if (key === 'email' && profileFieldError('email', value))
+          details.push({ field: key, message: 'Informe um e-mail válido.' })
+        else if (key === 'phone' && profileFieldError('phone', value))
+          details.push({ field: key, message: 'Informe um telefone com DDD.' })
+        else if (key === 'zipCode' && profileFieldError('zipCode', value))
+          details.push({ field: key, message: 'Informe um CEP válido.' })
+        else if (key === 'address' && profileFieldError('address', value))
+          details.push({ field: key, message: 'Informe seu endereço.' })
+        else if (key === 'city' && value.trim().length < 2)
+          details.push({ field: key, message: 'Informe a cidade.' })
+        else if (key === 'state' && value.trim().length !== 2)
+          details.push({ field: key, message: 'Use a sigla do estado com 2 letras.' })
+        else
+          normalized[key] = ['document', 'phone', 'zipCode'].includes(key)
+            ? digitsOnly(value)
+            : value.trim()
+      }
+      normalized.name = typeof body.responsibleName === 'string' ? body.responsibleName.trim() : ''
+    } else {
+      for (const key of ['name', 'cpf', 'birthDate', 'email', 'phone', 'zipCode', 'address']) {
+        const value = body[key]
+        const message = value === undefined ? `Preencha ${key}.` : profileFieldError(key, value)
+        if (message) details.push({ field: key, message })
+        else normalized[key] = PROFILE_DIGITS.includes(key) ? digitsOnly(value) : value.trim()
+      }
+    }
+    if (typeof body.password !== 'string' || body.password.length < 8) {
+      details.push({ field: 'password', message: 'Use pelo menos 8 caracteres.' })
+    }
+    if (!['adopter', 'guardian'].includes(body.accountType)) {
+      details.push({ field: 'accountType', message: 'Escolha o tipo da conta.' })
+    }
+    if (details.length) return sendError(res, 400, 'Validação falhou', details)
+
+    const user = store
+      .get('users')
+      .find({ id: userId })
+      .assign({
+        ...normalized,
+        role: guardian ? 'RESPONSAVEL' : 'ADOTANTE',
+        roles: [guardian ? 'GUARDIAN' : 'ADOPTER'],
+      })
+      .write()
+    const { lat: _lat, lng: _lng, ...publicUser } = user
+    res.json(publicUser)
+  })
+
+  server.get('/me/adopter-profile', (req, res) => res.json(getProfile(currentUserId(req))))
 
   server.put('/me/adopter-profile', (req, res) => {
+    const userId = currentUserId(req)
     const body = req.body
     const details = []
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
@@ -231,9 +476,190 @@ export function createApp({
     }
     if (details.length) return sendError(res, 400, 'Validação falhou', details)
 
-    const next = { ...store.get('profile').value(), ...normalized, userId: DEMO_USER_ID }
+    const existing = store.get('profile').value() ?? {}
+    const next = { ...(existing.userId === userId ? existing : {}), ...normalized, userId }
     store.set('profile', next).write()
-    res.json(getProfile())
+    res.json(getProfile(userId))
+  })
+
+  server.get('/me/guardian-profile', (req, res) => res.json(getGuardianProfile(currentUserId(req))))
+
+  server.put('/me/guardian-profile', (req, res) => {
+    const userId = currentUserId(req)
+    const body = req.body
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return sendError(res, 400, 'Corpo da requisição inválido', [
+        { field: 'body', message: 'Envie um objeto JSON' },
+      ])
+    }
+
+    const stored = store.get('guardianProfile').value() ?? {}
+    const current = stored.userId === userId ? stored : {}
+    const next = { ...current, ...body, userId }
+    const normalized = {}
+    const details = []
+    for (const key of GUARDIAN_FIELDS) {
+      if (body[key] === undefined) continue
+      if (body[key] === '' && key !== 'acceptsTerms') {
+        normalized[key] = ''
+        continue
+      }
+      const message = guardianFieldError(key, body[key], next)
+      if (message) details.push({ field: key, message })
+      else normalized[key] = GUARDIAN_DIGITS.includes(key) ? digitsOnly(body[key]) : body[key]
+    }
+    if (details.length) return sendError(res, 400, 'Validação falhou', details)
+
+    store.set('guardianProfile', { ...current, ...normalized, userId }).write()
+    const user = demoUser(userId)
+    const roles = Array.from(new Set([...(user.roles ?? ['ADOPTER']), 'GUARDIAN']))
+    store.get('users').find({ id: userId }).assign({ roles }).write()
+    res.json(getGuardianProfile(userId))
+  })
+
+  // --- Área da instituição --------------------------------------------------
+  server.get('/me/organization-pets', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const pets = organizationPets(currentUserId(req)).map(presentOrganizationPet)
+    res.json(list(pets))
+  })
+
+  const validateOrganizationPet = (body) => {
+    const details = []
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return [{ field: 'body', message: 'Envie um objeto JSON' }]
+    }
+    for (const key of ORGANIZATION_PET_FIELDS) {
+      const value = body[key]
+      if (key === 'age') {
+        if (!Number.isInteger(value) || value < 0 || value > 30)
+          details.push({ field: key, message: 'A idade deve ser um número entre 0 e 30' })
+      } else if (key === 'traits') {
+        if (!Array.isArray(value) || !value.length || value.some(isBlank))
+          details.push({ field: key, message: 'Informe ao menos uma característica' })
+      } else if (['children', 'otherPets', 'specialCare', 'vaccinated', 'neutered'].includes(key)) {
+        if (typeof value !== 'boolean')
+          details.push({ field: key, message: 'Informe verdadeiro ou falso' })
+      } else if (isBlank(value)) details.push({ field: key, message: `${key} é obrigatório` })
+    }
+    if (typeof body?.image === 'string') {
+      try {
+        new URL(body.image)
+      } catch {
+        details.push({ field: 'image', message: 'Informe uma URL válida' })
+      }
+    }
+    return details
+  }
+
+  server.post('/me/organization-pets', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const userId = currentUserId(req)
+    const details = validateOrganizationPet(req.body)
+    if (details.length) return sendError(res, 400, 'Validação falhou', details)
+    const {
+      name: organization,
+      initials: organizationInitials,
+      user,
+    } = organizationIdentity(userId)
+    const baseId =
+      req.body.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '') || 'pet'
+    let id = baseId
+    let suffix = 2
+    while (findPet(id)) id = `${baseId}-${suffix++}`
+    const pet = {
+      ...req.body,
+      id,
+      ageLabel: `${req.body.age} ${req.body.age === 1 ? 'ano' : 'anos'}`,
+      gallery: [req.body.image],
+      organization,
+      organizationInitials,
+      lat: typeof user.lat === 'number' ? user.lat : -23.5505,
+      lng: typeof user.lng === 'number' ? user.lng : -46.6333,
+      createdAt: new Date().toISOString(),
+    }
+    store.get('pets').push(pet).write()
+    res.status(201).json(presentOrganizationPet(pet))
+  })
+
+  server.put('/me/organization-pets/:id', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const userId = currentUserId(req)
+    const existing = organizationPets(userId).find(({ id }) => id === req.params.id)
+    if (!existing)
+      return sendError(res, 404, 'Pet não encontrado entre os cadastros da instituição')
+    const details = validateOrganizationPet(req.body)
+    if (details.length) return sendError(res, 400, 'Validação falhou', details)
+    const updated = {
+      ...existing,
+      ...req.body,
+      id: existing.id,
+      ageLabel: `${req.body.age} ${req.body.age === 1 ? 'ano' : 'anos'}`,
+      gallery: existing.gallery?.length
+        ? [req.body.image, ...existing.gallery.filter((item) => item !== req.body.image)]
+        : [req.body.image],
+    }
+    store.get('pets').find({ id: existing.id }).assign(updated).write()
+    res.json(presentOrganizationPet(updated))
+  })
+
+  server.delete('/me/organization-pets/:id', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const userId = currentUserId(req)
+    const existing = organizationPets(userId).find(({ id }) => id === req.params.id)
+    if (!existing)
+      return sendError(res, 404, 'Pet não encontrado entre os cadastros da instituição')
+    const hasRequests = store.get('requests').some({ petId: existing.id }).value()
+    if (hasRequests)
+      return sendError(res, 409, 'Não é possível remover um pet que possui solicitações')
+    store.get('pets').remove({ id: existing.id }).write()
+    store.get('favorites').remove({ petId: existing.id }).write()
+    res.status(204).end()
+  })
+
+  server.get('/me/received-requests', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const petIds = new Set(organizationPets(currentUserId(req)).map(({ id }) => id))
+    const requests = store
+      .get('requests')
+      .value()
+      .filter(({ petId }) => petIds.has(petId))
+      .reverse()
+      .map(withReceivedRequest)
+    res.json(list(requests))
+  })
+
+  server.post('/me/received-requests/:id/transitions', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const petIds = new Set(organizationPets(currentUserId(req)).map(({ id }) => id))
+    const request = store.get('requests').find({ id: req.params.id }).value()
+    if (!request || !petIds.has(request.petId))
+      return sendError(res, 404, 'Solicitação não encontrada')
+    const to = String(req.body?.to ?? '').toUpperCase()
+    const status = ORGANIZATION_REQUEST_TRANSITIONS[to]
+    if (!status) return sendError(res, 400, 'Transição não suportada')
+    const allowed =
+      (request.status === 'Enviada' && ['Em análise', 'Recusada'].includes(status)) ||
+      (request.status === 'Em análise' && ['Aprovada', 'Recusada'].includes(status))
+    if (!allowed)
+      return sendError(
+        res,
+        409,
+        `Não é possível alterar uma solicitação com status "${request.status}" para "${status}"`,
+      )
+    const messages = {
+      'Em análise': 'A instituição iniciou a análise da sua solicitação.',
+      Aprovada: 'Sua solicitação foi aprovada pela instituição.',
+      Recusada: 'A instituição encerrou esta solicitação.',
+    }
+    const updated = { ...request, status, message: messages[status] }
+    store.get('requests').find({ id: request.id }).assign(updated).write()
+    res.json(withReceivedRequest(updated))
   })
 
   // --- Pets -------------------------------------------------------------------
@@ -295,6 +721,7 @@ export function createApp({
 
   // --- Solicitações -----------------------------------------------------------
   server.post('/requests', (req, res) => {
+    const userId = currentUserId(req)
     const { petId, answers } = req.body ?? {}
     const details = []
     if (isBlank(petId)) details.push({ field: 'petId', message: 'petId é obrigatório' })
@@ -326,18 +753,18 @@ export function createApp({
     if (details.length) return sendError(res, 400, 'Validação falhou', details)
 
     if (!findPet(petId)) return sendError(res, 404, 'Pet não encontrado')
-    if (!getProfile().isComplete) {
+    if (!getProfile(userId).isComplete) {
       return sendError(
         res,
         422,
         'Complete seu perfil de adotante antes de solicitar uma adoção',
-        getProfile().missingFields.map((field) => ({
+        getProfile(userId).missingFields.map((field) => ({
           field,
           message: 'Campo obrigatório do perfil não preenchido ou inválido',
         })),
       )
     }
-    const duplicate = myRequests().some(
+    const duplicate = myRequests(userId).some(
       (request) => request.petId === petId && ACTIVE_STATUSES.includes(request.status),
     )
     if (duplicate) return sendError(res, 409, 'Você já possui uma solicitação ativa para este pet')
@@ -348,7 +775,7 @@ export function createApp({
       .reduce((max, { id }) => Math.max(max, Number(/^SOL-(\d+)$/.exec(id)?.[1] ?? 0)), 1042)
     const request = {
       id: `SOL-${String(lastNumber + 1).padStart(4, '0')}`,
-      userId: DEMO_USER_ID,
+      userId,
       petId,
       status: 'Enviada',
       date: new Date().toISOString(),
@@ -366,19 +793,19 @@ export function createApp({
     res.status(201).json(withPet(request))
   })
 
-  server.get('/me/requests', (_req, res) => {
-    const requests = myRequests().reverse().map(withPet)
+  server.get('/me/requests', (req, res) => {
+    const requests = myRequests(currentUserId(req)).reverse().map(withPet)
     res.json(list(requests))
   })
 
   server.get('/requests/:id', (req, res) => {
-    const request = myRequests().find(({ id }) => id === req.params.id)
+    const request = myRequests(currentUserId(req)).find(({ id }) => id === req.params.id)
     if (!request) return sendError(res, 404, 'Solicitação não encontrada')
     res.json(withPet(request))
   })
 
   server.post('/requests/:id/transitions', (req, res) => {
-    const request = myRequests().find(({ id }) => id === req.params.id)
+    const request = myRequests(currentUserId(req)).find(({ id }) => id === req.params.id)
     if (!request) return sendError(res, 404, 'Solicitação não encontrada')
     const to = String(req.body?.to ?? '').toUpperCase()
     if (to !== 'CANCELADA') {
@@ -403,12 +830,14 @@ export function createApp({
   })
 
   // --- Favoritos ---------------------------------------------------------------
-  const myFavorites = () => store.get('favorites').filter({ userId: DEMO_USER_ID }).value()
+  const myFavorites = (userId) => store.get('favorites').filter({ userId }).value()
 
-  server.get('/me/favorites/ids', (_req, res) => res.json(list(myFavorites().map((f) => f.petId))))
+  server.get('/me/favorites/ids', (req, res) =>
+    res.json(list(myFavorites(currentUserId(req)).map((f) => f.petId))),
+  )
 
-  server.get('/me/favorites', (_req, res) => {
-    const pets = myFavorites()
+  server.get('/me/favorites', (req, res) => {
+    const pets = myFavorites(currentUserId(req))
       .map((favorite) => findPet(favorite.petId))
       .filter(Boolean)
       .map(presentPet)
@@ -416,9 +845,10 @@ export function createApp({
   })
 
   server.put('/me/favorites/:petId', (req, res) => {
+    const userId = currentUserId(req)
     const { petId } = req.params
     if (!findPet(petId)) return sendError(res, 404, 'Pet não encontrado')
-    if (!myFavorites().some((favorite) => favorite.petId === petId)) {
+    if (!myFavorites(userId).some((favorite) => favorite.petId === petId)) {
       const nextId =
         store
           .get('favorites')
@@ -428,7 +858,7 @@ export function createApp({
         .get('favorites')
         .push({
           id: nextId,
-          userId: DEMO_USER_ID,
+          userId,
           petId,
           createdAt: new Date().toISOString(),
         })
@@ -438,7 +868,10 @@ export function createApp({
   })
 
   server.delete('/me/favorites/:petId', (req, res) => {
-    store.get('favorites').remove({ userId: DEMO_USER_ID, petId: req.params.petId }).write()
+    store
+      .get('favorites')
+      .remove({ userId: currentUserId(req), petId: req.params.petId })
+      .write()
     res.status(204).end()
   })
 

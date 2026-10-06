@@ -1,6 +1,7 @@
 import { Heart, MapPin } from 'lucide-react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useFavorite } from '../hooks/useFavorites'
+import { hasDemoAccount } from '../lib/demoAccount'
 import type { Pet } from '../types'
 import { HealthBadges } from './HealthBadges'
 import { Card, TextLink, cx } from './ui'
@@ -32,7 +33,17 @@ export function TraitList({ traits, large = false }: { traits: string[]; large?:
 export function PetCard({ pet, compatibilityScore, compatibilityLevel }: PetCardProps) {
   const { isFavorite, toggle, isPending } = useFavorite(pet.id)
   const location = useLocation()
+  const navigate = useNavigate()
   const from = `${location.pathname}${location.search}`
+  const petPath = `/pets/${pet.id}`
+  const hasAccount = hasDemoAccount()
+  const accessPath = '/criar-conta'
+  const canInteract = hasAccount
+
+  const handleFavorite = () => {
+    if (canInteract) toggle()
+    else navigate(accessPath, { state: { from: petPath } })
+  }
 
   return (
     <Card
@@ -53,7 +64,7 @@ export function PetCard({ pet, compatibilityScore, compatibilityLevel }: PetCard
             'absolute right-3.5 top-3.5 grid size-[39px] cursor-pointer place-items-center rounded-full border-0 bg-white/90',
             isFavorite ? 'text-coral' : 'text-forest-800',
           )}
-          onClick={toggle}
+          onClick={handleFavorite}
           aria-pressed={isFavorite}
           aria-busy={isPending}
           aria-label={isFavorite ? `Remover ${pet.name} dos favoritos` : `Favoritar ${pet.name}`}
@@ -87,7 +98,10 @@ export function PetCard({ pet, compatibilityScore, compatibilityLevel }: PetCard
         <HealthBadges pet={pet} />
         <p className="min-h-12 text-sm leading-[1.55] text-[#53635b]">{pet.summary}</p>
         <TraitList traits={pet.traits.slice(0, 3)} />
-        <TextLink to={`/pets/${pet.id}`} state={{ from }}>
+        <TextLink
+          to={canInteract ? petPath : accessPath}
+          state={{ from: canInteract ? from : petPath }}
+        >
           Conhecer {pet.name} <span aria-hidden="true">→</span>
         </TextLink>
       </div>
