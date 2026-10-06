@@ -67,7 +67,9 @@ export function useAdopterProfile() {
       const response = await api.get<AdopterProfileResponse>(PROFILE_PATH)
       const personalData = getDemoPersonalData()
       const defaults = Object.fromEntries(
-        Object.entries(personalData ?? {}).filter(([, value]) => typeof value === 'string' && value),
+        Object.entries(personalData ?? {}).filter(
+          ([, value]) => typeof value === 'string' && value,
+        ),
       )
       const merged = { ...response }
       for (const [field, value] of Object.entries(defaults)) {

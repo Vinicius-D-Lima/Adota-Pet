@@ -61,10 +61,7 @@ describe('CreateAccountPage', () => {
         accountType: 'guardian',
       }),
     )
-    expect(mocks.createDemoAccount).toHaveBeenCalledWith(
-      '/perfil?tipo=responsavel',
-      personalData,
-    )
+    expect(mocks.createDemoAccount).toHaveBeenCalledWith('/perfil?tipo=responsavel', personalData)
     expect(screen.getByTestId('current-path')).toHaveTextContent('/')
   })
 

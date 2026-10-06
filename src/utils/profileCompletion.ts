@@ -19,7 +19,11 @@ export interface ProfileCompletion {
 }
 
 const hasValue = (value: unknown) =>
-  typeof value === 'boolean' ? true : typeof value === 'string' ? value.trim().length > 0 : value != null
+  typeof value === 'boolean'
+    ? true
+    : typeof value === 'string'
+      ? value.trim().length > 0
+      : value != null
 
 export const adopterRequiredFields: RequiredField<ProfileDraft>[] = [
   { key: 'name', label: 'Nome completo' },
@@ -66,7 +70,9 @@ export const guardianRequiredFields: RequiredField<GuardianProfileDraft>[] = [
 function calculate<T>(profile: T, fields: RequiredField<T>[]): ProfileCompletion {
   const applicable = fields.filter((field) => field.applies?.(profile) ?? true)
   const missingFields = applicable
-    .filter((field) => !(field.isComplete?.(profile[field.key], profile) ?? hasValue(profile[field.key])))
+    .filter(
+      (field) => !(field.isComplete?.(profile[field.key], profile) ?? hasValue(profile[field.key])),
+    )
     .map(({ key, label }) => ({ key: String(key), label }))
   const completedFields = applicable.length - missingFields.length
   return {

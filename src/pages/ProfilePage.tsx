@@ -33,10 +33,7 @@ import { ApiError } from '../lib/ApiError'
 import { getDemoProfilePath } from '../lib/demoAccount'
 import { profileSchema } from '../schemas/profileSchema'
 import type { Profile, ProfileDraft } from '../types'
-import {
-  adopterRequiredFields,
-  calculateProfileCompletion,
-} from '../utils/profileCompletion'
+import { adopterRequiredFields, calculateProfileCompletion } from '../utils/profileCompletion'
 import { GuardianProfilePage } from './GuardianProfilePage'
 
 const SAVE_ERROR_MESSAGE = 'Não foi possível salvar. Seus dados foram mantidos.'

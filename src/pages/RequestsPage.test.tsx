@@ -39,9 +39,7 @@ describe('RequestsPage', () => {
       'aria-pressed',
       'true',
     )
-    expect(
-      screen.getByRole('button', { name: 'Encerradas: 2 solicitações' }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Encerradas: 2 solicitações' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Em análise: 1 solicitação' }))
     expect(screen.getByText('SOL-2')).toBeInTheDocument()
@@ -60,9 +58,7 @@ describe('RequestsPage', () => {
     const user = userEvent.setup()
     renderWithProviders(<RequestsPage />)
 
-    await user.click(
-      await screen.findByRole('button', { name: 'Aprovadas: 0 solicitações' }),
-    )
+    await user.click(await screen.findByRole('button', { name: 'Aprovadas: 0 solicitações' }))
     expect(screen.getByText('Nenhuma solicitação em “Aprovadas”')).toBeInTheDocument()
     expect(screen.queryByText('SOL-1042')).not.toBeInTheDocument()
   })

@@ -3,9 +3,9 @@ import { createInterface } from 'node:readline/promises'
 import { stdin as input, stdout as output } from 'node:process'
 
 const accounts = {
-  '1': { id: 'demo', label: 'Adotante — adotante preenchido' },
-  '2': { id: 'demo-organization', label: 'Instituto — instituição preenchida' },
-  '3': { id: 'demo-empty', label: 'Perfil vazio' },
+  1: { id: 'demo', label: 'Adotante — adotante preenchido' },
+  2: { id: 'demo-organization', label: 'Instituto — instituição preenchida' },
+  3: { id: 'demo-empty', label: 'Perfil vazio' },
 }
 
 const terminal = createInterface({ input, output })
