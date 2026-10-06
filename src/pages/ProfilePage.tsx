@@ -1,36 +1,500 @@
-import { Check, Info, Save } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
-import { Field, PageIntro } from '../components/UI'
-import type { Profile } from '../types'
-import { getInitials } from '../utils/getInitials'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { AlertTriangle, Check, Save } from 'lucide-react'
+import { type ReactNode, useState } from 'react'
+import {
+  type FieldErrors,
+  type RegisterOptions,
+  type Resolver,
+  type UseFormRegister,
+  useForm,
+  useWatch,
+} from 'react-hook-form'
+import { useLocation, useNavigate } from 'react-router-dom'
+import {
+  Button,
+  Container,
+  Feedback,
+  Field,
+  InfoNote,
+  Input,
+  PageIntro,
+  PageSurface,
+  SectionHeading,
+  Select,
+  cardClass,
+  cx,
+} from '../components/ui'
+import {
+  type AdopterProfile,
+  useAdopterProfile,
+  useSaveAdopterProfile,
+} from '../hooks/useAdopterProfile'
+import { ApiError } from '../lib/ApiError'
+import { getDemoProfilePath } from '../lib/demoAccount'
+import { profileSchema } from '../schemas/profileSchema'
+import type { Profile, ProfileDraft } from '../types'
+import { adopterRequiredFields, calculateProfileCompletion } from '../utils/profileCompletion'
+import { GuardianProfilePage } from './GuardianProfilePage'
 
-interface ProfilePageProps {
-  profile: Profile
-  onSave: (profile: Profile) => void
+const SAVE_ERROR_MESSAGE = 'Não foi possível salvar. Seus dados foram mantidos.'
+
+const profileFieldLabels = Object.fromEntries(
+  adopterRequiredFields.map(({ key, label }) => [key, label]),
+) as Record<keyof ProfileDraft, string>
+
+const isProfileField = (field: string): field is keyof ProfileDraft => field in profileFieldLabels
+
+const controlClass = 'min-h-[50px] px-4 py-3.5'
+const selectClass = `${controlClass} pr-[42px]`
+
+const yesNoOptions: RegisterOptions<ProfileDraft> = {
+  // As opções "Sim"/"Não" viram booleanos; a opção vazia continua '' (ainda não respondido).
+  // O valor inicial também passa por aqui, já como booleano.
+  setValueAs: (value: unknown) =>
+    typeof value === 'boolean' ? value : value === 'true' ? true : value === 'false' ? false : '',
 }
 
-export function ProfilePage({ profile, onSave }: ProfilePageProps) {
-  const [draft, setDraft] = useState<Profile>(profile)
-  const [saved, setSaved] = useState(false)
-  const update = <K extends keyof Profile>(key: K, value: Profile[K]) => { setDraft((current) => ({ ...current, [key]: value })); setSaved(false) }
-  const submit = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); onSave(draft); setSaved(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }
-  const initials = getInitials(draft.name)
+type NameOf = keyof ProfileDraft
+
+interface FormApi {
+  register: UseFormRegister<ProfileDraft>
+  errors: FieldErrors<ProfileDraft>
+}
+
+function ChoiceField({
+  form,
+  name,
+  label,
+  options,
+}: {
+  form: FormApi
+  name: NameOf
+  label: string
+  options: string[]
+}) {
+  return (
+    <Field label={label} error={form.errors[name]?.message as string | undefined} tight>
+      <Select className={selectClass} invalid={Boolean(form.errors[name])} {...form.register(name)}>
+        <option value="" disabled>
+          Selecione uma opção
+        </option>
+        {options.map((option) => (
+          <option key={option}>{option}</option>
+        ))}
+      </Select>
+    </Field>
+  )
+}
+
+function YesNoField({ form, name, label }: { form: FormApi; name: NameOf; label: string }) {
+  return (
+    <Field label={label} error={form.errors[name]?.message as string | undefined} tight>
+      <Select
+        className={selectClass}
+        invalid={Boolean(form.errors[name])}
+        {...form.register(name, yesNoOptions)}
+      >
+        <option value="" disabled>
+          Selecione uma opção
+        </option>
+        <option value="false">Não</option>
+        <option value="true">Sim</option>
+      </Select>
+    </Field>
+  )
+}
+
+function Notice({
+  tone,
+  children,
+  ...props
+}: {
+  tone: 'success' | 'warning'
+  children: ReactNode
+  role?: 'alert' | 'status'
+}) {
+  return (
+    <div
+      className={cx(
+        'mb-[18px] flex max-w-[860px] items-center gap-2 rounded-[10px] px-[15px] py-3 text-xs',
+        tone === 'success'
+          ? 'bg-forest-100 font-bold text-forest-700'
+          : 'bg-coral-pale text-[#a33f2d]',
+      )}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
+export function ProfilePage() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const returnTo = (location.state as { from?: string } | null)?.from
+  const onSaved = () => {
+    if (returnTo) navigate(returnTo, { replace: true })
+    else window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  const isGuardianAccount = getDemoProfilePath() === '/perfil?tipo=responsavel'
+
+  return isGuardianAccount ? (
+    <GuardianProfilePage onSaved={onSaved} />
+  ) : (
+    <AdopterProfilePage onSaved={onSaved} />
+  )
+}
+
+function AdopterProfilePage({ onSaved }: { onSaved: () => void }) {
+  const profileQuery = useAdopterProfile()
+
+  if (profileQuery.isPending) {
+    return <Feedback>Carregando seu perfil...</Feedback>
+  }
+
+  if (profileQuery.isError) {
+    return <Feedback error>Não foi possível carregar seu perfil. Tente novamente.</Feedback>
+  }
+
+  return <ProfileForm savedProfile={profileQuery.data} onSaved={onSaved} />
+}
+
+interface ProfileFormProps {
+  savedProfile: AdopterProfile
+  onSaved: () => void
+}
+
+function ProfileForm({ savedProfile, onSaved }: ProfileFormProps) {
+  const saveProfile = useSaveAdopterProfile()
+  // Guarda para qual versão do formulário a confirmação vale: editar qualquer campo a esconde.
+  const [savedFor, setSavedFor] = useState<unknown>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const {
+    register,
+    handleSubmit,
+    setError,
+    setValue,
+    control,
+    formState: { errors },
+  } = useForm<ProfileDraft, unknown, Profile>({
+    resolver: zodResolver(profileSchema) as unknown as Resolver<ProfileDraft, unknown, Profile>,
+    defaultValues: savedProfile.profile,
+  })
+  const draft = useWatch({ control }) as ProfileDraft
+  const form: FormApi = { register, errors }
+
+  const saved = savedFor === draft
+
+  /** Campo numérico: aceita só dígitos e respeita o limite de tamanho. */
+  const digits = <N extends 'cpf' | 'phone' | 'zipCode'>(
+    name: N,
+    max: number,
+  ): RegisterOptions<ProfileDraft, N> => ({
+    onChange: (event) =>
+      // O tipo de `name` é só um dos três campos de texto; o valor é sempre uma string.
+      setValue(name as 'cpf', event.target.value.replace(/\D/g, '').slice(0, max), {
+        shouldDirty: true,
+      }),
+  })
+
+  const submit = handleSubmit(async (profile) => {
+    if (saveProfile.isPending) return
+    setSavedFor(null)
+    setSaveError(null)
+
+    try {
+      await saveProfile.mutateAsync(profile)
+      setSavedFor(draft)
+      onSaved()
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 400) {
+        const fieldErrors = Object.entries(error.toFieldErrors()).filter(([field]) =>
+          isProfileField(field),
+        )
+        if (fieldErrors.length > 0) {
+          for (const [field, message] of fieldErrors) {
+            setError(field as NameOf, { type: 'server', message })
+          }
+          return
+        }
+      }
+      setSaveError(SAVE_ERROR_MESSAGE)
+    }
+  })
+
+  const completion = calculateProfileCompletion('adopter', draft)
+  const missingFields = completion.missingFields
+  const completionPercentage = completion.percentage
+  const savedMissingFields = savedProfile.missingFields.map((field) =>
+    isProfileField(field) ? profileFieldLabels[field] : field,
+  )
 
   return (
-    <div className="page-surface">
-      <section className="container page-section profile-page">
-        <PageIntro eyebrow="Seu espaço no AdotaPet" title="Perfil do adotante" description="Essas informações são usadas para calcular sua compatibilidade e apoiar uma adoção responsável." />
-        {saved && <div className="save-message"><Check size={18} /> Perfil atualizado. As próximas compatibilidades usarão estes dados.</div>}
-        <form className="profile-form" onSubmit={submit}>
-          <aside className="profile-aside"><span className="profile-avatar" aria-label={`Iniciais de ${draft.name}`}>{initials}</span><h2>{draft.name}</h2><p>Perfil completo</p><div className="profile-progress"><span style={{ width: '100%' }} /></div><div className="info-note"><Info size={17} /><p>Seus dados são compartilhados apenas com a organização quando você envia uma solicitação.</p></div></aside>
-          <div className="profile-fields">
-            <section><div className="form-section-heading"><span>1</span><div><h2>Moradia e composição da casa</h2><p>Conte como é o ambiente onde o pet viverá.</p></div></div><div className="form-grid"><Field label="Tipo de moradia"><select value={draft.housing} onChange={(event) => update('housing', event.target.value)}><option>Apartamento</option><option>Casa</option><option>Chácara ou sítio</option></select></Field><Field label="Área externa segura?"><select value={draft.hasOutdoorArea ? 'Sim' : 'Não'} onChange={(event) => update('hasOutdoorArea', event.target.value === 'Sim')}><option>Não</option><option>Sim</option></select></Field><Field label="Há crianças na residência?"><select value={draft.hasChildren ? 'Sim' : 'Não'} onChange={(event) => update('hasChildren', event.target.value === 'Sim')}><option>Não</option><option>Sim</option></select></Field><Field label="Já há outros pets?"><select value={draft.hasOtherPets ? 'Sim' : 'Não'} onChange={(event) => update('hasOtherPets', event.target.value === 'Sim')}><option>Não</option><option>Sim</option></select></Field></div></section>
-            <section><div className="form-section-heading"><span>2</span><div><h2>Rotina e experiência</h2><p>Isso nos ajuda a considerar energia, companhia e cuidados.</p></div></div><div className="form-grid"><Field label="Tempo disponível por dia"><select value={draft.dailyTime} onChange={(event) => update('dailyTime', event.target.value)}><option>Até 1 hora</option><option>2 a 3 horas</option><option>Mais de 3 horas</option></select></Field><Field label="Nível de atividade"><select value={draft.activityLevel} onChange={(event) => update('activityLevel', event.target.value)}><option>Tranquilo</option><option>Moderado</option><option>Ativo</option></select></Field><Field label="Experiência com animais"><select value={draft.experience} onChange={(event) => update('experience', event.target.value)}><option>Primeiro pet</option><option>Já tive pets</option><option>Tenho bastante experiência</option></select></Field><Field label="Disponibilidade para cuidados especiais?"><select value={draft.acceptsSpecialCare ? 'Sim' : 'Não'} onChange={(event) => update('acceptsSpecialCare', event.target.value === 'Sim')}><option>Não</option><option>Sim</option></select></Field></div></section>
-            <section><div className="form-section-heading"><span>3</span><div><h2>Preferências</h2><p>Preferências ajudam na busca, mas não limitam suas possibilidades.</p></div></div><div className="form-grid"><Field label="Espécie"><select value={draft.preferredSpecies} onChange={(event) => update('preferredSpecies', event.target.value)}><option>Sem preferência</option><option>Cachorro</option><option>Gato</option></select></Field><Field label="Porte"><select value={draft.preferredSize} onChange={(event) => update('preferredSize', event.target.value)}><option>Sem preferência</option><option>Pequeno</option><option>Pequeno ou médio</option><option>Médio ou grande</option></select></Field></div></section>
-            <div className="profile-submit"><p>Alterações relevantes podem mudar os resultados de compatibilidade.</p><button className="button primary" type="submit"><Save size={18} /> Salvar perfil</button></div>
+    <PageSurface>
+      <Container as="section" className="pb-[90px] pt-[35px] md:pt-[54px]">
+        <PageIntro
+          className="mb-[22px]"
+          eyebrow="Seu espaço no AdotaPet"
+          title="Perfil do adotante"
+          description="Essas informações são usadas para calcular sua compatibilidade e apoiar uma adoção responsável."
+        />
+        {saved && (
+          <Notice tone="success" role="status">
+            <Check size={18} /> Perfil atualizado. As próximas compatibilidades usarão estes dados.
+          </Notice>
+        )}
+        {saveError && (
+          <Notice tone="warning" role="alert">
+            <AlertTriangle size={18} /> {saveError}
+          </Notice>
+        )}
+        {!savedProfile.isComplete && (
+          <Notice tone="warning" role="status">
+            <AlertTriangle size={18} />
+            <div className="font-medium">
+              <strong>Seu perfil salvo está incompleto.</strong>
+              {savedMissingFields.length > 0 && <> Complete: {savedMissingFields.join(', ')}.</>}
+            </div>
+          </Notice>
+        )}
+        <form
+          className={cx(
+            cardClass,
+            'grid max-w-[990px] overflow-hidden md:grid-cols-[250px_minmax(0,1fr)]',
+          )}
+          onSubmit={submit}
+          noValidate
+        >
+          <aside className="border-b border-line bg-cream px-6 py-8 text-left md:border-b-0 md:border-r">
+            <div className="md:sticky md:top-[100px]">
+              <div>
+                <h2 className="mb-[5px] font-sans text-xl">Acompanhe seu perfil</h2>
+                <p className="mb-0 text-sm text-forest-700">
+                  Perfil {completionPercentage}% completo
+                </p>
+              </div>
+              <div
+                className="mb-[22px] mt-3 h-[5px] overflow-hidden rounded-full bg-[#dce4de]"
+                role="progressbar"
+                aria-label="Completude do perfil"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={completionPercentage}
+              >
+                <span
+                  className="block h-full bg-coral"
+                  style={{ width: `${completionPercentage}%` }}
+                />
+              </div>
+              <div className="mb-[22px]" aria-live="polite">
+                {missingFields.length > 0 ? (
+                  <>
+                    <h3 className="mb-2.5 font-sans text-sm">
+                      {missingFields.length === 1
+                        ? 'Falta 1 campo'
+                        : `Faltam ${missingFields.length} campos`}
+                    </h3>
+                    <ul className="m-0 grid list-none gap-[7px] overflow-y-auto p-0 pr-[5px] md:max-h-[calc(100vh-410px)]">
+                      {missingFields.map(({ key, label }) => (
+                        <li
+                          key={key}
+                          className="flex items-start gap-2 text-xs leading-[1.45] text-muted before:mt-1 before:size-1.5 before:shrink-0 before:rounded-full before:border before:border-coral before:content-['']"
+                        >
+                          {label}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="mb-0 text-sm font-bold text-forest-700">
+                    Todos os campos foram preenchidos.
+                  </p>
+                )}
+              </div>
+              <InfoNote large>
+                <p className="mb-0">
+                  Seus dados são compartilhados apenas com a organização quando você envia uma
+                  solicitação.
+                </p>
+              </InfoNote>
+            </div>
+          </aside>
+          <div className="px-[18px] py-[25px] md:p-8 [&>section+section]:mt-8 [&>section+section]:border-t [&>section+section]:border-line [&>section+section]:pt-7">
+            <section>
+              <SectionHeading
+                number={1}
+                title="Informações pessoais"
+                description="Dados de identificação e contato do responsável pela adoção."
+              />
+              <div className="grid grid-cols-1 gap-[18px]">
+                <Field label="Nome completo" error={errors.name?.message} tight full>
+                  <Input
+                    className={controlClass}
+                    invalid={Boolean(errors.name)}
+                    placeholder="Digite seu nome completo"
+                    autoComplete="name"
+                    {...register('name')}
+                  />
+                </Field>
+                <Field label="CPF" error={errors.cpf?.message} tight>
+                  <Input
+                    className={controlClass}
+                    invalid={Boolean(errors.cpf)}
+                    placeholder="Ex.: 52998224725"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={11}
+                    autoComplete="off"
+                    {...register('cpf', digits('cpf', 11))}
+                  />
+                </Field>
+                <Field
+                  label="Data de nascimento"
+                  error={errors.birthDate?.message}
+                  hint="É necessário ter pelo menos 18 anos."
+                  tight
+                >
+                  <Input
+                    className={controlClass}
+                    type="date"
+                    invalid={Boolean(errors.birthDate)}
+                    autoComplete="bday"
+                    {...register('birthDate')}
+                  />
+                </Field>
+                <Field label="E-mail" error={errors.email?.message} tight>
+                  <Input
+                    className={controlClass}
+                    type="email"
+                    invalid={Boolean(errors.email)}
+                    placeholder="voce@exemplo.com"
+                    autoComplete="email"
+                    {...register('email')}
+                  />
+                </Field>
+                <Field label="Telefone/celular" error={errors.phone?.message} tight>
+                  <Input
+                    className={controlClass}
+                    type="tel"
+                    invalid={Boolean(errors.phone)}
+                    placeholder="Ex.: 11999999999"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={11}
+                    autoComplete="tel"
+                    {...register('phone', digits('phone', 11))}
+                  />
+                </Field>
+                <Field label="CEP" error={errors.zipCode?.message} tight>
+                  <Input
+                    className={controlClass}
+                    invalid={Boolean(errors.zipCode)}
+                    placeholder="Ex.: 01001000"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={8}
+                    autoComplete="postal-code"
+                    {...register('zipCode', digits('zipCode', 8))}
+                  />
+                </Field>
+                <Field label="Endereço" error={errors.address?.message} tight full>
+                  <Input
+                    className={controlClass}
+                    invalid={Boolean(errors.address)}
+                    placeholder="Rua, número, bairro e cidade"
+                    autoComplete="street-address"
+                    {...register('address')}
+                  />
+                </Field>
+              </div>
+            </section>
+
+            <section>
+              <SectionHeading
+                number={2}
+                title="Moradia e composição da casa"
+                description="Conte como é o ambiente onde o pet viverá."
+              />
+              <div className="grid grid-cols-1 gap-[18px]">
+                <ChoiceField
+                  form={form}
+                  name="housing"
+                  label="Tipo de moradia"
+                  options={['Apartamento', 'Casa', 'Chácara ou sítio']}
+                />
+                <YesNoField form={form} name="hasOutdoorArea" label="Área externa segura?" />
+                <YesNoField form={form} name="hasChildren" label="Há crianças na residência?" />
+                <YesNoField form={form} name="hasOtherPets" label="Já há outros pets?" />
+              </div>
+            </section>
+
+            <section>
+              <SectionHeading
+                number={3}
+                title="Rotina e experiência"
+                description="Isso nos ajuda a considerar energia, companhia e cuidados."
+              />
+              <div className="grid grid-cols-1 gap-[18px]">
+                <ChoiceField
+                  form={form}
+                  name="dailyTime"
+                  label="Tempo disponível por dia"
+                  options={['Até 1 hora', '2 a 3 horas', 'Mais de 3 horas']}
+                />
+                <ChoiceField
+                  form={form}
+                  name="activityLevel"
+                  label="Nível de atividade"
+                  options={['Tranquilo', 'Moderado', 'Ativo']}
+                />
+                <ChoiceField
+                  form={form}
+                  name="experience"
+                  label="Experiência com animais"
+                  options={['Primeiro pet', 'Já tive pets', 'Tenho bastante experiência']}
+                />
+                <YesNoField
+                  form={form}
+                  name="acceptsSpecialCare"
+                  label="Disponibilidade para cuidados especiais?"
+                />
+              </div>
+            </section>
+
+            <section>
+              <SectionHeading
+                number={4}
+                title="Preferências"
+                description="Preferências ajudam na busca, mas não limitam suas possibilidades."
+              />
+              <div className="grid grid-cols-1 gap-[18px]">
+                <ChoiceField
+                  form={form}
+                  name="preferredSpecies"
+                  label="Espécie"
+                  options={['Sem preferência', 'Cachorro', 'Gato']}
+                />
+                <ChoiceField
+                  form={form}
+                  name="preferredSize"
+                  label="Porte"
+                  options={['Sem preferência', 'Pequeno', 'Pequeno ou médio', 'Médio ou grande']}
+                />
+              </div>
+            </section>
+
+            <div className="mt-[30px] flex flex-col items-stretch justify-between gap-5 border-t border-line pt-7 md:flex-row md:items-center">
+              <p className="mb-0 text-[10px] text-muted">
+                Alterações relevantes podem mudar os resultados de compatibilidade.
+              </p>
+              <Button type="submit" disabled={saveProfile.isPending}>
+                <Save size={18} /> {saveProfile.isPending ? 'Salvando…' : 'Salvar perfil'}
+              </Button>
+            </div>
           </div>
         </form>
-      </section>
-    </div>
+      </Container>
+    </PageSurface>
   )
 }

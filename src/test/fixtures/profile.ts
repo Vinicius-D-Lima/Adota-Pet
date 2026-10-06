@@ -1,0 +1,41 @@
+import type { Profile, ProfileDraft } from '../../types'
+
+export const emptyProfile: ProfileDraft = {
+  name: '',
+  cpf: '',
+  birthDate: '',
+  email: '',
+  phone: '',
+  zipCode: '',
+  address: '',
+  housing: '',
+  hasOutdoorArea: '',
+  dailyTime: '',
+  activityLevel: '',
+  hasChildren: '',
+  hasOtherPets: '',
+  experience: '',
+  acceptsSpecialCare: '',
+  preferredSpecies: '',
+  preferredSize: '',
+}
+
+export const validProfile: Profile = {
+  name: 'Luquinhas Ferreira',
+  cpf: '52998224725',
+  birthDate: '1990-05-10',
+  email: 'luquinhas@exemplo.com',
+  phone: '11999999999',
+  zipCode: '01001000',
+  address: 'Rua das Flores, 123, Centro, São Paulo',
+  housing: 'Apartamento',
+  hasOutdoorArea: false,
+  dailyTime: '2 a 3 horas',
+  activityLevel: 'Moderado',
+  hasChildren: false,
+  hasOtherPets: true,
+  experience: 'Já tive pets',
+  acceptsSpecialCare: true,
+  preferredSpecies: 'Sem preferência',
+  preferredSize: 'Pequeno ou médio',
+}
