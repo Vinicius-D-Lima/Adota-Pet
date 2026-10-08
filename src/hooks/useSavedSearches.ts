@@ -32,12 +32,17 @@ export function useSavedSearches() {
   const [searches, setSearches] = useState(readStorage)
 
   const saveSearch = (search: SavedSearch) => {
+    if (searches.length >= 10) {
+      return false
+    }
+
     const updatedSearches = [
       ...searches,
       search,
     ]
     writeStorage(updatedSearches)
     setSearches(updatedSearches)
+    return true
   }
 
   const deleteSearch = (id: string) => {

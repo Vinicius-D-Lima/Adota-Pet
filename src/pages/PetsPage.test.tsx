@@ -115,6 +115,26 @@ describe('PetsPage - consulta e filtros', () => {
     ])
     expect(screen.getByText('Busca salva com sucesso.')).toBeInTheDocument()
   })
+
+  it('impede salvar mais de 10 buscas', async () => {
+    localStorage.setItem(
+      'saved-searches',
+      JSON.stringify(
+        Array.from({ length: 10 }, (_, index) => ({
+          id: `search-${index}`,
+          name: `Busca ${index}`,
+          filters: {},
+          alertsEnabled: false,
+        })),
+      ),
+    )
+    setup('/pets?species=Gato')
+    await screen.findByRole('heading', { name: 'Luna' })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Salvar busca' }))
+
+    expect(screen.getByText('Você atingiu o limite de 10 buscas salvas.')).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('saved-searches') ?? '[]')).toHaveLength(10)
+  })
 })
 
 describe('PetsPage - preferências do perfil', () => {

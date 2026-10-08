@@ -197,7 +197,7 @@ export function PetsPage() {
       .filter(Boolean)
       .join(' · ')
 
-    saveSearch({
+    const wasSaved = saveSearch({
       id: crypto.randomUUID(),
       name,
       filters: {
@@ -209,7 +209,11 @@ export function PetsPage() {
       },
       alertsEnabled: false,
     })
-    setSavedSearchMessage('Busca salva com sucesso.')
+    setSavedSearchMessage(
+      wasSaved
+        ? 'Busca salva com sucesso.'
+        : 'Você atingiu o limite de 10 buscas salvas.',
+    )
   }
 
   const filterSelect = 'h-[43px] w-auto rounded-[9px] bg-white py-0 pl-3 pr-9'

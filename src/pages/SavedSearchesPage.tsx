@@ -80,6 +80,16 @@ export function SavedSearchesPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        const query = getSearchQuery(search.filters)
+                        navigate(query ? `/pets?${query}` : '/pets')
+                      }}
+                    >
+                      Aplicar
+                    </Button>
+
                     {editingId === search.id ? (
                       <Button
                         variant="secondary"
@@ -107,16 +117,6 @@ export function SavedSearchesPage() {
                         Renomear
                       </Button>
                     )}
-
-                    <Button
-                      variant="secondary"
-                      onClick={() => {
-                        const query = getSearchQuery(search.filters)
-                        navigate(query ? `/pets?${query}` : '/pets')
-                      }}
-                    >
-                      Aplicar
-                    </Button>
 
                     <Button
                       variant="text"
