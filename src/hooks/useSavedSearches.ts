@@ -46,6 +46,19 @@ export function useSavedSearches() {
     setSearches(updatedSearches)
   }
 
+  const renameSearch = (id: string, newName: string) => {
+    const updatedSearches = searches.map((search) =>
+      search.id === id
+        ? {
+            ...search,
+            name: newName,
+          }
+        : search,
+    )
+    writeStorage(updatedSearches)
+    setSearches(updatedSearches)
+  }
+
   const toggleAlert = (id: string) => {
     const updatedSearches = searches.map((search) =>
       search.id === id
@@ -63,6 +76,7 @@ export function useSavedSearches() {
     searches,
     saveSearch,
     deleteSearch,
+    renameSearch,
     toggleAlert,
   }
 }

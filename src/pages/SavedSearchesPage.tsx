@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { Container, PageIntro, PageSurface, Card, Button } from '../components/ui'
 import { useSavedSearches, type SavedSearch } from '../hooks/useSavedSearches'
 
@@ -16,10 +17,13 @@ function getSearchQuery(filters: SavedSearch['filters']) {
 
 export function SavedSearchesPage() {
   const navigate = useNavigate()
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
   const {
     searches,
     deleteSearch,
     toggleAlert,
+    renameSearch,
   } = useSavedSearches()
 
   return (
@@ -49,23 +53,20 @@ export function SavedSearchesPage() {
               <Card key={search.id} className="p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <h2 className="mb-1 text-lg font-semibold">
-                      {search.name}
-                    </h2>
+                    {editingId === search.id ? (
+                      <input
+                        value={editingName}
+                        onChange={(event) => setEditingName(event.target.value)}
+                        className="rounded border px-2 py-1"
+                      />
+                    ) : (
+                      <h2 className="mb-1 text-lg font-semibold">
+                        {search.name}
+                      </h2>
+                    )}
 
                     <p className="text-sm text-muted">
                       Alertas: {search.alertsEnabled ? 'Ativos' : 'Desativados'}
-                    </p>
-
-                    <p className="mt-2 text-xs text-muted">
-                      {[
-                        search.filters.search,
-                        search.filters.species,
-                        search.filters.sex,
-                        ...(search.filters.size ?? []),
-                      ]
-                        .filter(Boolean)
-                        .join(' • ')}
                     </p>
 
                     <Button
@@ -79,6 +80,34 @@ export function SavedSearchesPage() {
                   </div>
 
                   <div className="flex flex-col gap-2">
+                    {editingId === search.id ? (
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          const newName = editingName.trim()
+
+                          if (!newName) return
+
+                          renameSearch(search.id, newName)
+
+                          setEditingId(null)
+                          setEditingName('')
+                        }}
+                      >
+                        Salvar nome
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          setEditingId(search.id)
+                          setEditingName(search.name)
+                        }}
+                      >
+                        Renomear
+                      </Button>
+                    )}
+
                     <Button
                       variant="secondary"
                       onClick={() => {
