@@ -16,6 +16,7 @@ import {
 import { useAdopterProfile } from '../hooks/useAdopterProfile'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePets, type PetSort } from '../hooks/usePets'
+import { useSavedSearches } from '../hooks/useSavedSearches'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
 
 export const PAGE_SIZE = 4
@@ -90,6 +91,8 @@ export function PetsPage() {
   }
 
   const profileQuery = useAdopterProfile()
+  const { saveSearch } = useSavedSearches()
+  const [savedSearchMessage, setSavedSearchMessage] = useState('')
   const preferences = useMemo(() => {
     const profile = profileQuery.data?.profile
     const preferredSpecies = profile?.preferredSpecies
@@ -177,6 +180,38 @@ export function PetsPage() {
     setSearchParams({}, { replace: false })
   }
 
+  const saveCurrentSearch = () => {
+    const sortLabels = {
+      recent: 'Mais recentes',
+      name: 'Nome A–Z',
+      distance: 'Mais próximos',
+      compatibility: 'Compatibilidade',
+    }
+    const name = [
+      searchFromUrl && `Busca: ${searchFromUrl}`,
+      species,
+      ...size,
+      sex,
+      sort !== 'recent' && sortLabels[sort],
+    ]
+      .filter(Boolean)
+      .join(' · ')
+
+    saveSearch({
+      id: crypto.randomUUID(),
+      name,
+      filters: {
+        search: searchFromUrl || undefined,
+        species: species || undefined,
+        size: size.length ? size : undefined,
+        sex: sex || undefined,
+        sort: sort === 'recent' ? undefined : sort,
+      },
+      alertsEnabled: false,
+    })
+    setSavedSearchMessage('Busca salva com sucesso.')
+  }
+
   const filterSelect = 'h-[43px] w-auto rounded-[9px] bg-white py-0 pl-3 pr-9'
 
   return (
@@ -259,7 +294,17 @@ export function PetsPage() {
                 <X size={15} /> Limpar
               </Button>
             )}
+            {hasFilters && (
+              <Button variant="secondary" onClick={saveCurrentSearch}>
+                Salvar busca
+              </Button>
+            )}
           </div>
+          {savedSearchMessage && (
+            <p className="mt-2 text-xs text-forest-700" role="status">
+              {savedSearchMessage}
+            </p>
+          )}
           <div className="mt-3.5 flex flex-wrap items-center gap-3">
             <Button
               variant="secondary"

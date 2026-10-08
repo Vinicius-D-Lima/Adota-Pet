@@ -18,6 +18,7 @@ function LocationProbe() {
 let profileResponse: Record<string, unknown>
 
 beforeEach(() => {
+  localStorage.removeItem('saved-searches')
   profileResponse = { ...validProfile, isComplete: true, missingFields: [] }
   mocks.get.mockReset()
   mocks.get.mockImplementation((path, options) => {
@@ -93,6 +94,26 @@ describe('PetsPage - consulta e filtros', () => {
     expect(screen.getByRole('button', { name: 'Grande' })).toHaveAttribute('aria-pressed', 'false')
     await waitFor(() => expect(mocks.get).toHaveBeenCalled())
     expect(lastPetsCall()?.[1]).toMatchObject({ query: { size: ['Pequeno', 'Médio'] } })
+  })
+
+  it('salva os filtros ativos para consultar depois', async () => {
+    setup('/pets?species=Gato&size=Pequeno&sex=F%C3%AAmea&sort=name')
+    await screen.findByRole('heading', { name: 'Luna' })
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Salvar busca' }))
+
+    expect(JSON.parse(localStorage.getItem('saved-searches') ?? '[]')).toMatchObject([
+      {
+        name: 'Gato · Pequeno · Fêmea · Nome A–Z',
+        filters: {
+          species: 'Gato',
+          size: ['Pequeno'],
+          sex: 'Fêmea',
+          sort: 'name',
+        },
+        alertsEnabled: false,
+      },
+    ])
+    expect(screen.getByText('Busca salva com sucesso.')).toBeInTheDocument()
   })
 })
 

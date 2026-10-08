@@ -13,6 +13,10 @@ const HomePage = named(() => import('./pages/HomePage'), 'HomePage')
 const PetsPage = named(() => import('./pages/PetsPage'), 'PetsPage')
 const PetDetailPage = named(() => import('./pages/PetDetailPage'), 'PetDetailPage')
 const FavoritesPage = named(() => import('./pages/FavoritesPage'), 'FavoritesPage')
+const SavedSearchesPage = named(
+  () => import('./pages/SavedSearchesPage'),
+  'SavedSearchesPage',
+)
 const CompatibilityPage = named(() => import('./pages/CompatibilityPage'), 'CompatibilityPage')
 const QuestionnairePage = named(() => import('./pages/QuestionnairePage'), 'QuestionnairePage')
 const RequestsPage = named(() => import('./pages/RequestsPage'), 'RequestsPage')
@@ -93,6 +97,10 @@ export default function App() {
                   <FavoritesPage />
                 </AccountTypeRoute>
               }
+            />
+            <Route
+              path="/minhas-buscas"
+              element={<SavedSearchesPage />}
             />
             <Route
               path="/pets/:petId/compatibilidade"
