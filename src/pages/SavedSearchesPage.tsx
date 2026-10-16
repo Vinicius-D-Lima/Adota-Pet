@@ -19,12 +19,7 @@ export function SavedSearchesPage() {
   const navigate = useNavigate()
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
-  const {
-    searches,
-    deleteSearch,
-    toggleAlert,
-    renameSearch,
-  } = useSavedSearches()
+  const { searches, deleteSearch, toggleAlert, renameSearch } = useSavedSearches()
 
   return (
     <PageSurface>
@@ -37,14 +32,10 @@ export function SavedSearchesPage() {
 
         {searches.length === 0 ? (
           <Card className="p-6 text-center">
-            <p className="mb-4">
-              Você ainda não possui buscas salvas.
-            </p>
+            <p className="mb-4">Você ainda não possui buscas salvas.</p>
 
             <Link to="/pets">
-              <Button>
-                Encontrar pets
-              </Button>
+              <Button>Encontrar pets</Button>
             </Link>
           </Card>
         ) : (
@@ -60,22 +51,15 @@ export function SavedSearchesPage() {
                         className="rounded border px-2 py-1"
                       />
                     ) : (
-                      <h2 className="mb-1 text-lg font-semibold">
-                        {search.name}
-                      </h2>
+                      <h2 className="mb-1 text-lg font-semibold">{search.name}</h2>
                     )}
 
                     <p className="text-sm text-muted">
                       Alertas: {search.alertsEnabled ? 'Ativos' : 'Desativados'}
                     </p>
 
-                    <Button
-                      variant="secondary"
-                      onClick={() => toggleAlert(search.id)}
-                    >
-                      {search.alertsEnabled
-                        ? 'Desativar alerta'
-                        : 'Ativar alerta'}
+                    <Button variant="secondary" onClick={() => toggleAlert(search.id)}>
+                      {search.alertsEnabled ? 'Desativar alerta' : 'Ativar alerta'}
                     </Button>
                   </div>
 
@@ -118,10 +102,7 @@ export function SavedSearchesPage() {
                       </Button>
                     )}
 
-                    <Button
-                      variant="text"
-                      onClick={() => deleteSearch(search.id)}
-                    >
+                    <Button variant="text" onClick={() => deleteSearch(search.id)}>
                       Excluir
                     </Button>
                   </div>

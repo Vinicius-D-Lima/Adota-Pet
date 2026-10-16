@@ -16,16 +16,11 @@ export interface SavedSearch {
 }
 
 function readStorage(): SavedSearch[] {
-  return JSON.parse(
-    localStorage.getItem(STORAGE_KEY) ?? '[]',
-  )
+  return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
 }
 
 function writeStorage(searches: SavedSearch[]) {
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(searches),
-  )
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(searches))
 }
 
 export function useSavedSearches() {
@@ -36,10 +31,7 @@ export function useSavedSearches() {
       return false
     }
 
-    const updatedSearches = [
-      ...searches,
-      search,
-    ]
+    const updatedSearches = [...searches, search]
     writeStorage(updatedSearches)
     setSearches(updatedSearches)
     return true

@@ -210,9 +210,7 @@ export function PetsPage() {
       alertsEnabled: false,
     })
     setSavedSearchMessage(
-      wasSaved
-        ? 'Busca salva com sucesso.'
-        : 'Você atingiu o limite de 10 buscas salvas.',
+      wasSaved ? 'Busca salva com sucesso.' : 'Você atingiu o limite de 10 buscas salvas.',
     )
   }
 
