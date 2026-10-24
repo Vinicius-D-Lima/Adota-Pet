@@ -68,11 +68,11 @@ Comparação entre o [Plano de Projeto](plano-de-projeto.md) (versão 1.0, de 01
 - **Por quê (justificativa inferida; a regra veio do mock, e o motivo não está registrado no repositório):** uma adoção já aprovada é um acordo com a organização, e cancelá-la com um clique pertence à futura máquina de estados da solicitação (issues #20 a #22). A equipe deve confirmar se é essa a intenção.
 - **Pendência:** se a equipe quiser seguir o texto do REQ-18 ao pé da letra, a mudança é pequena (`CANCELLABLE_STATUSES` em `src/utils/requestStatus.ts` e a regra equivalente em `mock-server/server.js`). Fica como **decisão da equipe**; ver [Pendências](#5-pendências-em-relação-ao-plano).
 
-### 4. `Aprovada` e `Recusada` existem, mas só pelo seed
+### 4. Decisão da instituição sem as etapas do processo
 
 - **Plano:** a lista mostra os cinco status.
-- **Entregue:** a interface mostra os cinco. Como não há rota nem área da organização para decidir uma solicitação (fora do escopo), o mock só **cria** `Enviada` e **cancela**. Para a demonstração, o seed traz uma solicitação de cada status (`SOL-1039` a `SOL-1042`).
-- **Por quê:** o plano exclui "aprovação real de adoções" e o "painel administrativo para organizações".
+- **Entregue:** a interface mostra os cinco status, e a área da instituição (PR #86) permite **Iniciar análise**, **Aprovar** e **Recusar** (`Enviada` → `Em análise` ou `Recusada`; `Em análise` → `Aprovada` ou `Recusada`). O seed ainda traz uma solicitação de cada status (`SOL-1039` a `SOL-1042`) para a demonstração inicial.
+- **Por quê:** o plano exclui "aprovação real de adoções" e o "painel administrativo para organizações", então isto é **além** do escopo do plano. Continuam fora as etapas de entrevista e visita, o motivo obrigatório da recusa e a diferença entre administrador e voluntário (issues #20, #21, #28 e #35).
 
 ### 5. Acessibilidade parcial (#57 revertida)
 

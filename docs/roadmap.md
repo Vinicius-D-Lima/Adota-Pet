@@ -36,7 +36,7 @@ A lista completa está em [Escopo prometido x entregue](escopo-prometido-vs-entr
 ## Limitações conhecidas
 
 - **Usuário único e sem autenticação:** tudo fala do usuário `demo`.
-- **Estados da solicitação:** `Aprovada` e `Recusada` existem no contrato e na interface, mas o mock não leva uma solicitação até eles; só o seed traz exemplos.
+- **Estados da solicitação:** a instituição já pode iniciar a análise, aprovar e recusar (PR #86), mas sem etapas de entrevista e visita, sem motivo obrigatório da recusa e sem diferença entre administrador e voluntário.
 - **Distância:** calculada a partir de coordenadas fixas, sem geolocalização do navegador.
 - **Imagens:** os pets usam URLs externas; não há upload.
 - **Compatibilidade:** calculada no cliente, com critérios de peso igual e sem ajuste de pesos.
@@ -45,23 +45,33 @@ A lista completa está em [Escopo prometido x entregue](escopo-prometido-vs-entr
 
 ## Fase 2: backend
 
-Já existem issues de backend e de frontend separadas, cada uma com critérios de aceite. Ordem sugerida:
+### Decisões da fase
 
-| Ordem | Issues                   | Tema                                                                                                  |
-| ----- | ------------------------ | ----------------------------------------------------------------------------------------------------- |
-| 1     | #3                       | Migrar o projeto para monorepo (preparação para o backend)                                            |
-| 2     | #9                       | Imagem Docker de banco de dados para persistência real                                                |
-| 3     | #47                      | Padrões transversais da API (framework, ORM, erros, validação, docs, logs, testes)                    |
-| 4     | #48                      | Usuários e autenticação (cadastro, login e JWT)                                                       |
-| 5     | #4 e #5                  | Autenticação no React (login, cadastro e sessão) e middleware de rotas                                |
-| 6     | #49, #50, #51 e #18      | Pets, solicitações, favoritos e perfil do adotante na API                                             |
-| 7     | #27, #28, #41 e #60      | Organizações, papéis e permissões, e a área da organização                                            |
-| 8     | #19 e #33                | Serviço de matching e as recomendações "Para você"                                                    |
-| 9     | #20, #21, #22, #34 a #36 | Máquina de estados da solicitação, entrevista e visita, chat, e as telas do adotante e do responsável |
-| 10    | #29 e #42                | Prontuário médico do pet                                                                              |
-| 11    | #23, #24, #37 e #38      | Adoção e acompanhamento pós-adoção                                                                    |
-| 12    | #30, #31, #43 e #44      | Notificações, filtros salvos e alertas                                                                |
-| 13    | #25, #26, #39 e #40      | Avaliações, reputação, denúncias e moderação                                                          |
+Registradas em [Decisões técnicas](decisoes.md#19-backend-em-express-não-em-nestjs): **Express**, **PostgreSQL** com **Prisma** e migrations, **JWT** curto com refresh rotacionado em cookie httpOnly, **CASL**, arquivos pela **API do S3** com **SeaweedFS**, jobs com **pg-boss**, **monorepo** com npm workspaces, testes com **Vitest e supertest** e **Docker** para o projeto inteiro com Hadolint e Trivy. O [catálogo de testes](testes/README.md) tem 238 testes (112 de segurança), cada um com ID.
+
+> Os documentos de gerência ainda citam MongoDB. Essa divergência está registrada na decisão 20, e a atualização deles cabe à equipe de gerência.
+
+### Ordem das issues
+
+A ordem respeita as dependências declaradas em cada issue. Issues da mesma linha podem andar em paralelo.
+
+| Ordem | Épico | Issues                                       | Tema                                                                                     |
+| ----- | ----- | -------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| 1     | #93   | #3                                           | Monorepo com npm workspaces                                                              |
+| 2     | #93   | #9 e #97                                     | Banco PostgreSQL no Docker; pipeline de segurança no CI (já pode começar)                |
+| 3     | #93   | #96                                          | Docker do projeto inteiro (web, mock e banco agora; a API depois da #47)                 |
+| 4     | #45   | #47, #94 e #95                               | Padrões da API (Express e Prisma), armazenamento S3 (SeaweedFS) e fila de jobs (pg-boss) |
+| 5     | #45   | #48, #4 e #5                                 | Autenticação no backend, no frontend e proteção de rotas                                 |
+| 6     | #15   | #27, #28 e #41                               | Organizações, permissões (CASL) e área da organização                                    |
+| 7     | #11   | #18                                          | Perfil do adotante na API                                                                |
+| 8     | #45   | #49, #51, #50 e #60                          | Pets, favoritos e solicitações na API; cadastro de pets na área da organização           |
+| 9     | #11   | #19 e #33                                    | Serviço de matching e recomendações "Para você"                                          |
+| 10    | #12   | #20, depois #21 e #22, depois #34, #35 e #36 | Máquina de estados, agendamento, chat e as telas do adotante e do responsável            |
+| 11    | #16   | #29 e #42                                    | Prontuário médico do pet                                                                 |
+| 12    | #17   | #30, depois #31, depois #43 e #44            | Notificações, filtros salvos e alertas                                                   |
+| 13    | #13   | #23, depois #24, depois #37 e #38            | Adoção e acompanhamento pós-adoção                                                       |
+| 14    | #14   | #25, depois #26, depois #39 e #40            | Avaliações, reputação, denúncias e moderação                                             |
+| 15    | #93   | #98                                          | Testes de segurança dinâmicos noturnos (quando a API tiver a OpenAPI estável)            |
 
 ### Como trocar o mock pelo backend
 
@@ -77,6 +87,6 @@ O frontend só conhece a URL base e o contrato.
 
 1. Decidir sobre a acessibilidade (#57) e, se for o caso, refazer o PR.
 2. Validar a `dev` completa (`npm ci`, lint, formatação, tipos, testes, build e um teste no navegador com o mock).
-3. Abrir o PR `dev` → `main`, para que as issues com "Closes" fechem sozinhas e a `main` receba tudo.
+3. Manter a `main` em dia com a `dev` por PR, para a `main` receber o que já foi validado.
 4. Limpar as branches já mescladas.
-5. Escolher entre adaptar a #33 (ainda frontend) ou iniciar a fase do backend (#3, #9 e #47).
+5. Iniciar a fase do backend pela #3 (monorepo) e, em paralelo, pela #97 (pipeline de segurança), que já vale para o mock e o frontend.
