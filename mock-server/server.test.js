@@ -506,6 +506,113 @@ describe('favoritos', () => {
   })
 })
 
+describe('notificações', () => {
+  const organization = { 'X-Demo-User-Id': 'demo-organization' }
+
+  it('lista somente notificações da conta, com unreadCount e filtro de não lidas', async () => {
+    const all = await request(app).get('/me/notifications')
+    expect(all.status).toBe(200)
+    expect(all.body.data).toHaveLength(3)
+    expect(all.body.unreadCount).toBe(2)
+    expect(all.body.data[0]).toMatchObject({
+      id: 'NOT-1003',
+      type: 'MessageReceived',
+      readAt: null,
+    })
+    expect(all.body.data[0]).not.toHaveProperty('userId')
+
+    const unread = await request(app).get('/me/notifications').query({ unread: true })
+    expect(unread.body.data).toHaveLength(2)
+    expect(unread.body.data.every((notification) => notification.readAt === null)).toBe(true)
+    expect(unread.body.unreadCount).toBe(2)
+  })
+
+  it('pagina com cursor e rejeita parâmetros inválidos', async () => {
+    const db = seed()
+    db.notifications = Array.from({ length: 7 }, (_, index) => ({
+      id: `NOT-${index}`,
+      userId: 'demo',
+      type: 'MessageReceived',
+      title: `Notificação ${index}`,
+      body: 'Mensagem de teste.',
+      link: '/solicitacoes',
+      readAt: null,
+      createdAt: new Date(Date.UTC(2026, 9, 25, 0, index)).toISOString(),
+    }))
+    const pagedApp = createApp({ db, delay: 0 })
+    const first = await request(pagedApp).get('/me/notifications')
+    expect(first.body.data).toHaveLength(5)
+    expect(first.body.nextCursor).toBe(first.body.data[4].id)
+
+    const second = await request(pagedApp)
+      .get('/me/notifications')
+      .query({ cursor: first.body.nextCursor })
+    expect(second.body.data).toHaveLength(2)
+    expect(second.body.nextCursor).toBeNull()
+
+    expectError(
+      await request(app).get('/me/notifications').query({ unread: 'yes' }),
+      400,
+      'Bad Request',
+    )
+    expectError(
+      await request(app).get('/me/notifications').query({ cursor: 'not-found' }),
+      400,
+      'Bad Request',
+    )
+  })
+
+  it('marca uma ou todas como lidas sem acessar notificações de outra conta', async () => {
+    expectError(await request(app).patch('/me/notifications/NOT-2001/read'), 404, 'Not Found')
+
+    expect((await request(app).patch('/me/notifications/NOT-1003/read')).status).toBe(204)
+    let list = await request(app).get('/me/notifications')
+    expect(list.body.unreadCount).toBe(1)
+    expect(list.body.data.find(({ id }) => id === 'NOT-1003').readAt).toEqual(expect.any(String))
+
+    expect((await request(app).patch('/me/notifications/read-all')).status).toBe(204)
+    list = await request(app).get('/me/notifications')
+    expect(list.body.unreadCount).toBe(0)
+    expect((await request(app).get('/me/notifications').set(organization)).body.unreadCount).toBe(1)
+  })
+
+  it('carrega preferências padrão e persiste a lista atualizada por usuário', async () => {
+    const initial = await request(app).get('/me/notification-preferences')
+    expect(initial.status).toBe(200)
+    expect(initial.body.data).toHaveLength(9)
+    expect(initial.body.data.find(({ type }) => type === 'MessageReceived')).toMatchObject({
+      inApp: true,
+      email: false,
+    })
+
+    const preferences = initial.body.data.map((preference) =>
+      preference.type === 'MessageReceived' ? { ...preference, email: true } : preference,
+    )
+    const updated = await request(app)
+      .put('/me/notification-preferences')
+      .send({ data: preferences })
+    expect(updated.body.data.find(({ type }) => type === 'MessageReceived').email).toBe(true)
+    expect(
+      (await request(app).get('/me/notification-preferences')).body.data.find(
+        ({ type }) => type === 'MessageReceived',
+      ).email,
+    ).toBe(true)
+    expect(
+      (await request(app).get('/me/notification-preferences').set(organization)).body.data.find(
+        ({ type }) => type === 'MessageReceived',
+      ).email,
+    ).toBe(false)
+  })
+
+  it('rejeita lista de preferências incompleta', async () => {
+    expectError(
+      await request(app).put('/me/notification-preferences').send({ data: [] }),
+      400,
+      'Bad Request',
+    )
+  })
+})
+
 describe('área da instituição', () => {
   const guardian = { 'X-Demo-User-Id': 'demo-organization' }
   const petPayload = {

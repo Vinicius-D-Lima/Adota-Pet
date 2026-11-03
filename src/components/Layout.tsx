@@ -9,6 +9,7 @@ import { useReceivedRequests } from '../hooks/useOrganization'
 import { getInitials } from '../utils/getInitials'
 import { isActiveRequest } from '../utils/requestStatus'
 import { FavoriteNotice } from './FavoriteNotice'
+import { NotificationBell } from './NotificationBell'
 import { Container, cx } from './ui'
 
 interface LayoutProps {
@@ -163,6 +164,8 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
               </button>
             )}
           </nav>
+
+          {account.isAuthenticated && <NotificationBell enabled />}
 
           {account.isAuthenticated ? (
             <div className="relative hidden md:block" ref={accountMenuRef}>

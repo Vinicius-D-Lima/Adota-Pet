@@ -433,5 +433,48 @@
       "message": "A organização recebeu sua solicitação e está revisando seu perfil.",
       "userId": "demo"
     }
-  ]
+  ],
+  "notifications": [
+    {
+      "id": "NOT-1003",
+      "userId": "demo",
+      "type": "MessageReceived",
+      "title": "Nova mensagem sobre Mimi",
+      "body": "A organização enviou uma mensagem sobre sua solicitação.",
+      "link": "/solicitacoes",
+      "readAt": null,
+      "createdAt": "2026-10-25T14:30:00.000Z"
+    },
+    {
+      "id": "NOT-1002",
+      "userId": "demo",
+      "type": "RequestStatusChanged",
+      "title": "Sua solicitação foi atualizada",
+      "body": "A solicitação de adoção de Mimi está em análise.",
+      "link": "/solicitacoes",
+      "readAt": null,
+      "createdAt": "2026-10-24T11:00:00.000Z"
+    },
+    {
+      "id": "NOT-1001",
+      "userId": "demo",
+      "type": "CheckInDue",
+      "title": "Acompanhe uma adoção",
+      "body": "Há um novo acompanhamento disponível para você.",
+      "link": "/solicitacoes",
+      "readAt": "2026-10-20T08:30:00.000Z",
+      "createdAt": "2026-10-20T08:00:00.000Z"
+    },
+    {
+      "id": "NOT-2001",
+      "userId": "demo-organization",
+      "type": "NewRequestForOrganization",
+      "title": "Nova solicitação recebida",
+      "body": "Uma pessoa enviou uma solicitação para um pet da organização.",
+      "link": "/organizacao/solicitacoes",
+      "readAt": null,
+      "createdAt": "2026-10-25T09:00:00.000Z"
+    }
+  ],
+  "notificationPreferences": []
 }

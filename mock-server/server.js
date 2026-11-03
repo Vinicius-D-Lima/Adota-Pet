@@ -13,6 +13,23 @@ const MAX_LIMIT = 100
 const ACTIVE_STATUSES = ['Enviada', 'Em análise', 'Aprovada']
 const CANCELLABLE_STATUSES = ['Enviada', 'Em análise']
 const SORTS = ['recent', 'name', 'distance']
+const NOTIFICATION_TYPES = [
+  'RequestStatusChanged',
+  'AppointmentProposed',
+  'AppointmentConfirmed',
+  'MessageReceived',
+  'CheckInDue',
+  'CheckInOverdue',
+  'CheckInReviewed',
+  'NewRequestForOrganization',
+  'NewMatchingPet',
+]
+const DEFAULT_EMAIL_NOTIFICATION_TYPES = [
+  'RequestStatusChanged',
+  'AppointmentConfirmed',
+  'CheckInOverdue',
+  'NewRequestForOrganization',
+]
 const PETS_QUERY_PARAMS = ['search', 'page', 'limit', 'sort', 'species', 'size', 'sex', 'city']
 const PROFILE_ENUMS = {
   housing: ['Apartamento', 'Casa', 'Chácara ou sítio'],
@@ -251,6 +268,9 @@ export function createApp({
   const server = jsonServer.create()
   const router = jsonServer.router(db)
   const store = router.db
+  if (!Array.isArray(store.get('notifications').value())) store.set('notifications', []).write()
+  if (!Array.isArray(store.get('notificationPreferences').value()))
+    store.set('notificationPreferences', []).write()
 
   const currentUserId = (req) => {
     const requested = req.get('X-Demo-User-Id')
@@ -873,6 +893,139 @@ export function createApp({
       .remove({ userId: currentUserId(req), petId: req.params.petId })
       .write()
     res.status(204).end()
+  })
+
+  // --- Notificações (API simulada) ----------------------------------------------
+  const myNotifications = (userId) =>
+    store
+      .get('notifications')
+      .filter({ userId })
+      .value()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+
+  const myNotificationPreferences = (userId) => {
+    const saved = store.get('notificationPreferences').filter({ userId }).value()
+    if (saved.length) return saved
+
+    const defaults = NOTIFICATION_TYPES.map((type) => ({
+      userId,
+      type,
+      inApp: true,
+      email: DEFAULT_EMAIL_NOTIFICATION_TYPES.includes(type),
+    }))
+    store
+      .get('notificationPreferences')
+      .push(...defaults)
+      .write()
+    return defaults
+  }
+
+  server.get('/me/notifications', (req, res) => {
+    const userId = currentUserId(req)
+    const unreadParam = req.query.unread
+    if (unreadParam !== undefined && !['true', 'false'].includes(unreadParam)) {
+      return sendError(res, 400, 'Parâmetro unread inválido', [
+        { field: 'unread', message: 'Use true ou false.' },
+      ])
+    }
+
+    const all = myNotifications(userId)
+    const unreadCount = all.filter((notification) => !notification.readAt).length
+    const matching =
+      unreadParam === 'true' ? all.filter((notification) => !notification.readAt) : all
+    const cursor = req.query.cursor
+    const cursorIndex =
+      cursor === undefined ? -1 : matching.findIndex((notification) => notification.id === cursor)
+    if (cursor !== undefined && cursorIndex < 0) {
+      return sendError(res, 400, 'Cursor inválido', [
+        { field: 'cursor', message: 'O cursor não pertence a esta lista.' },
+      ])
+    }
+
+    const page = matching.slice(cursorIndex + 1, cursorIndex + 1 + 5)
+    const hasMore = cursorIndex + 1 + page.length < matching.length
+    res.json({
+      data: page.map(({ userId: _userId, ...notification }) => notification),
+      unreadCount,
+      nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    })
+  })
+
+  server.patch('/me/notifications/read-all', (req, res) => {
+    const userId = currentUserId(req)
+    const readAt = new Date().toISOString()
+    store
+      .get('notifications')
+      .filter({ userId })
+      .each((notification) => {
+        if (!notification.readAt) notification.readAt = readAt
+      })
+      .write()
+    res.status(204).end()
+  })
+
+  server.patch('/me/notifications/:id/read', (req, res) => {
+    const userId = currentUserId(req)
+    const notification = store.get('notifications').find({ id: req.params.id, userId }).value()
+    if (!notification) return sendError(res, 404, 'Notificação não encontrada')
+
+    store
+      .get('notifications')
+      .find({ id: notification.id, userId })
+      .assign({ readAt: notification.readAt ?? new Date().toISOString() })
+      .write()
+    res.status(204).end()
+  })
+
+  server.get('/me/notification-preferences', (req, res) => {
+    const preferences = myNotificationPreferences(currentUserId(req)).map(
+      ({ userId: _userId, ...preference }) => preference,
+    )
+    res.json({ data: preferences })
+  })
+
+  server.put('/me/notification-preferences', (req, res) => {
+    const body = req.body?.data
+    if (!Array.isArray(body)) {
+      return sendError(res, 400, 'Corpo da requisição inválido', [
+        { field: 'data', message: 'Envie a lista completa de preferências.' },
+      ])
+    }
+
+    const details = []
+    const seen = new Set()
+    for (const [index, preference] of body.entries()) {
+      if (
+        !preference ||
+        !NOTIFICATION_TYPES.includes(preference.type) ||
+        typeof preference.inApp !== 'boolean' ||
+        typeof preference.email !== 'boolean' ||
+        seen.has(preference.type)
+      ) {
+        details.push({
+          field: `data.${index}`,
+          message: 'Informe um tipo válido e os canais inApp/email sem duplicar tipos.',
+        })
+      } else {
+        seen.add(preference.type)
+      }
+    }
+    if (seen.size !== NOTIFICATION_TYPES.length) {
+      details.push({
+        field: 'data',
+        message: 'Inclua exatamente uma preferência para cada tipo de notificação.',
+      })
+    }
+    if (details.length) return sendError(res, 400, 'Validação falhou', details)
+
+    const userId = currentUserId(req)
+    const stored = body.map((preference) => ({ ...preference, userId }))
+    store.get('notificationPreferences').remove({ userId }).write()
+    store
+      .get('notificationPreferences')
+      .push(...stored)
+      .write()
+    res.json({ data: body })
   })
 
   // --- Respostas do json-server no formato do contrato --------------------------
