@@ -100,7 +100,14 @@ export default function App() {
                 </AccountTypeRoute>
               }
             />
-            <Route path="/minhas-buscas" element={<SavedSearchesPage />} />
+            <Route
+              path="/minhas-buscas"
+              element={
+                <AccountTypeRoute type="adopter">
+                  <SavedSearchesPage />
+                </AccountTypeRoute>
+              }
+            />
             <Route
               path="/pets/:petId/compatibilidade"
               element={

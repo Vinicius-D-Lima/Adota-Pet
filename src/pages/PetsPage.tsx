@@ -1,6 +1,7 @@
 import { Search, SlidersHorizontal, Sparkles, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
 import { PetGrid } from '../components/PetGrid'
 import {
@@ -17,6 +18,7 @@ import { useAdopterProfile } from '../hooks/useAdopterProfile'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { usePets, type PetSort } from '../hooks/usePets'
 import { useSavedSearches } from '../hooks/useSavedSearches'
+import { ApiError } from '../lib/ApiError'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
 
 export const PAGE_SIZE = 4
@@ -37,9 +39,14 @@ const sizesByPreference: Record<string, PetSize[]> = {
   'Médio ou grande': ['Médio', 'Grande'],
 }
 
-const readParam = (params: URLSearchParams, key: keyof typeof allowed) => {
+type AllowedFilter<Key extends keyof typeof allowed> = (typeof allowed)[Key][number]
+
+const readParam = <Key extends keyof typeof allowed>(
+  params: URLSearchParams,
+  key: Key,
+): AllowedFilter<Key> | '' => {
   const value = params.get(key) ?? ''
-  return (allowed[key] as readonly string[]).includes(value) ? value : ''
+  return (allowed[key] as readonly string[]).includes(value) ? (value as AllowedFilter<Key>) : ''
 }
 
 export function PetsPage() {
@@ -93,6 +100,12 @@ export function PetsPage() {
   const profileQuery = useAdopterProfile()
   const { saveSearch } = useSavedSearches()
   const [savedSearchMessage, setSavedSearchMessage] = useState('')
+  const [savedSearchError, setSavedSearchError] = useState(false)
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+  const [saveSearchName, setSaveSearchName] = useState('')
+  const [saveSearchNameError, setSaveSearchNameError] = useState('')
+  const saveNameInputRef = useRef<HTMLInputElement>(null)
+  const [savingSearch, setSavingSearch] = useState(false)
   const preferences = useMemo(() => {
     const profile = profileQuery.data?.profile
     const preferredSpecies = profile?.preferredSpecies
@@ -174,44 +187,49 @@ export function PetsPage() {
       : petsQuery.hasNextPage
   const total = petsQuery.data?.pages[0]?.total ?? 0
   const hasFilters = Boolean(searchFromUrl || species || size.length || sex || sort !== 'recent')
+  const hasSearchCriteria = Boolean(searchFromUrl.trim() || species || size.length || sex)
 
   const clearFilters = () => {
     setSearchState({ source: searchFromUrl, value: '' })
     setSearchParams({}, { replace: false })
   }
 
-  const saveCurrentSearch = () => {
-    const sortLabels = {
-      recent: 'Mais recentes',
-      name: 'Nome A–Z',
-      distance: 'Mais próximos',
-      compatibility: 'Compatibilidade',
-    }
-    const name = [
-      searchFromUrl && `Busca: ${searchFromUrl}`,
-      species,
-      ...size,
-      sex,
-      sort !== 'recent' && sortLabels[sort],
-    ]
-      .filter(Boolean)
-      .join(' · ')
+  const suggestedSearchName = [searchFromUrl && `Busca: ${searchFromUrl}`, species, ...size, sex]
+    .filter(Boolean)
+    .join(' · ')
 
-    const wasSaved = saveSearch({
-      id: crypto.randomUUID(),
-      name,
-      filters: {
-        search: searchFromUrl || undefined,
-        species: species || undefined,
-        size: size.length ? size : undefined,
-        sex: sex || undefined,
-        sort: sort === 'recent' ? undefined : sort,
-      },
-      alertsEnabled: false,
-    })
-    setSavedSearchMessage(
-      wasSaved ? 'Busca salva com sucesso.' : 'Você atingiu o limite de 10 buscas salvas.',
-    )
+  const saveCurrentSearch = async () => {
+    if (savingSearch) return
+    const name = saveSearchName.trim()
+    if (!name) {
+      setSaveSearchNameError('Informe um nome para a busca.')
+      return
+    }
+
+    setSavingSearch(true)
+    try {
+      await saveSearch({
+        name,
+        criteria: {
+          search: searchFromUrl || undefined,
+          species: species || undefined,
+          size: size.length ? size : undefined,
+          sex: sex || undefined,
+        },
+      })
+      setSavedSearchError(false)
+      setSavedSearchMessage('Busca salva com sucesso.')
+      setSaveDialogOpen(false)
+    } catch (error) {
+      setSavedSearchError(true)
+      setSavedSearchMessage(
+        error instanceof ApiError && error.statusCode === 409
+          ? 'Você atingiu o limite de 10 buscas salvas. Remova uma busca antes de salvar outra.'
+          : `Não foi possível salvar a busca. ${error instanceof Error ? error.message : 'Tente novamente.'}`,
+      )
+    } finally {
+      setSavingSearch(false)
+    }
   }
 
   const filterSelect = 'h-[43px] w-auto rounded-[9px] bg-white py-0 pl-3 pr-9'
@@ -296,14 +314,25 @@ export function PetsPage() {
                 <X size={15} /> Limpar
               </Button>
             )}
-            {hasFilters && (
-              <Button variant="secondary" onClick={saveCurrentSearch}>
+            {hasSearchCriteria && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSaveSearchName(suggestedSearchName)
+                  setSaveSearchNameError('')
+                  setSavedSearchMessage('')
+                  setSaveDialogOpen(true)
+                }}
+              >
                 Salvar busca
               </Button>
             )}
           </div>
           {savedSearchMessage && (
-            <p className="mt-2 text-xs text-forest-700" role="status">
+            <p
+              className={`mt-2 text-xs ${savedSearchError ? 'text-[#a33f2d]' : 'text-forest-700'}`}
+              role={savedSearchError ? 'alert' : 'status'}
+            >
               {savedSearchMessage}
             </p>
           )}
@@ -325,6 +354,46 @@ export function PetsPage() {
             </small>
           </div>
         </div>
+        {saveDialogOpen && (
+          <ConfirmDialog
+            title="Salvar busca"
+            description="Dê um nome para encontrar esta busca depois em “Buscas salvas”."
+            confirmLabel="Salvar busca"
+            confirmVariant="primary"
+            cancelLabel="Cancelar"
+            busy={savingSearch}
+            initialFocusRef={saveNameInputRef}
+            onClose={() => setSaveDialogOpen(false)}
+            onConfirm={() => void saveCurrentSearch()}
+          >
+            <label htmlFor="saved-search-name" className="mt-5 block text-sm font-semibold">
+              Nome da busca
+            </label>
+            <input
+              id="saved-search-name"
+              ref={saveNameInputRef}
+              value={saveSearchName}
+              maxLength={80}
+              onChange={(event) => {
+                setSaveSearchName(event.target.value)
+                setSaveSearchNameError('')
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  void saveCurrentSearch()
+                }
+              }}
+              aria-invalid={Boolean(saveSearchNameError)}
+              className="mt-1 w-full rounded-lg border border-line px-3 py-2"
+            />
+            {saveSearchNameError && (
+              <p className="mt-1 text-sm text-[#a33f2d]" role="alert">
+                {saveSearchNameError}
+              </p>
+            )}
+          </ConfirmDialog>
+        )}
         <div className="mb-[18px] mt-7 flex items-center justify-between text-[13px] text-muted">
           <p className="mb-0 text-ink">
             <strong>{total}</strong> {total === 1 ? 'pet encontrado' : 'pets encontrados'}

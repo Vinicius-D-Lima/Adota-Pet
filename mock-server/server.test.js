@@ -613,6 +613,91 @@ describe('notificações', () => {
   })
 })
 
+describe('filtros salvos', () => {
+  const filter = {
+    name: 'Gatos pequenos',
+    criteria: { species: 'Gato', size: ['Pequeno'] },
+    active: false,
+  }
+  const organization = { 'X-Demo-User-Id': 'demo-organization' }
+
+  it('cria, lista, atualiza e exclui buscas isoladas por usuário', async () => {
+    const created = await request(app).post('/me/saved-filters').send(filter)
+    expect(created.status).toBe(201)
+    expect(created.body).toMatchObject({
+      id: expect.any(String),
+      name: filter.name,
+      criteria: filter.criteria,
+      active: false,
+      createdAt: expect.any(String),
+    })
+    expect(created.body).not.toHaveProperty('userId')
+
+    const ownList = await request(app).get('/me/saved-filters')
+    expect(ownList.body).toMatchObject({ total: 1, data: [created.body] })
+    expect((await request(app).get('/me/saved-filters').set(organization)).body.total).toBe(0)
+
+    const updated = await request(app)
+      .patch(`/me/saved-filters/${created.body.id}`)
+      .send({ name: 'Gatos pequenos em alerta', active: true })
+    expect(updated.body).toMatchObject({
+      name: 'Gatos pequenos em alerta',
+      active: true,
+      criteria: filter.criteria,
+    })
+    expect((await request(app).delete(`/me/saved-filters/${created.body.id}`)).status).toBe(204)
+    expect((await request(app).get('/me/saved-filters')).body.total).toBe(0)
+  })
+
+  it('rejeita critérios desconhecidos e valores fora dos enums', async () => {
+    const unknown = await request(app)
+      .post('/me/saved-filters')
+      .send({ ...filter, criteria: { ...filter.criteria, cityName: 'São Paulo' } })
+    expectError(unknown, 400, 'Bad Request')
+    expect(unknown.body.details).toContainEqual({
+      field: 'criteria.cityName',
+      message: 'Critério desconhecido',
+    })
+
+    const invalid = await request(app)
+      .post('/me/saved-filters')
+      .send({ ...filter, criteria: { species: 'Ave' } })
+    expectError(invalid, 400, 'Bad Request')
+    expect(invalid.body.details[0].field).toBe('criteria.species')
+  })
+
+  it('retorna 409 no 11º filtro e impede alterações de outra conta', async () => {
+    const created = await request(app).post('/me/saved-filters').send(filter)
+    for (let index = 1; index < 10; index += 1) {
+      const response = await request(app)
+        .post('/me/saved-filters')
+        .send({ ...filter, name: `Busca ${index}` })
+      expect(response.status).toBe(201)
+    }
+
+    expectError(
+      await request(app)
+        .post('/me/saved-filters')
+        .send({ ...filter, name: 'Busca 11' }),
+      409,
+      'Conflict',
+    )
+    expectError(
+      await request(app)
+        .patch(`/me/saved-filters/${created.body.id}`)
+        .set(organization)
+        .send({ active: true }),
+      404,
+      'Not Found',
+    )
+    expectError(
+      await request(app).delete(`/me/saved-filters/${created.body.id}`).set(organization),
+      404,
+      'Not Found',
+    )
+  })
+})
+
 describe('área da instituição', () => {
   const guardian = { 'X-Demo-User-Id': 'demo-organization' }
   const petPayload = {

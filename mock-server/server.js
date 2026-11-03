@@ -31,6 +31,12 @@ const DEFAULT_EMAIL_NOTIFICATION_TYPES = [
   'NewRequestForOrganization',
 ]
 const PETS_QUERY_PARAMS = ['search', 'page', 'limit', 'sort', 'species', 'size', 'sex', 'city']
+const SAVED_FILTER_FIELDS = ['search', 'species', 'size', 'sex', 'city']
+const SAVED_FILTER_ENUMS = {
+  species: ['Cachorro', 'Gato'],
+  size: ['Pequeno', 'Médio', 'Grande'],
+  sex: ['Fêmea', 'Macho'],
+}
 const PROFILE_ENUMS = {
   housing: ['Apartamento', 'Casa', 'Chácara ou sítio'],
   dailyTime: ['Até 1 hora', '2 a 3 horas', 'Mais de 3 horas'],
@@ -268,6 +274,7 @@ export function createApp({
   const server = jsonServer.create()
   const router = jsonServer.router(db)
   const store = router.db
+  if (!Array.isArray(store.get('savedFilters').value())) store.set('savedFilters', []).write()
   if (!Array.isArray(store.get('notifications').value())) store.set('notifications', []).write()
   if (!Array.isArray(store.get('notificationPreferences').value()))
     store.set('notificationPreferences', []).write()
@@ -282,6 +289,78 @@ export function createApp({
     store.get('users').find({ id: userId }).value()
   const findPet = (id) => store.get('pets').find({ id }).value()
   const myRequests = (userId) => store.get('requests').filter({ userId }).value()
+  const mySavedFilters = (userId) =>
+    store
+      .get('savedFilters')
+      .filter({ userId })
+      .value()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const presentSavedFilter = ({ userId: _userId, ...savedFilter }) => savedFilter
+  const validateSavedFilter = (body, partial = false) => {
+    const details = []
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return [{ field: 'body', message: 'Envie um objeto JSON' }]
+    }
+
+    for (const key of Object.keys(body)) {
+      if (!['name', 'criteria', 'active'].includes(key)) {
+        details.push({ field: key, message: 'Campo desconhecido' })
+      }
+    }
+    if (!partial || Object.hasOwn(body, 'name')) {
+      if (isBlank(body.name) || body.name.trim().length > 80) {
+        details.push({ field: 'name', message: 'Informe um nome com até 80 caracteres' })
+      }
+    }
+    if (!partial || Object.hasOwn(body, 'criteria')) {
+      const criteria = body.criteria
+      if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria)) {
+        details.push({ field: 'criteria', message: 'Informe os critérios como um objeto' })
+      } else {
+        for (const key of Object.keys(criteria)) {
+          if (!SAVED_FILTER_FIELDS.includes(key)) {
+            details.push({ field: `criteria.${key}`, message: 'Critério desconhecido' })
+          } else if (key === 'size') {
+            if (
+              !Array.isArray(criteria.size) ||
+              criteria.size.length === 0 ||
+              criteria.size.some((value) => !SAVED_FILTER_ENUMS.size.includes(value)) ||
+              new Set(criteria.size).size !== criteria.size.length
+            ) {
+              details.push({
+                field: 'criteria.size',
+                message: 'Informe portes válidos e sem repetição',
+              })
+            }
+          } else if (SAVED_FILTER_ENUMS[key]) {
+            if (!SAVED_FILTER_ENUMS[key].includes(criteria[key])) {
+              details.push({
+                field: `criteria.${key}`,
+                message: `Valor inválido para ${key}`,
+              })
+            }
+          } else if (
+            isBlank(criteria[key]) ||
+            (key === 'city' && criteria[key].trim().length < 2)
+          ) {
+            details.push({ field: `criteria.${key}`, message: 'Informe um valor válido' })
+          }
+        }
+        if (Object.keys(criteria).length === 0) {
+          details.push({ field: 'criteria', message: 'Informe ao menos um critério de busca' })
+        }
+      }
+    }
+    if (!partial || Object.hasOwn(body, 'active')) {
+      if (typeof body.active !== 'boolean') {
+        details.push({ field: 'active', message: 'active deve ser verdadeiro ou falso' })
+      }
+    }
+    if (partial && Object.keys(body).length === 0) {
+      details.push({ field: 'body', message: 'Informe ao menos um campo para atualizar' })
+    }
+    return details
+  }
   const withPet = (request) => ({
     ...request,
     pet: findPet(request.petId) ?? null,
@@ -892,6 +971,63 @@ export function createApp({
       .get('favorites')
       .remove({ userId: currentUserId(req), petId: req.params.petId })
       .write()
+    res.status(204).end()
+  })
+
+  // --- Filtros salvos (API simulada) -------------------------------------------
+  server.get('/me/saved-filters', (req, res) => {
+    const data = mySavedFilters(currentUserId(req)).map(presentSavedFilter)
+    res.json({ data, total: data.length })
+  })
+
+  server.post('/me/saved-filters', (req, res) => {
+    const details = validateSavedFilter(req.body)
+    if (details.length) return sendError(res, 400, 'Critérios de busca inválidos', details)
+
+    const userId = currentUserId(req)
+    if (mySavedFilters(userId).length >= 10) {
+      return sendError(res, 409, 'Você atingiu o limite de 10 buscas salvas')
+    }
+
+    const nextId =
+      store
+        .get('savedFilters')
+        .value()
+        .reduce((max, filter) => Math.max(max, Number(filter.id) || 0), 0) + 1
+    const savedFilter = {
+      id: String(nextId),
+      userId,
+      name: req.body.name.trim(),
+      criteria: req.body.criteria,
+      active: req.body.active,
+      createdAt: new Date().toISOString(),
+    }
+    store.get('savedFilters').push(savedFilter).write()
+    res.status(201).json(presentSavedFilter(savedFilter))
+  })
+
+  server.patch('/me/saved-filters/:id', (req, res) => {
+    const userId = currentUserId(req)
+    const savedFilter = mySavedFilters(userId).find(({ id }) => id === req.params.id)
+    if (!savedFilter) return sendError(res, 404, 'Busca salva não encontrada')
+
+    const details = validateSavedFilter(req.body, true)
+    if (details.length) return sendError(res, 400, 'Atualização inválida', details)
+
+    const updated = {
+      ...savedFilter,
+      ...req.body,
+      name: req.body.name?.trim() ?? savedFilter.name,
+    }
+    store.get('savedFilters').find({ id: savedFilter.id, userId }).assign(updated).write()
+    res.json(presentSavedFilter(updated))
+  })
+
+  server.delete('/me/saved-filters/:id', (req, res) => {
+    const userId = currentUserId(req)
+    const savedFilter = mySavedFilters(userId).find(({ id }) => id === req.params.id)
+    if (!savedFilter) return sendError(res, 404, 'Busca salva não encontrada')
+    store.get('savedFilters').remove({ id: savedFilter.id, userId }).write()
     res.status(204).end()
   })
 
