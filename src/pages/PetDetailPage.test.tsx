@@ -5,17 +5,17 @@ import { fakeFavoritesApi } from '../test/fakeFavoritesApi'
 import { makeRequest } from '../test/fixtures/requests'
 import { petFixture } from '../test/petFixture'
 import { renderWithProviders } from '../test/renderWithProviders'
-import type { AdoptionRequest, Pet } from '../types'
+import type { AdoptionRequest } from '../types'
 import { PetDetailPage } from './PetDetailPage'
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), put: vi.fn(), delete: vi.fn() }))
 vi.mock('../lib/api', () => ({ api: mocks }))
 
-function setup(requests: AdoptionRequest[], pet: Pet = petFixture) {
+function setup(requests: AdoptionRequest[]) {
   fakeFavoritesApi(mocks)
   const favoritesGet = mocks.get.getMockImplementation()
   mocks.get.mockImplementation((path: string) => {
-    if (path === `/pets/${petFixture.id}`) return Promise.resolve(pet)
+    if (path === `/pets/${petFixture.id}`) return Promise.resolve(petFixture)
     if (path === '/me/requests') return Promise.resolve({ data: requests, total: requests.length })
     return favoritesGet?.(path)
   })
@@ -34,19 +34,6 @@ afterEach(() => {
 })
 
 describe('PetDetailPage - solicitação ativa', () => {
-  it('mostra o tratamento para organizações com menos de três avaliações', async () => {
-    setup([], { ...petFixture, organizationRating: 4.5, organizationRatingCount: 2 })
-
-    expect(await screen.findByText('Ainda sem avaliações suficientes')).toBeInTheDocument()
-  })
-
-  it('exibe nota e quantidade quando há avaliações suficientes', async () => {
-    setup([], { ...petFixture, organizationRating: 4.4, organizationRatingCount: 4 })
-
-    expect(await screen.findByRole('img', { name: '4.4 de 5 estrelas' })).toBeInTheDocument()
-    expect(screen.getByText('4.4 (4 avaliações)')).toBeInTheDocument()
-  })
-
   it('sem solicitação mostra o botão para ver a compatibilidade', async () => {
     setup([])
 

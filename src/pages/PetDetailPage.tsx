@@ -12,10 +12,8 @@ import {
   Eyebrow,
   LinkButton,
   PageSurface,
-  TextLink,
   cx,
 } from '../components/ui'
-import { RatingStars } from '../components/RatingStars'
 import { useActiveRequestForPet } from '../hooks/useAdoptionRequests'
 import { useFavorite } from '../hooks/useFavorites'
 import { usePet } from '../hooks/usePets'
@@ -194,28 +192,6 @@ export function PetDetailPage() {
               </span>
               <ShieldCheck size={19} className="ml-auto text-forest-700" />
             </div>
-            <section className="mt-5" aria-labelledby="organization-rating-heading">
-              <h2 id="organization-rating-heading" className="mb-2 text-base">
-                Avaliações da organização
-              </h2>
-              {pet.organizationRatingCount !== undefined && pet.organizationRatingCount < 3 ? (
-                <p className="mb-0 text-xs text-muted">Ainda sem avaliações suficientes</p>
-              ) : pet.organizationRating !== undefined &&
-                pet.organizationRating !== null &&
-                pet.organizationRatingCount !== undefined ? (
-                <div className="flex flex-wrap items-center gap-2">
-                  <RatingStars value={pet.organizationRating} readOnly />
-                  <span className="text-xs text-muted">
-                    {pet.organizationRating.toFixed(1)} ({pet.organizationRatingCount}{' '}
-                    {pet.organizationRatingCount === 1 ? 'avaliação' : 'avaliações'})
-                  </span>
-                </div>
-              ) : (
-                <p className="mb-0 text-xs text-muted">
-                  As avaliações serão exibidas aqui quando estiverem disponíveis.
-                </p>
-              )}
-            </section>
             <div className="mt-[18px] flex items-center gap-[11px] rounded-xl bg-cream p-[13px] text-forest-800">
               <MapPin size={18} />
               <span className="flex flex-col">
@@ -248,15 +224,6 @@ export function PetDetailPage() {
                 </p>
               </>
             )}
-            <TextLink
-              className="mt-5"
-              to={`/denuncias/nova?${new URLSearchParams({
-                targetType: 'PET',
-                targetId: pet.id,
-              }).toString()}`}
-            >
-              Denunciar este pet
-            </TextLink>
           </aside>
         </div>
       </Container>

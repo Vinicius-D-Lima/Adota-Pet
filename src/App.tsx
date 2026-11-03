@@ -19,7 +19,6 @@ const RequestsPage = named(() => import('./pages/RequestsPage'), 'RequestsPage')
 const RequestSuccessPage = named(() => import('./pages/RequestSuccessPage'), 'RequestSuccessPage')
 const ProfilePage = named(() => import('./pages/ProfilePage'), 'ProfilePage')
 const CreateAccountPage = named(() => import('./pages/CreateAccountPage'), 'CreateAccountPage')
-const ReportPage = named(() => import('./pages/ReportPage'), 'ReportPage')
 const OrganizationDashboardPage = named(
   () => import('./pages/OrganizationDashboardPage'),
   'OrganizationDashboardPage',
@@ -176,14 +175,6 @@ export default function App() {
               }
             />
             <Route path="/criar-conta" element={<CreateAccountPage />} />
-            <Route
-              path="/denuncias/nova"
-              element={
-                <ProtectedRoute>
-                  <ReportPage />
-                </ProtectedRoute>
-              }
-            />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
