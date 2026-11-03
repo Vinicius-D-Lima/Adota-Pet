@@ -1,6 +1,6 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { validProfile } from '../test/fixtures/profile'
 import { petFixtures } from '../test/fixtures/pets'
@@ -13,6 +13,16 @@ vi.mock('../lib/api', () => ({ api: { get: mocks.get } }))
 function LocationProbe() {
   const location = useLocation()
   return <output data-testid="location">{location.search}</output>
+}
+
+function HistoryControls() {
+  const navigate = useNavigate()
+  return (
+    <div>
+      <button onClick={() => navigate(-1)}>Voltar</button>
+      <button onClick={() => navigate(1)}>Avançar</button>
+    </div>
+  )
 }
 
 let profileResponse: Record<string, unknown>
@@ -36,6 +46,7 @@ const setup = (route = '/pets') =>
     <>
       <PetsPage />
       <LocationProbe />
+      <HistoryControls />
     </>,
     { route },
   )
@@ -93,6 +104,32 @@ describe('PetsPage - consulta e filtros', () => {
     expect(screen.getByRole('button', { name: 'Grande' })).toHaveAttribute('aria-pressed', 'false')
     await waitFor(() => expect(mocks.get).toHaveBeenCalled())
     expect(lastPetsCall()?.[1]).toMatchObject({ query: { size: ['Pequeno', 'Médio'] } })
+  })
+
+  it('reproduz filtros compartilhados e acompanha voltar/avançar do navegador', async () => {
+    const user = userEvent.setup()
+    setup('/pets?search=Luna&species=Gato&size=Pequeno&sex=F%C3%AAmea')
+
+    expect(screen.getByLabelText('Filtrar por espécie')).toHaveValue('Gato')
+    expect(screen.getByLabelText('Filtrar por sexo')).toHaveValue('Fêmea')
+    expect(screen.getByRole('button', { name: 'Pequeno' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByPlaceholderText('Busque por nome, raça ou cidade')).toHaveValue('Luna')
+    await waitFor(() =>
+      expect(lastPetsCall()?.[1]).toMatchObject({
+        query: { search: 'Luna', species: 'Gato', size: ['Pequeno'], sex: 'Fêmea' },
+      }),
+    )
+
+    await user.selectOptions(screen.getByLabelText('Filtrar por espécie'), 'Cachorro')
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('species=Cachorro'),
+    )
+    await user.click(screen.getByRole('button', { name: 'Voltar' }))
+    await waitFor(() => expect(screen.getByLabelText('Filtrar por espécie')).toHaveValue('Gato'))
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    await waitFor(() =>
+      expect(screen.getByLabelText('Filtrar por espécie')).toHaveValue('Cachorro'),
+    )
   })
 })
 
