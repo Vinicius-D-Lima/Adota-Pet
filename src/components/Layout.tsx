@@ -72,6 +72,7 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
           ...(account.isAuthenticated
             ? ([
                 ['/favoritos', 'Favoritos'],
+                ['/minhas-buscas', 'Buscas salvas'],
                 ['/solicitacoes', 'Minhas solicitações'],
                 [profilePath, 'Meu perfil'],
               ] as [string, string][])

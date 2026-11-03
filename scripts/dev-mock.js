@@ -24,7 +24,12 @@ if (!account) {
 
 console.log(`\nIniciando como ${account.label}...\n`)
 
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+const npmCli = process.env.npm_execpath
+if (!npmCli) {
+  console.error('Não foi possível localizar o npm CLI. Execute este script com "npm run dev:mock".')
+  process.exit(1)
+}
+
 const environment = {
   ...process.env,
   DEMO_USER_ID: account.id,
@@ -32,8 +37,8 @@ const environment = {
   VITE_DEMO_SESSION_ID: String(Date.now()),
 }
 const children = [
-  spawn(npm, ['run', 'dev'], { env: environment, stdio: 'inherit' }),
-  spawn(npm, ['run', 'mock'], { env: environment, stdio: 'inherit' }),
+  spawn(process.execPath, [npmCli, 'run', 'dev'], { env: environment, stdio: 'inherit' }),
+  spawn(process.execPath, [npmCli, 'run', 'mock'], { env: environment, stdio: 'inherit' }),
 ]
 
 let stopping = false
@@ -50,7 +55,12 @@ const exitCodes = await Promise.all(
   children.map(
     (child) =>
       new Promise((resolve) => {
-        child.on('exit', (code) => {
+        child.on('error', (error) => {
+          console.error(`Não foi possível iniciar um processo filho: ${error.message}`)
+          stop()
+          resolve(1)
+        })
+        child.on('close', (code) => {
           stop()
           resolve(code ?? 0)
         })
