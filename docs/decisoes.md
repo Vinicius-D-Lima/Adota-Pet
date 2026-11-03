@@ -93,9 +93,67 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 
 ## 18. Seed com 12 pets e uma solicitação de cada status
 
-- **Contexto:** o mock não leva uma solicitação a `Aprovada` ou `Recusada`, então esses status não podiam ser vistos em demonstração.
+- **Contexto:** o adotante só cria e cancela solicitações, e na primeira versão do mock nada levava uma solicitação a `Aprovada` ou `Recusada`. Esses status passaram a ser decididos pela instituição (PR #86), mas um exemplo de cada um continua útil na demonstração inicial.
 - **Decisão:** o `db.seed.json` passou de 6 para 12 pets (a segunda página da listagem ficou útil) e traz as solicitações `SOL-1039` (`Aprovada`), `SOL-1040` (`Recusada`), `SOL-1041` (`Cancelada`) e `SOL-1042` (`Em análise`).
 - **Consequência:** a próxima solicitação criada é a `SOL-1043`; os testes do servidor passaram a conferir o seed (12 pets, um de cada status e o 409 ao cancelar uma `Aprovada`).
+
+## 19. Backend em Express, não em NestJS
+
+- **Contexto:** a issue #47 recomendava NestJS (módulos, injeção de dependências e Swagger prontos). A equipe é pequena, o prazo é curto e os schemas Zod do frontend já existem.
+- **Decisão:** **Express**, com a estrutura de pastas por módulo definida na #47 e Zod para validação, reaproveitando os schemas do pacote compartilhado.
+- **Consequência:** menos conceitos novos e nenhuma cerimônia, mas a organização (camadas, validação, tratamento de erros, guards) é montada à mão. As issues #28, #47 e #48 foram reescritas sem as referências ao NestJS (`@Roles`, `@CurrentUser`, `@nestjs/*`).
+
+## 20. PostgreSQL, não MongoDB
+
+- **Contexto:** o plano de gerência, o business case e o dicionário da EAP citam **MongoDB**. O backlog de issues (#18 a #51) descreve um modelo muito relacional: organizações, membros com papéis, solicitações com histórico, adoções, check-ins, avaliações e denúncias.
+- **Decisão:** **PostgreSQL**, porque regras como "uma solicitação ativa por pet e adotante" (índice único parcial), "aprovar cria exatamente uma adoção" (transação) e "a organização tem ao menos um administrador" ficam garantidas pelo banco.
+- **Consequência:** os documentos de gerência ainda dizem MongoDB (pacotes 1.3.3 e 1.5.8 do dicionário da EAP). A atualização deles cabe à equipe de gerência, e a divergência está registrada aqui.
+
+## 21. Prisma com migrations
+
+- **Decisão:** **Prisma** como ORM, com migrations versionadas, tipos TypeScript gerados e seed. O `@casl/prisma` usa os mesmos modelos para filtrar as consultas.
+- **Consequência:** consultas muito complexas podem exigir SQL bruto (`$queryRaw`), sempre parametrizado.
+
+## 22. Autenticação com JWT curto e refresh rotacionado em cookie httpOnly
+
+- **Decisão:** access token JWT de cerca de 15 minutos, enviado em `Authorization: Bearer` e guardado só em memória no frontend. Refresh token de cerca de 7 dias em cookie `httpOnly`, `Secure` e `SameSite`, rotacionado a cada uso e guardado no banco só como hash. Senha com argon2.
+- **Consequência:** o reuso de um refresh antigo derruba a cadeia inteira de tokens do usuário. É o modelo mais trabalhoso de acertar, por isso a #48 traz 16 testes obrigatórios (ver [Testes do backend](testes/README.md)).
+
+## 23. Permissões com CASL
+
+- **Decisão:** **CASL** (`@casl/ability` e `@casl/prisma`), com negação por padrão e a matriz de permissões da #28 como fonte da verdade.
+- **Consequência:** as regras "só dentro da minha organização" viram condições do CASL, e as listagens usam `accessibleBy` para nunca devolver registros de outra organização. O frontend pode reaproveitar as mesmas regras.
+
+## 24. Arquivos pela API do S3, com SeaweedFS no Docker
+
+- **Contexto:** a issue #24 sugeria o MinIO. A edição comunitária do MinIO deixou de publicar imagens Docker em outubro de 2025 e entrou em modo de manutenção em dezembro de 2025.
+- **Decisão:** o código usa a API do S3 (`@aws-sdk/client-s3`), e o ambiente local roda o **SeaweedFS** (Apache-2.0). Fotos e anexos passam por um módulo único (#94), com bucket privado e URLs assinadas.
+- **Consequência:** trocar para Cloudflare R2 ou S3 é só mudar variáveis de ambiente, sem alterar código.
+
+## 25. Jobs em segundo plano com pg-boss
+
+- **Decisão:** **pg-boss** (MIT), que usa o próprio PostgreSQL como fila, sem Redis. Cobre retentativa, agendamento, dead letter e enfileirar na mesma transação dos dados (#95).
+- **Consequência:** nenhum serviço a mais para manter. Em troca, a fila usa o mesmo banco; neste tamanho de projeto isso não pesa. BullMQ com Redis continua uma saída se a carga crescer.
+
+## 26. Monorepo com npm workspaces
+
+- **Decisão:** `apps/web`, `apps/api` e `packages/shared`, este último com os schemas Zod compartilhados entre frontend e backend (#3).
+- **Consequência:** o contrato de dados passa a ser único: mudar um campo obrigatório no pacote compartilhado quebra o `typecheck` de quem não acompanhou.
+
+## 27. Testes do backend com Vitest e supertest, catalogados por ID
+
+- **Decisão:** Vitest e supertest contra um Postgres real de teste. Cada teste tem um ID (por exemplo `AUTH-07`) que aparece no nome do teste e em um documento por módulo em [`docs/testes/`](testes/README.md). Cada issue de backend traz uma seção "Testes obrigatórios" com os seus IDs.
+- **Consequência:** são 238 testes catalogados (112 de segurança). O catálogo é a especificação, escrita antes do código, e precisa ser mantida em dia.
+
+## 28. Docker para o projeto inteiro, com Hadolint e Trivy
+
+- **Decisão:** web, api, banco, storage e e-mail de desenvolvimento (Mailpit) sobem com `docker compose` (#96). O **Hadolint** revisa os Dockerfiles e o **Trivy** varre imagens e configuração; o CI falha em vulnerabilidades **HIGH** e **CRITICAL que já tenham correção disponível**.
+- **Consequência:** vulnerabilidades sem correção não bloqueiam, para não travar o projeto por algo que ninguém consegue resolver. Elas aparecem no relatório.
+
+## 29. Segurança no pipeline
+
+- **Decisão:** Dependabot, `npm audit`, Gitleaks, CodeQL, permissões mínimas no workflow e actions fixadas por SHA (#97), mais ZAP e Schemathesis em execução noturna (#98).
+- **Consequência:** o que roda em todo PR é rápido e grátis. Os testes dinâmicos, mais lentos, rodam à noite para não atrasar os PRs.
 
 ## Decisão pendente: acessibilidade
 

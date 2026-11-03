@@ -34,19 +34,19 @@ Solicitações do seed: `SOL-1039` (Fred, `Aprovada`), `SOL-1040` (Nina, `Recusa
 
 ## Rotas
 
-| Rota                                                       | O que faz                                         |
-| ---------------------------------------------------------- | ------------------------------------------------- |
-| `GET /pets`                                                | Lista pets com filtros, ordenação e paginação     |
-| `GET /pets/:id`                                            | Um pet (404 se não existir)                       |
-| `GET /me`                                                  | Usuário de demonstração                           |
-| `GET /me/adopter-profile`                                  | Perfil com `isComplete` e `missingFields`         |
-| `PUT /me/adopter-profile`                                  | Atualização parcial do perfil                     |
-| `POST /requests`                                           | Cria uma solicitação de adoção                    |
-| `GET /me/requests`                                         | Solicitações do usuário (a mais recente primeiro) |
-| `GET /requests/:id`                                        | Uma solicitação do usuário                        |
-| `POST /requests/:id/transitions`                           | Muda o status (hoje só `{ "to": "CANCELADA" }`)   |
-| `GET /me/favorites` · `GET /me/favorites/ids`              | Favoritos (pets completos / só os IDs)            |
-| `PUT /me/favorites/:petId` · `DELETE /me/favorites/:petId` | Adiciona / remove favorito (204, idempotentes)    |
+| Rota                                                       | O que faz                                                   |
+| ---------------------------------------------------------- | ----------------------------------------------------------- |
+| `GET /pets`                                                | Lista pets com filtros, ordenação e paginação               |
+| `GET /pets/:id`                                            | Um pet (404 se não existir)                                 |
+| `GET /me`                                                  | Usuário de demonstração                                     |
+| `GET /me/adopter-profile`                                  | Perfil com `isComplete` e `missingFields`                   |
+| `PUT /me/adopter-profile`                                  | Atualização parcial do perfil                               |
+| `POST /requests`                                           | Cria uma solicitação de adoção                              |
+| `GET /me/requests`                                         | Solicitações do usuário (a mais recente primeiro)           |
+| `GET /requests/:id`                                        | Uma solicitação do usuário                                  |
+| `POST /requests/:id/transitions`                           | Muda o status (para o adotante, só `{ "to": "CANCELADA" }`) |
+| `GET /me/favorites` · `GET /me/favorites/ids`              | Favoritos (pets completos / só os IDs)                      |
+| `PUT /me/favorites/:petId` · `DELETE /me/favorites/:petId` | Adiciona / remove favorito (204, idempotentes)              |
 
 ### `GET /pets`
 
@@ -125,6 +125,23 @@ Toda solicitação devolvida traz o **pet embutido** (`pet`, ou `null` se o pet 
 - `PUT /me/favorites/:petId` é **idempotente** (favoritar duas vezes não duplica) e devolve **404** se o pet não existe.
 - `DELETE /me/favorites/:petId` também é idempotente e sempre devolve 204.
 
+### Rotas da instituição
+
+Exclusivas de contas com o papel `GUARDIAN` (instituição ou protetor). Qualquer outra conta recebe **403** ("Esta área é exclusiva para instituições e protetores").
+
+| Rota                                                    | O que faz                                               |
+| ------------------------------------------------------- | ------------------------------------------------------- |
+| `PUT /me/account`                                       | Grava os dados da conta criada em `/criar-conta`        |
+| `GET /me/guardian-profile` · `PUT /me/guardian-profile` | Perfil da instituição ou do protetor                    |
+| `GET /me/organization-pets`                             | Pets da instituição                                     |
+| `POST /me/organization-pets`                            | Cadastra um pet (201); o `id` é gerado a partir do nome |
+| `PUT /me/organization-pets/:id`                         | Edita um pet da própria instituição                     |
+| `DELETE /me/organization-pets/:id`                      | Remove um pet da própria instituição                    |
+| `GET /me/received-requests`                             | Solicitações dos pets da instituição                    |
+| `POST /me/received-requests/:id/transitions`            | `{ "to": "EM_ANALISE" \| "APROVADA" \| "RECUSADA" }`    |
+
+As transições da instituição aceitas são `Enviada` → `Em análise` ou `Recusada`, e `Em análise` → `Aprovada` ou `Recusada`. Destino desconhecido retorna **400**, transição fora dessa tabela retorna **409**, e solicitação de pet de outra instituição retorna **404**.
+
 ## Formato de erro
 
 ```json
@@ -151,7 +168,7 @@ Os dois rodam no ambiente `node` (`// @vitest-environment node`), enquanto os te
 ## Limitações conhecidas
 
 - Um único usuário, sem autenticação nem permissões.
-- Os status `Aprovada` e `Recusada` existem no contrato e na interface, mas o mock não tem como levar uma solicitação até eles (só cria `Enviada` e cancela). As quatro solicitações do seed existem justamente para mostrar esses status.
+- O adotante só cria e cancela. `Aprovada` e `Recusada` são decididas pela instituição, pelas rotas da seção anterior, mas sem etapas intermediárias (entrevista, visita), sem motivo obrigatório e sem distinção entre administrador e voluntário. As quatro solicitações do seed mostram cada status desde o primeiro uso.
 - Sem upload de fotos: os pets usam URLs externas.
 - Sem concorrência real: é um arquivo JSON e um processo.
 - A compatibilidade é calculada **no frontend**; o mock não tem rota de recomendação.
