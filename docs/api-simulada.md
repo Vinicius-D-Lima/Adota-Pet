@@ -13,7 +13,7 @@ O frontend conversa com uma API REST simulada, em `mock-server/`. Ela existe par
 | `mock-server/db.seed.json` | Seed **versionado**: contas de demonstração, 12 pets, perfis, favoritos, solicitações e notificações de exemplo |
 | `mock-server/db.json`      | Banco em uso. Criado a partir do seed na primeira execução e **ignorado pelo git**                              |
 
-Os dados (favoritos, perfil e solicitações) **persistem entre recarregamentos e reinícios**, porque ficam no `db.json`.
+Os dados (favoritos, perfil, solicitações e buscas salvas) **persistem entre recarregamentos e reinícios**, porque ficam no `db.json`.
 
 ```bash
 npm run mock:reset   # copia o seed sobre o db.json e volta aos dados originais
@@ -47,11 +47,21 @@ Solicitações do seed: `SOL-1039` (Fred, `Aprovada`), `SOL-1040` (Nina, `Recusa
 | `POST /requests/:id/transitions`                           | Muda o status (hoje só `{ "to": "CANCELADA" }`)             |
 | `GET /me/favorites` · `GET /me/favorites/ids`              | Favoritos (pets completos / só os IDs)                      |
 | `PUT /me/favorites/:petId` · `DELETE /me/favorites/:petId` | Adiciona / remove favorito (204, idempotentes)              |
+| `GET /me/saved-filters`                                    | Lista as buscas salvas da conta atual                       |
+| `POST /me/saved-filters`                                   | Cria uma busca (máximo de 10 por conta; 409 no limite)      |
+| `PATCH /me/saved-filters/:id`                              | Atualiza nome ou estado do alerta                           |
+| `DELETE /me/saved-filters/:id`                             | Exclui uma busca da conta atual (204)                       |
 | `GET /me/notifications?cursor=&unread=`                    | Notificações paginadas e contador global de não lidas       |
 | `PATCH /me/notifications/:id/read`                         | Marca como lida uma notificação da conta atual (204)        |
 | `PATCH /me/notifications/read-all`                         | Marca como lidas todas as notificações da conta atual (204) |
 | `GET /me/notification-preferences`                         | Preferências de canal por tipo de notificação               |
 | `PUT /me/notification-preferences`                         | Substitui as preferências com `{ "data": [...] }`           |
+
+### Buscas salvas
+
+As buscas são isoladas por `X-Demo-User-Id` e persistem em `db.json`. A resposta de listagem tem o formato `{ data: SavedFilter[], total }`; cada item contém `id`, `name`, `criteria`, `active` e `createdAt`. Os critérios aceitos são `search`, `species` (`Cachorro` ou `Gato`), `size` (lista de portes), `sex` e `city`. Critérios desconhecidos ou valores inválidos retornam 400, e o 11º filtro da conta retorna 409.
+
+O mock salva e atualiza o estado do alerta, mas não avalia novos pets, não cria notificações `NewMatchingPet` e não envia o resumo diário por e-mail. O processamento de eventos e o resumo dependem do backend real descrito na issue #31 e da infraestrutura da #95.
 
 ### Notificações
 
