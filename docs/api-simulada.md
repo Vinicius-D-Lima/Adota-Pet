@@ -4,14 +4,14 @@ O frontend conversa com uma API REST simulada, em `mock-server/`. Ela existe par
 
 - Baseada em [json-server](https://github.com/typicode/json-server) **0.17.4** (Express), com rotas, validação e regras de negócio próprias em `mock-server/server.js`.
 - As rotas respondem tanto em `/pets` quanto em `/api/pets`. O Vite faz proxy de `/api` para `http://localhost:3001`, então o navegador nunca vê CORS.
-- Há **um usuário de demonstração fixo** (`demo`). Não existe login: todas as rotas `/me/*` falam desse usuário.
+- Não existe login real. As rotas `/me/*` usam o usuário indicado por `X-Demo-User-Id` (entre as contas de demonstração do seed) ou `demo` quando o cabeçalho não é enviado.
 
 ## Dados
 
-| Arquivo                    | Papel                                                                                                                        |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `mock-server/db.seed.json` | Seed **versionado**: 1 usuário, 12 pets, 1 perfil, 1 favorito e 4 solicitações (`SOL-1039` a `SOL-1042`, uma de cada status) |
-| `mock-server/db.json`      | Banco em uso. Criado a partir do seed na primeira execução e **ignorado pelo git**                                           |
+| Arquivo                    | Papel                                                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `mock-server/db.seed.json` | Seed **versionado**: contas de demonstração, 12 pets, perfis, favoritos, solicitações e notificações de exemplo |
+| `mock-server/db.json`      | Banco em uso. Criado a partir do seed na primeira execução e **ignorado pelo git**                              |
 
 Os dados (favoritos, perfil e solicitações) **persistem entre recarregamentos e reinícios**, porque ficam no `db.json`.
 
@@ -23,7 +23,7 @@ npm run mock:reset   # copia o seed sobre o db.json e volta aos dados originais
 
 Pets do seed: Luna, Bento, Mimi, Fred, Nina, Tobias, Thor, Amora, Simba, Pipoca, Rex e Maya (8 cachorros e 4 gatos, de portes Pequeno, Médio e Grande).
 
-Solicitações do seed: `SOL-1039` (Fred, `Aprovada`), `SOL-1040` (Nina, `Recusada`), `SOL-1041` (Tobias, `Cancelada`) e `SOL-1042` (Mimi, `Em análise`).
+Solicitações do seed: `SOL-1039` (Fred, `Aprovada`), `SOL-1040` (Nina, `Recusada`), `SOL-1041` (Tobias, `Cancelada`) e `SOL-1042` (Mimi, `Em análise`). A conta `demo` também tem notificações de exemplo para testar o sino, o histórico e o contador de não lidas.
 
 ## Configuração
 
@@ -44,9 +44,22 @@ Solicitações do seed: `SOL-1039` (Fred, `Aprovada`), `SOL-1040` (Nina, `Recusa
 | `POST /requests`                                           | Cria uma solicitação de adoção                              |
 | `GET /me/requests`                                         | Solicitações do usuário (a mais recente primeiro)           |
 | `GET /requests/:id`                                        | Uma solicitação do usuário                                  |
-| `POST /requests/:id/transitions`                           | Muda o status (para o adotante, só `{ "to": "CANCELADA" }`) |
+| `POST /requests/:id/transitions`                           | Muda o status (hoje só `{ "to": "CANCELADA" }`)             |
 | `GET /me/favorites` · `GET /me/favorites/ids`              | Favoritos (pets completos / só os IDs)                      |
 | `PUT /me/favorites/:petId` · `DELETE /me/favorites/:petId` | Adiciona / remove favorito (204, idempotentes)              |
+| `GET /me/notifications?cursor=&unread=`                    | Notificações paginadas e contador global de não lidas       |
+| `PATCH /me/notifications/:id/read`                         | Marca como lida uma notificação da conta atual (204)        |
+| `PATCH /me/notifications/read-all`                         | Marca como lidas todas as notificações da conta atual (204) |
+| `GET /me/notification-preferences`                         | Preferências de canal por tipo de notificação               |
+| `PUT /me/notification-preferences`                         | Substitui as preferências com `{ "data": [...] }`           |
+
+### Notificações
+
+As notificações e preferências são separadas por `X-Demo-User-Id` e persistem em `db.json`. A listagem retorna `{ data, unreadCount, nextCursor }`; o cursor aponta para o último item da página anterior e `unread=true` filtra os itens sem `readAt`. A identidade interna do usuário não é incluída nas respostas.
+
+As preferências retornam `{ data: [{ type, inApp, email }] }`. O `PUT` recebe a lista completa em `data`, com exatamente uma entrada para cada tipo. Os valores padrão deixam o canal in-app ativo e habilitam e-mail apenas para os tipos marcados como críticos no mock.
+
+Este servidor apenas simula a API: não processa eventos de domínio, não envia e-mails e não implementa autenticação/autorização real. Os endpoints do backend continuam descritos na issue #30.
 
 ### `GET /pets`
 
