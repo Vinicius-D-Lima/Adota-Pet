@@ -25,6 +25,7 @@ const NotificationPreferencesPage = named(
   () => import('./pages/NotificationPreferencesPage'),
   'NotificationPreferencesPage',
 )
+const ReportPage = named(() => import('./pages/ReportPage'), 'ReportPage')
 const OrganizationDashboardPage = named(
   () => import('./pages/OrganizationDashboardPage'),
   'OrganizationDashboardPage',
@@ -205,6 +206,14 @@ export default function App() {
               }
             />
             <Route path="/criar-conta" element={<CreateAccountPage />} />
+            <Route
+              path="/denuncias/nova"
+              element={
+                <ProtectedRoute>
+                  <ReportPage />
+                </ProtectedRoute>
+              }
+            />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
