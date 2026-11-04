@@ -466,6 +466,159 @@ describe('POST /requests/:id/transitions', () => {
   })
 })
 
+describe('chat da solicitação', () => {
+  const organization = { 'X-Demo-User-Id': 'demo-organization' }
+  const outsider = { 'X-Demo-User-Id': 'demo-empty' }
+
+  it('lista mensagens apenas para participantes e não devolve dados de contato', async () => {
+    const created = await request(app)
+      .post('/requests')
+      .send({ petId: 'luna', answers: validAnswers })
+    const requestId = created.body.id
+    await request(app)
+      .post(`/requests/${requestId}/messages`)
+      .set(organization)
+      .send({ body: 'Olá, vamos conversar?' })
+    await request(app)
+      .post(`/requests/${requestId}/messages`)
+      .send({ body: 'Claro, obrigado!' })
+    const adopterView = await request(app).get(`/requests/${requestId}/messages`)
+    expect(adopterView.status).toBe(200)
+    expect(adopterView.body).toMatchObject({
+      unreadCount: 1,
+      nextCursor: null,
+      data: [
+        { authorName: 'Instituto Patinhas', mine: false, readAt: null },
+        { authorName: 'Lucas Ferreira', mine: true, readAt: null },
+      ],
+    })
+    for (const message of adopterView.body.data) {
+      expect(message).not.toHaveProperty('authorId')
+      expect(message).not.toHaveProperty('email')
+      expect(message).not.toHaveProperty('phone')
+      expect(message).not.toHaveProperty('userId')
+    }
+
+    const organizationView = await request(app).get(`/requests/${requestId}/messages`).set(organization)
+    expect(organizationView.body.unreadCount).toBe(1)
+    expect(organizationView.body.data[0]).toMatchObject({
+      authorName: 'Instituto Patinhas',
+      mine: true,
+    })
+    expectError(
+      await request(app).get(`/requests/${requestId}/messages`).set(outsider),
+      403,
+      'Forbidden',
+    )
+  })
+
+  it('rejeita mensagens vazias, maiores que 2000 caracteres e campos extras', async () => {
+    expectError(
+      await request(app).post('/requests/SOL-1042/messages').send({ body: '  ' }),
+      400,
+      'Bad Request',
+    )
+    expectError(
+      await request(app)
+        .post('/requests/SOL-1042/messages')
+        .send({ body: 'x'.repeat(2001) }),
+      400,
+      'Bad Request',
+    )
+    expectError(
+      await request(app)
+        .post('/requests/SOL-1042/messages')
+        .send({ body: 'Olá', email: 'contato@example.com' }),
+      400,
+      'Bad Request',
+    )
+  })
+
+  it('envia texto puro e mantém o HTML como conteúdo literal', async () => {
+    const created = await request(app)
+      .post('/requests')
+      .send({ petId: 'luna', answers: validAnswers })
+    const requestId = created.body.id
+    const body = '<script>alert(1)</script>'
+    const sent = await request(app).post(`/requests/${requestId}/messages`).send({ body })
+    expect(sent.status).toBe(201)
+    expect(sent.body).toMatchObject({ body, mine: true, authorName: 'Lucas Ferreira' })
+    expect(sent.body).not.toHaveProperty('authorId')
+    const fromOrganization = await request(app).get(`/requests/${requestId}/messages`).set(organization)
+    expect(fromOrganization.body.data.at(-1)).toMatchObject({
+      body,
+      mine: false,
+      authorName: 'Lucas Ferreira',
+    })
+  })
+
+  it('pagina mensagens antigas com cursor em ordem cronológica', async () => {
+    const db = seed()
+    db.chatMessages = Array.from({ length: 23 }, (_, index) => ({
+      id: `MSG-${String(index + 1).padStart(4, '0')}`,
+      requestId: 'SOL-1042',
+      authorId: index % 2 ? 'demo' : 'demo-organization',
+      body: `Mensagem ${index + 1}`,
+      createdAt: new Date(Date.UTC(2026, 9, 25, 12, index)).toISOString(),
+      readAt: null,
+    }))
+    const pagedApp = createApp({ db, delay: 0 })
+    const first = await request(pagedApp).get('/requests/SOL-1042/messages')
+    expect(first.body.data).toHaveLength(20)
+    expect(first.body.data[0].body).toBe('Mensagem 4')
+    expect(first.body.data.at(-1).body).toBe('Mensagem 23')
+    expect(first.body.nextCursor).toBe('MSG-0004')
+
+    const previous = await request(pagedApp)
+      .get('/requests/SOL-1042/messages')
+      .query({ cursor: first.body.nextCursor })
+    expect(previous.body.data.map(({ body }) => body)).toEqual([
+      'Mensagem 1',
+      'Mensagem 2',
+      'Mensagem 3',
+    ])
+    expect(previous.body.nextCursor).toBeNull()
+  })
+
+  it('bloqueia envio após estado final e marca apenas mensagens recebidas como lidas', async () => {
+    const db = seed()
+    db.requests.find(({ id }) => id === 'SOL-1039').status = 'Aprovada'
+    const finalApp = createApp({ db, delay: 0 })
+    expectError(
+      await request(finalApp).post('/requests/SOL-1039/messages').send({ body: 'Mais uma' }),
+      409,
+      'Conflict',
+    )
+
+    const requestWithUnread = (await request(app).get('/me/requests')).body.data.find(
+      ({ id }) => id === 'SOL-1039',
+    )
+    expect(requestWithUnread.unreadMessageCount).toBe(1)
+    expect((await request(app).patch('/requests/SOL-1039/messages/read')).status).toBe(204)
+    const requestAfterRead = (await request(app).get('/me/requests')).body.data.find(
+      ({ id }) => id === 'SOL-1039',
+    )
+    expect(requestAfterRead.unreadMessageCount).toBe(0)
+    const readMessages = (await request(app).get('/requests/SOL-1039/messages')).body.data
+    expect(readMessages[0].readAt).toEqual(expect.any(String))
+    expect(readMessages[1].readAt).toBeNull()
+  })
+
+  it('impede leitura, envio e marcação de leitura para outras contas', async () => {
+    expectError(
+      await request(app).post('/requests/SOL-1042/messages').set(outsider).send({ body: 'Oi' }),
+      403,
+      'Forbidden',
+    )
+    expectError(
+      await request(app).patch('/requests/SOL-1042/messages/read').set(outsider),
+      403,
+      'Forbidden',
+    )
+    expectError(await request(app).get('/requests/inexistente/messages'), 404, 'Not Found')
+  })
+})
+
 describe('solicitações do seed', () => {
   it('traz um exemplo de cada status para demonstrar a listagem', async () => {
     const mine = await request(app).get('/me/requests')

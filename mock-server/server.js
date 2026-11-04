@@ -12,6 +12,7 @@ const DEFAULT_LIMIT = 12
 const MAX_LIMIT = 100
 const ACTIVE_STATUSES = ['Enviada', 'Em análise', 'Aprovada']
 const CANCELLABLE_STATUSES = ['Enviada', 'Em análise']
+const FINAL_REQUEST_STATUSES = ['Aprovada', 'Recusada', 'Cancelada']
 const SORTS = ['recent', 'name', 'distance']
 const NOTIFICATION_TYPES = [
   'RequestStatusChanged',
@@ -274,6 +275,7 @@ export function createApp({
   const server = jsonServer.create()
   const router = jsonServer.router(db)
   const store = router.db
+  if (!Array.isArray(store.get('chatMessages').value())) store.set('chatMessages', []).write()
   if (!Array.isArray(store.get('savedFilters').value())) store.set('savedFilters', []).write()
   if (!Array.isArray(store.get('notifications').value())) store.set('notifications', []).write()
   if (!Array.isArray(store.get('notificationPreferences').value()))
@@ -411,13 +413,41 @@ export function createApp({
     const { name } = organizationIdentity(userId)
     return store.get('pets').filter({ organization: name }).value()
   }
+  const isChatParticipant = (request, userId) =>
+    request.userId === userId || organizationPets(userId).some(({ id }) => id === request.petId)
+  const messagesForRequest = (requestId) =>
+    store
+      .get('chatMessages')
+      .filter({ requestId })
+      .value()
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+  const unreadChatCount = (requestId, userId) =>
+    messagesForRequest(requestId).filter(
+      (message) => message.authorId !== userId && !message.readAt,
+    ).length
+  const presentChatMessage = (message, userId) => {
+    const request = store.get('requests').find({ id: message.requestId }).value()
+    const authorName =
+      message.authorId === request?.userId
+        ? getProfile(message.authorId).name || demoUser(message.authorId)?.name || 'Adotante'
+        : organizationIdentity(message.authorId).name
+    return {
+      id: message.id,
+      authorName,
+      mine: message.authorId === userId,
+      body: message.body,
+      createdAt: message.createdAt,
+      readAt: message.readAt,
+    }
+  }
   const presentOrganizationPet = (pet) => ({ ...pet, distance: null, distanceKm: null })
-  const withReceivedRequest = (request) => {
+  const withReceivedRequest = (request, viewerId) => {
     const user = demoUser(request.userId) ?? {}
     const profile = getProfile(request.userId)
     const completed = PROFILE_FIELDS.length - profile.missingFields.length
     return {
       ...withPet(request),
+      unreadMessageCount: unreadChatCount(request.id, viewerId),
       adopter: {
         id: request.userId,
         name: profile.name || user.name || '',
@@ -723,19 +753,21 @@ export function createApp({
 
   server.get('/me/received-requests', (req, res) => {
     if (!requireGuardian(req, res)) return
-    const petIds = new Set(organizationPets(currentUserId(req)).map(({ id }) => id))
+    const userId = currentUserId(req)
+    const petIds = new Set(organizationPets(userId).map(({ id }) => id))
     const requests = store
       .get('requests')
       .value()
       .filter(({ petId }) => petIds.has(petId))
       .reverse()
-      .map(withReceivedRequest)
+      .map((request) => withReceivedRequest(request, userId))
     res.json(list(requests))
   })
 
   server.post('/me/received-requests/:id/transitions', (req, res) => {
     if (!requireGuardian(req, res)) return
-    const petIds = new Set(organizationPets(currentUserId(req)).map(({ id }) => id))
+    const userId = currentUserId(req)
+    const petIds = new Set(organizationPets(userId).map(({ id }) => id))
     const request = store.get('requests').find({ id: req.params.id }).value()
     if (!request || !petIds.has(request.petId))
       return sendError(res, 404, 'Solicitação não encontrada')
@@ -758,7 +790,7 @@ export function createApp({
     }
     const updated = { ...request, status, message: messages[status] }
     store.get('requests').find({ id: request.id }).assign(updated).write()
-    res.json(withReceivedRequest(updated))
+    res.json(withReceivedRequest(updated, userId))
   })
 
   // --- Pets -------------------------------------------------------------------
@@ -893,7 +925,13 @@ export function createApp({
   })
 
   server.get('/me/requests', (req, res) => {
-    const requests = myRequests(currentUserId(req)).reverse().map(withPet)
+    const userId = currentUserId(req)
+    const requests = myRequests(userId)
+      .reverse()
+      .map((request) => ({
+        ...withPet(request),
+        unreadMessageCount: unreadChatCount(request.id, userId),
+      }))
     res.json(list(requests))
   })
 
@@ -926,6 +964,103 @@ export function createApp({
     }
     store.get('requests').find({ id: request.id }).assign(updated).write()
     res.json(withPet(updated))
+  })
+
+  // --- Chat da solicitação (API simulada) --------------------------------------
+  server.get('/requests/:id/messages', (req, res) => {
+    const userId = currentUserId(req)
+    const adoptionRequest = store.get('requests').find({ id: req.params.id }).value()
+    if (!adoptionRequest) return sendError(res, 404, 'Solicitação não encontrada')
+    if (!isChatParticipant(adoptionRequest, userId)) {
+      return sendError(res, 403, 'Somente os participantes podem acessar esta conversa')
+    }
+    if (Object.keys(req.query).some((key) => key !== 'cursor')) {
+      return sendError(res, 400, 'Parâmetro desconhecido', [
+        { field: 'query', message: 'Apenas cursor é aceito' },
+      ])
+    }
+    const allMessages = messagesForRequest(adoptionRequest.id)
+    const cursor = req.query.cursor
+    let end = allMessages.length
+    if (cursor !== undefined) {
+      if (typeof cursor !== 'string') {
+        return sendError(res, 400, 'Cursor inválido', [
+          { field: 'cursor', message: 'Informe um cursor válido' },
+        ])
+      }
+      end = allMessages.findIndex(({ id }) => id === cursor)
+      if (end < 0) {
+        return sendError(res, 400, 'Cursor inválido', [
+          { field: 'cursor', message: 'O cursor não pertence a esta conversa' },
+        ])
+      }
+    }
+    const start = Math.max(0, end - 20)
+    const page = allMessages.slice(start, end)
+    res.json({
+      data: page.map((message) => presentChatMessage(message, userId)),
+      unreadCount: unreadChatCount(adoptionRequest.id, userId),
+      nextCursor: start > 0 ? page[0].id : null,
+    })
+  })
+
+  server.post('/requests/:id/messages', (req, res) => {
+    const userId = currentUserId(req)
+    const adoptionRequest = store.get('requests').find({ id: req.params.id }).value()
+    if (!adoptionRequest) return sendError(res, 404, 'Solicitação não encontrada')
+    if (!isChatParticipant(adoptionRequest, userId)) {
+      return sendError(res, 403, 'Somente os participantes podem enviar mensagens')
+    }
+    if (FINAL_REQUEST_STATUSES.includes(adoptionRequest.status)) {
+      return sendError(res, 409, 'O chat está bloqueado para solicitações encerradas')
+    }
+    const body = req.body
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).some((key) => key !== 'body') ||
+      typeof body.body !== 'string' ||
+      !body.body.trim() ||
+      body.body.length > 2000
+    ) {
+      return sendError(res, 400, 'Mensagem inválida', [
+        { field: 'body', message: 'A mensagem deve ter entre 1 e 2000 caracteres' },
+      ])
+    }
+    const nextId =
+      store
+        .get('chatMessages')
+        .value()
+        .reduce((max, message) => Math.max(max, Number(message.id.replace(/\D/g, '')) || 0), 0) + 1
+    const message = {
+      id: `MSG-${String(nextId).padStart(4, '0')}`,
+      requestId: adoptionRequest.id,
+      authorId: userId,
+      body: body.body,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+    }
+    store.get('chatMessages').push(message).write()
+    res.status(201).json(presentChatMessage(message, userId))
+  })
+
+  server.patch('/requests/:id/messages/read', (req, res) => {
+    const userId = currentUserId(req)
+    const adoptionRequest = store.get('requests').find({ id: req.params.id }).value()
+    if (!adoptionRequest) return sendError(res, 404, 'Solicitação não encontrada')
+    if (!isChatParticipant(adoptionRequest, userId)) {
+      return sendError(res, 403, 'Somente os participantes podem marcar mensagens como lidas')
+    }
+    const readAt = new Date().toISOString()
+    store
+      .get('chatMessages')
+      .filter({ requestId: adoptionRequest.id })
+      .each((message) => {
+        if (message.authorId !== userId && !message.readAt) message.readAt = readAt
+      })
+      .write()
+    res.status(204).end()
   })
 
   // --- Favoritos ---------------------------------------------------------------
