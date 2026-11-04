@@ -479,9 +479,7 @@ describe('chat da solicitação', () => {
       .post(`/requests/${requestId}/messages`)
       .set(organization)
       .send({ body: 'Olá, vamos conversar?' })
-    await request(app)
-      .post(`/requests/${requestId}/messages`)
-      .send({ body: 'Claro, obrigado!' })
+    await request(app).post(`/requests/${requestId}/messages`).send({ body: 'Claro, obrigado!' })
     const adopterView = await request(app).get(`/requests/${requestId}/messages`)
     expect(adopterView.status).toBe(200)
     expect(adopterView.body).toMatchObject({
@@ -499,7 +497,9 @@ describe('chat da solicitação', () => {
       expect(message).not.toHaveProperty('userId')
     }
 
-    const organizationView = await request(app).get(`/requests/${requestId}/messages`).set(organization)
+    const organizationView = await request(app)
+      .get(`/requests/${requestId}/messages`)
+      .set(organization)
     expect(organizationView.body.unreadCount).toBe(1)
     expect(organizationView.body.data[0]).toMatchObject({
       authorName: 'Instituto Patinhas',
@@ -544,7 +544,9 @@ describe('chat da solicitação', () => {
     expect(sent.status).toBe(201)
     expect(sent.body).toMatchObject({ body, mine: true, authorName: 'Lucas Ferreira' })
     expect(sent.body).not.toHaveProperty('authorId')
-    const fromOrganization = await request(app).get(`/requests/${requestId}/messages`).set(organization)
+    const fromOrganization = await request(app)
+      .get(`/requests/${requestId}/messages`)
+      .set(organization)
     expect(fromOrganization.body.data.at(-1)).toMatchObject({
       body,
       mine: false,
