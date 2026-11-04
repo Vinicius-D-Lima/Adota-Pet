@@ -9,12 +9,11 @@ import { renderWithProviders } from '../test/renderWithProviders'
 import { RequestsPage } from './RequestsPage'
 
 vi.mock('../lib/api', () => ({
-  api: { get: vi.fn(), post: vi.fn(), patch: vi.fn() },
+  api: { get: vi.fn(), post: vi.fn() },
 }))
 
 const getMock = vi.mocked(api.get)
 const postMock = vi.mocked(api.post)
-const patchMock = vi.mocked(api.patch)
 
 const list = (...data: ReturnType<typeof makeRequest>[]) => ({ data, total: data.length })
 
@@ -265,38 +264,5 @@ describe('RequestsPage', () => {
     renderWithProviders(<RequestsPage />)
 
     expect(await screen.findByText(/nenhuma solicitação ainda/i)).toBeInTheDocument()
-  })
-
-  it('exibe o badge de mensagens não lidas e abre o chat ao expandir a solicitação', async () => {
-    getMock.mockImplementation((path) => {
-      if (path === '/me/requests') {
-        return Promise.resolve(list(makeRequest({ unreadMessageCount: 2 })))
-      }
-      if (path === '/requests/SOL-1042/messages') {
-        return Promise.resolve({
-          data: [
-            {
-              id: 'MSG-1',
-              authorName: 'Instituto Patinhas',
-              mine: false,
-              body: 'Olá!',
-              createdAt: '2026-10-25T13:00:00.000Z',
-              readAt: null,
-            },
-          ],
-          unreadCount: 2,
-          nextCursor: null,
-        })
-      }
-      return Promise.resolve({ data: [], total: 0 })
-    })
-    patchMock.mockResolvedValue(undefined)
-    renderWithProviders(<RequestsPage />)
-
-    expect(await screen.findByLabelText('2 mensagens não lidas')).toBeInTheDocument()
-    await userEvent.setup().click(screen.getByText('Conversa'))
-
-    expect(await screen.findByText('Olá!')).toBeInTheDocument()
-    expect(patchMock).toHaveBeenCalledWith('/requests/SOL-1042/messages/read')
   })
 })

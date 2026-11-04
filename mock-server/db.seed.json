@@ -434,24 +434,6 @@
       "userId": "demo"
     }
   ],
-  "chatMessages": [
-    {
-      "id": "MSG-1001",
-      "requestId": "SOL-1039",
-      "authorId": "demo-organization",
-      "body": "Olá, Lucas! Recebemos sua solicitação para a Mimi e gostaríamos de conversar sobre sua rotina.",
-      "createdAt": "2026-10-25T13:00:00.000Z",
-      "readAt": null
-    },
-    {
-      "id": "MSG-1002",
-      "requestId": "SOL-1039",
-      "authorId": "demo",
-      "body": "Obrigado! Tenho disponibilidade para conversar durante a semana.",
-      "createdAt": "2026-10-25T13:10:00.000Z",
-      "readAt": null
-    }
-  ],
   "notifications": [
     {
       "id": "NOT-1003",

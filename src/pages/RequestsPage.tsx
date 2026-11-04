@@ -1,8 +1,7 @@
-import { CalendarDays, ChevronRight, ClipboardList, MapPin, MessageCircle } from 'lucide-react'
-import { useState, type SyntheticEvent } from 'react'
+import { CalendarDays, ChevronRight, ClipboardList, MapPin } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ConfirmDialog } from '../components/ConfirmDialog'
-import { RequestChat } from '../components/RequestChat'
 import {
   Alert,
   Button,
@@ -51,7 +50,6 @@ export function RequestsPage() {
   const cancelRequest = useCancelAdoptionRequest()
   const [searchParams, setSearchParams] = useSearchParams()
   const [cancelError, setCancelError] = useState('')
-  const [openChats, setOpenChats] = useState<Record<string, boolean>>({})
   const [toCancel, setToCancel] = useState<{
     request: AdoptionRequest
     opener: HTMLElement
@@ -158,13 +156,6 @@ export function RequestsPage() {
             <div className="grid gap-3.5" aria-live="polite">
               {visibleRequests.map((request) => {
                 const { pet } = request
-                const chatOpen = (event: SyntheticEvent<HTMLDetailsElement>) => {
-                  const isOpen = event.currentTarget.open
-                  setOpenChats((current) => ({
-                    ...current,
-                    [request.id]: isOpen,
-                  }))
-                }
                 return (
                   <Card
                     as="article"
@@ -229,26 +220,6 @@ export function RequestsPage() {
                         </Link>
                       )}
                     </div>
-                    <details
-                      className="col-span-2 border-t border-line pt-3 md:col-span-3"
-                      onToggle={chatOpen}
-                    >
-                      <summary className="flex cursor-pointer items-center gap-2 text-sm font-bold text-forest-800">
-                        <MessageCircle size={17} />
-                        Conversa
-                        {(request.unreadMessageCount ?? 0) > 0 && (
-                          <span
-                            className="rounded-full bg-coral px-2 py-0.5 text-xs text-white"
-                            aria-label={`${request.unreadMessageCount} mensagens não lidas`}
-                          >
-                            {request.unreadMessageCount}
-                          </span>
-                        )}
-                      </summary>
-                      {openChats[request.id] && (
-                        <RequestChat requestId={request.id} status={request.status} />
-                      )}
-                    </details>
                   </Card>
                 )
               })}

@@ -45,9 +45,6 @@ Solicitações do seed: `SOL-1039` (Fred, `Aprovada`), `SOL-1040` (Nina, `Recusa
 | `GET /me/requests`                                         | Solicitações do usuário (a mais recente primeiro)           |
 | `GET /requests/:id`                                        | Uma solicitação do usuário                                  |
 | `POST /requests/:id/transitions`                           | Muda o status (hoje só `{ "to": "CANCELADA" }`)             |
-| `GET /requests/:id/messages?cursor=`                       | Mensagens da solicitação com paginação por cursor           |
-| `POST /requests/:id/messages`                              | Envia uma mensagem de texto puro (máximo 2.000 caracteres)  |
-| `PATCH /requests/:id/messages/read`                        | Marca mensagens recebidas da conversa como lidas (204)      |
 | `GET /me/favorites` · `GET /me/favorites/ids`              | Favoritos (pets completos / só os IDs)                      |
 | `PUT /me/favorites/:petId` · `DELETE /me/favorites/:petId` | Adiciona / remove favorito (204, idempotentes)              |
 | `GET /me/saved-filters`                                    | Lista as buscas salvas da conta atual                       |
@@ -73,12 +70,6 @@ As notificações e preferências são separadas por `X-Demo-User-Id` e persiste
 As preferências retornam `{ data: [{ type, inApp, email }] }`. O `PUT` recebe a lista completa em `data`, com exatamente uma entrada para cada tipo. Os valores padrão deixam o canal in-app ativo e habilitam e-mail apenas para os tipos marcados como críticos no mock.
 
 Este servidor apenas simula a API: não processa eventos de domínio, não envia e-mails e não implementa autenticação/autorização real. Os endpoints do backend continuam descritos na issue #30.
-
-### Chat da solicitação
-
-As rotas do chat local simulam o contrato da issue #22. O histórico retorna `{ data, unreadCount, nextCursor }`, com mensagens em ordem cronológica e páginas de até 20 itens. `cursor` aponta para a mensagem mais antiga carregada, para buscar mensagens anteriores. Mensagens são renderizadas como texto e respostas não incluem IDs de autor, e-mail ou telefone. O mock permite leitura aos participantes da solicitação e bloqueia envio quando o status é `Aprovada`, `Recusada` ou `Cancelada`.
-
-O mock não implementa autenticação/autorização real, limites de taxa ou emissão do evento `MessageReceived`; essas garantias continuam sendo responsabilidade do backend.
 
 ### `GET /pets`
 
