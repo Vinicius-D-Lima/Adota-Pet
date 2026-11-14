@@ -58,7 +58,10 @@ export function useGuardianProfile() {
       const personalData = getDemoPersonalData()
       const personalDefaults = personalData
         ? {
-            displayName: personalData.organizationName,
+            displayName:
+              personalData.guardianType === 'ORGANIZATION'
+                ? personalData.organizationName
+                : undefined,
             legalName: personalData.responsibleName ?? personalData.name,
             document: personalData.document,
             email: personalData.email,
@@ -69,7 +72,9 @@ export function useGuardianProfile() {
               personalData.city && personalData.state
                 ? `${personalData.city}, ${personalData.state}`
                 : personalData.city,
-            guardianType: personalData.organizationName ? 'ORGANIZATION' : undefined,
+            guardianType:
+              personalData.guardianType ??
+              (personalData.organizationName ? 'ORGANIZATION' : undefined),
           }
         : {}
       const defaults = Object.fromEntries(

@@ -310,6 +310,7 @@ describe('perfil', () => {
     const emptyAccount = { 'X-Demo-User-Id': 'demo-empty' }
     const payload = {
       accountType: 'guardian',
+      guardianType: 'ORGANIZATION',
       organizationName: 'Instituto Patinhas',
       responsibleName: 'Maria da Silva',
       document: '11222333000181',
@@ -327,6 +328,7 @@ describe('perfil', () => {
     expect(response.status).toBe(200)
     expect(response.body).toMatchObject({
       id: 'demo-empty',
+      guardianType: 'ORGANIZATION',
       organizationName: 'Instituto Patinhas',
       responsibleName: 'Maria da Silva',
       document: '11222333000181',
@@ -341,6 +343,37 @@ describe('perfil', () => {
       roles: ['GUARDIAN'],
     })
     expect(response.body).not.toHaveProperty('password')
+  })
+
+  it('grava uma conta de protetor independente com CPF e sem instituição', async () => {
+    const emptyAccount = { 'X-Demo-User-Id': 'demo-empty' }
+    const payload = {
+      accountType: 'guardian',
+      guardianType: 'INDIVIDUAL',
+      responsibleName: 'Lucas de Paula',
+      document: '52998224725',
+      email: 'lucas@exemplo.com',
+      phone: '11999999999',
+      zipCode: '01310100',
+      address: 'Rua das Flores, 100',
+      city: 'São Paulo',
+      state: 'SP',
+      password: 'senha123',
+    }
+
+    const response = await request(app).put('/me/account').set(emptyAccount).send(payload)
+
+    expect(response.status).toBe(200)
+    expect(response.body).toMatchObject({
+      id: 'demo-empty',
+      guardianType: 'INDIVIDUAL',
+      organizationName: '',
+      responsibleName: 'Lucas de Paula',
+      document: '52998224725',
+      name: 'Lucas de Paula',
+      role: 'RESPONSAVEL',
+      roles: ['GUARDIAN'],
+    })
   })
 
   it('separa o adotante e a instituição pelo cabeçalho de conta demo', async () => {
