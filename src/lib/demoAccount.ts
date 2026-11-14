@@ -27,7 +27,6 @@ export const demoAccounts = [
 export type DemoAccountId = (typeof demoAccounts)[number]['id']
 
 export interface DemoPersonalData {
-  guardianType?: 'INDIVIDUAL' | 'ORGANIZATION'
   name?: string
   cpf?: string
   birthDate?: string

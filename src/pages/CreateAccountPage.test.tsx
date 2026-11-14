@@ -31,7 +31,6 @@ describe('CreateAccountPage', () => {
     )
 
     await user.click(screen.getByRole('radio', { name: /Quero divulgar pets/ }))
-    await user.click(screen.getByRole('radio', { name: /Instituição ou ONG/ }))
     await user.type(screen.getByLabelText('Nome da instituição'), 'Instituto Patinhas')
     await user.type(screen.getByLabelText('Nome do responsável'), 'Maria da Silva')
     await user.type(screen.getByLabelText('CNPJ'), '11222333000181')
@@ -45,7 +44,6 @@ describe('CreateAccountPage', () => {
     await user.click(screen.getByRole('button', { name: /Criar minha conta/ }))
 
     const personalData = {
-      guardianType: 'ORGANIZATION',
       organizationName: 'Instituto Patinhas',
       responsibleName: 'Maria da Silva',
       document: '11222333000181',
@@ -65,46 +63,6 @@ describe('CreateAccountPage', () => {
     )
     expect(mocks.createDemoAccount).toHaveBeenCalledWith('/perfil?tipo=responsavel', personalData)
     expect(screen.getByTestId('current-path')).toHaveTextContent('/')
-  })
-
-  it('cria uma conta de protetor independente com CPF e sem dados de instituição', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(<CreateAccountPage />, { route: '/criar-conta' })
-
-    await user.click(screen.getByRole('radio', { name: /Quero divulgar pets/ }))
-    await user.click(screen.getByRole('radio', { name: /Pessoa física/ }))
-    await user.type(screen.getByLabelText('Nome completo'), 'Lucas de Paula')
-    await user.type(screen.getByLabelText('CPF'), '52998224725')
-    await user.type(screen.getByLabelText('Cidade'), 'São Paulo')
-    await user.type(screen.getByLabelText('Estado'), 'SP')
-    await user.type(screen.getByLabelText('E-mail'), 'lucas@exemplo.com')
-    await user.type(screen.getByLabelText('Celular'), '11999999999')
-    await user.type(screen.getByLabelText('CEP'), '01310100')
-    await user.type(screen.getByLabelText('Endereço completo'), 'Rua das Flores, 100')
-    await user.type(screen.getByPlaceholderText('Crie uma senha'), 'senha123')
-    await user.click(screen.getByRole('button', { name: /Criar minha conta/ }))
-
-    const personalData = {
-      guardianType: 'INDIVIDUAL',
-      responsibleName: 'Lucas de Paula',
-      document: '52998224725',
-      email: 'lucas@exemplo.com',
-      phone: '11999999999',
-      city: 'São Paulo',
-      state: 'SP',
-      zipCode: '01310100',
-      address: 'Rua das Flores, 100',
-    }
-    await waitFor(() =>
-      expect(mocks.put).toHaveBeenCalledWith('/me/account', {
-        ...personalData,
-        password: 'senha123',
-        accountType: 'guardian',
-      }),
-    )
-    expect(mocks.createDemoAccount).toHaveBeenCalledWith('/perfil?tipo=responsavel', personalData)
-    expect(screen.queryByLabelText('Nome da instituição')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('CNPJ')).not.toBeInTheDocument()
   })
 
   it('valida os dados básicos do adotante antes de criar a conta', async () => {

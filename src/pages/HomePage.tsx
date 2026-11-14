@@ -1,26 +1,19 @@
 import {
   ArrowRight,
   CheckCircle2,
-  ClipboardCheck,
   HeartHandshake,
-  House,
-  PawPrint,
   type LucideIcon,
   Search,
   ShieldCheck,
   Sparkles,
-  UserRoundPlus,
 } from 'lucide-react'
 import { useMemo } from 'react'
 import { PetCard, PetCardSkeleton } from '../components/PetCard'
 import { PetGrid } from '../components/PetGrid'
 import { Button, Card, Container, Eyebrow, LinkButton, TextLink } from '../components/ui'
 import { useAdopterProfile } from '../hooks/useAdopterProfile'
-import { useDemoAccount } from '../hooks/useDemoAccount'
 import { usePets } from '../hooks/usePets'
 import { calculateCompatibility } from '../utils/calculateCompatibility'
-import { calculateProfileCompletion } from '../utils/profileCompletion'
-import { profileFieldLabels } from '../utils/profileFieldLabels'
 
 const sectionTitle = 'mb-0 text-[clamp(34px,4vw,48px)] leading-[1.14]'
 const floatingNote =
@@ -47,37 +40,7 @@ const steps: [LucideIcon, string, string, string][] = [
   ],
 ]
 
-const profileFieldGroups = [
-  {
-    title: 'Informações pessoais',
-    icon: UserRoundPlus,
-    fields: ['name', 'cpf', 'birthDate', 'email', 'phone', 'zipCode', 'address'],
-  },
-  {
-    title: 'Moradia e composição',
-    icon: House,
-    fields: ['housing', 'hasOutdoorArea', 'hasChildren', 'hasOtherPets'],
-  },
-  {
-    title: 'Rotina e experiência',
-    icon: ClipboardCheck,
-    fields: ['dailyTime', 'activityLevel', 'experience', 'acceptsSpecialCare'],
-  },
-  {
-    title: 'Preferências de adoção',
-    icon: PawPrint,
-    fields: ['preferredSpecies', 'preferredSize'],
-  },
-]
-
-function summarizeFields(fields: string[]) {
-  const labels = fields.map((field) => profileFieldLabels[field] ?? field)
-  if (labels.length <= 2) return labels.join(' e ')
-  return `${labels.slice(0, 2).join(', ')} e mais ${labels.length - 2}`
-}
-
 export function HomePage() {
-  const account = useDemoAccount()
   const petsQuery = usePets({ sort: 'recent', limit: 12 })
   const profileQuery = useAdopterProfile()
   const pets = useMemo(() => petsQuery.data?.pages[0]?.data ?? [], [petsQuery.data])
@@ -95,23 +58,6 @@ export function HomePage() {
       .sort((a, b) => b.result.score - a.result.score)
       .slice(0, 3)
   }, [pets, profileQuery.data])
-  const profileCompletion = useMemo(
-    () =>
-      profileQuery.data
-        ? calculateProfileCompletion('adopter', profileQuery.data.profile)
-        : undefined,
-    [profileQuery.data],
-  )
-  const missingGroups = useMemo(() => {
-    const missingFields = new Set(profileCompletion?.missingFields.map(({ key }) => key) ?? [])
-    return profileFieldGroups
-      .map((group) => ({
-        ...group,
-        missingFields: group.fields.filter((field) => missingFields.has(field)),
-      }))
-      .filter((group) => group.missingFields.length > 0)
-  }, [profileCompletion])
-  const profilePath = account.isAuthenticated ? account.profilePath : '/criar-conta'
 
   return (
     <>
@@ -132,8 +78,8 @@ export function HomePage() {
               <LinkButton to="/pets" className="w-full sm:w-auto">
                 Encontrar meu pet <ArrowRight size={18} />
               </LinkButton>
-              <LinkButton variant="secondary" to={profilePath} className="w-full sm:w-auto">
-                {account.isAuthenticated ? 'Completar meu perfil' : 'Criar minha conta'}
+              <LinkButton variant="secondary" to="/perfil" className="w-full sm:w-auto">
+                Completar meu perfil
               </LinkButton>
             </div>
             <div className="mt-[30px] flex flex-col gap-[9px] text-[13px] font-semibold text-forest-700 sm:flex-row sm:gap-6">
@@ -204,140 +150,24 @@ export function HomePage() {
       <section className="bg-white py-[68px] md:py-[92px]">
         <Container>
           <div className="mb-9">
-            <Eyebrow>{account.isAuthenticated ? 'Compatibilidade' : 'Comece por aqui'}</Eyebrow>
-            <h2 className={sectionTitle}>
-              {account.isAuthenticated ? 'Recomendados para você' : 'Encontre seu novo companheiro'}
-            </h2>
+            <Eyebrow>Compatibilidade</Eyebrow>
+            <h2 className={sectionTitle}>Recomendados para você</h2>
           </div>
 
-          {!account.isAuthenticated && (
-            <Card className="relative overflow-hidden border-forest-800/10 bg-[linear-gradient(135deg,#f7f3e8_0%,#edf3eb_100%)] p-6 shadow-[0_18px_55px_rgba(29,64,49,0.08)] sm:p-8 lg:p-10">
-              <div className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full bg-coral/10" />
-              <div className="relative grid gap-8 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
-                <div>
-                  <span className="mb-5 grid size-14 place-items-center rounded-2xl bg-coral text-white shadow-[0_10px_25px_rgba(233,120,82,0.25)]">
-                    <HeartHandshake size={28} />
-                  </span>
-                  <h3 className="mb-3 max-w-[620px] font-display text-[28px] leading-tight text-forest-900 sm:text-[34px]">
-                    Crie seu perfil e descubra os pets que combinam com a sua rotina
-                  </h3>
-                  <p className="mb-0 max-w-[650px] text-base leading-[1.7] text-muted sm:text-lg">
-                    É rápido, gratuito e ajuda a tornar cada adoção mais segura e consciente para
-                    você e para o pet.
-                  </p>
-                  <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                    <LinkButton to="/criar-conta" className="w-full sm:w-auto">
-                      Criar meu perfil <ArrowRight size={18} />
-                    </LinkButton>
-                    <LinkButton variant="secondary" to="/pets" className="w-full sm:w-auto">
-                      Explorar todos os pets
-                    </LinkButton>
-                  </div>
-                </div>
-                <ul
-                  className="m-0 grid list-none gap-3 p-0"
-                  aria-label="Vantagens de criar um perfil"
-                >
-                  {[
-                    'Recomendações que combinam com você',
-                    'Teste de compatibilidade personalizado',
-                    'Acompanhamento das suas solicitações',
-                  ].map((benefit) => (
-                    <li
-                      key={benefit}
-                      className="flex items-center gap-3 rounded-2xl border border-white/80 bg-white/75 px-4 py-3.5 font-semibold text-forest-800 shadow-sm"
-                    >
-                      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-forest-100 text-forest-700">
-                        <CheckCircle2 size={18} />
-                      </span>
-                      {benefit}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          {!profileQuery.isPending && !profileQuery.data?.isComplete && (
+            <Card className="p-6">
+              <h3 className="mb-3 text-xl">Complete seu perfil para receber recomendações</h3>
+              <p className="text-muted">Ainda faltam algumas informações importantes:</p>
+              <ul className="mb-5 mt-3 list-disc pl-5">
+                {profileQuery.data?.missingFields.map((field) => (
+                  <li key={field}>{field}</li>
+                ))}
+              </ul>
+              <LinkButton to="/perfil">Completar perfil</LinkButton>
             </Card>
           )}
 
-          {account.isAuthenticated && profileQuery.isPending && (
-            <Card className="animate-pulse p-6 sm:p-8" aria-label="Carregando perfil">
-              <div className="mb-4 h-7 w-2/3 rounded bg-[#e5ebe6]" />
-              <div className="mb-7 h-4 w-full max-w-xl rounded bg-[#e5ebe6]" />
-              <div className="h-3 w-full rounded-full bg-[#e5ebe6]" />
-            </Card>
-          )}
-
-          {account.isAuthenticated && profileQuery.isError && (
-            <Card className="p-6 text-center sm:p-8" role="alert">
-              <h3 className="mb-2 text-xl">Não foi possível verificar seu perfil</h3>
-              <p className="mb-5 text-muted">
-                Tente novamente para receber recomendações personalizadas.
-              </p>
-              <Button variant="secondary" onClick={() => void profileQuery.refetch()}>
-                Tentar novamente
-              </Button>
-            </Card>
-          )}
-
-          {account.isAuthenticated && profileCompletion && !profileCompletion.isComplete && (
-            <Card className="overflow-hidden border-forest-800/10 shadow-[0_18px_55px_rgba(29,64,49,0.07)]">
-              <div className="bg-[linear-gradient(135deg,#fbf8ef_0%,#f0f5f1_100%)] p-6 sm:p-8">
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <span className="mb-4 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-sm font-bold text-forest-700 shadow-sm">
-                      <Sparkles size={16} /> Seu perfil está quase lá
-                    </span>
-                    <h3 className="mb-2 font-display text-[27px] leading-tight sm:text-[31px]">
-                      Complete algumas informações para liberar suas recomendações
-                    </h3>
-                    <p className="mb-0 max-w-[680px] leading-[1.65] text-muted">
-                      Esses dados ajudam a encontrar pets compatíveis com sua casa, sua rotina e
-                      suas preferências.
-                    </p>
-                  </div>
-                  <strong className="shrink-0 font-display text-[34px] text-coral">
-                    {profileCompletion.percentage}%
-                  </strong>
-                </div>
-                <div
-                  className="mt-6 h-2.5 overflow-hidden rounded-full bg-white"
-                  aria-hidden="true"
-                >
-                  <div
-                    className="h-full rounded-full bg-coral transition-[width] duration-300"
-                    style={{ width: `${profileCompletion.percentage}%` }}
-                  />
-                </div>
-                <span className="sr-only">Perfil {profileCompletion.percentage}% completo</span>
-              </div>
-
-              <div className="p-6 sm:p-8">
-                <p className="mb-4 font-bold text-forest-900">O que ainda falta preencher</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {missingGroups.map(({ title, icon: Icon, missingFields }) => (
-                    <div
-                      key={title}
-                      className="flex items-start gap-3 rounded-2xl border border-line bg-cream/45 p-4"
-                    >
-                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-forest-100 text-forest-700">
-                        <Icon size={20} />
-                      </span>
-                      <span>
-                        <strong className="block text-forest-900">{title}</strong>
-                        <span className="mt-1 block text-sm leading-relaxed text-muted">
-                          {summarizeFields(missingFields)}
-                        </span>
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                <LinkButton to={account.profilePath} className="mt-6 w-full sm:w-auto">
-                  Continuar preenchimento <ArrowRight size={18} />
-                </LinkButton>
-              </div>
-            </Card>
-          )}
-
-          {account.isAuthenticated && profileCompletion?.isComplete && (
+          {profileQuery.data?.isComplete && (
             <PetGrid>
               {recommendedPets.map(({ pet, result }) => (
                 <PetCard
@@ -401,9 +231,8 @@ export function HomePage() {
               Quanto mais sabemos sobre sua rotina, melhor fica o encontro.
             </h2>
           </div>
-          <LinkButton variant="cream" to={profilePath} className="shrink-0">
-            {account.isAuthenticated ? 'Preencher meu perfil' : 'Criar meu perfil'}{' '}
-            <ArrowRight size={18} />
+          <LinkButton variant="cream" to="/perfil" className="shrink-0">
+            Preencher meu perfil <ArrowRight size={18} />
           </LinkButton>
         </section>
       </Container>

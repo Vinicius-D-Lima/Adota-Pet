@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { PawPrint, UserRoundPlus } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { type Resolver, useForm, useWatch } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Container, Field, Input, PageSurface } from '../components/ui'
@@ -41,15 +41,6 @@ export function CreateAccountPage() {
     },
   })
   const accountType = useWatch({ control, name: 'accountType' })
-  const guardianType = useWatch({ control, name: 'guardianType' })
-
-  useEffect(() => {
-    if (!guardianType) return
-    setValue('document', '', { shouldDirty: false, shouldValidate: false })
-    if (guardianType === 'INDIVIDUAL') {
-      setValue('organizationName', '', { shouldDirty: false, shouldValidate: false })
-    }
-  }, [guardianType, setValue])
 
   const digits = (field: 'cpf' | 'phone' | 'document' | 'zipCode', max: number) => ({
     onChange: (event: React.ChangeEvent<HTMLInputElement>) =>
@@ -66,10 +57,7 @@ export function CreateAccountPage() {
     const personalData =
       accountType === 'guardian'
         ? {
-            guardianType: data.guardianType,
-            ...(data.guardianType === 'ORGANIZATION'
-              ? { organizationName: data.organizationName }
-              : {}),
+            organizationName: data.organizationName,
             responsibleName: data.responsibleName,
             document: data.document,
             email: data.email,
@@ -93,10 +81,7 @@ export function CreateAccountPage() {
         accountType === 'guardian'
           ? {
               accountType,
-              guardianType: data.guardianType,
-              ...(data.guardianType === 'ORGANIZATION'
-                ? { organizationName: data.organizationName }
-                : {}),
+              organizationName: data.organizationName,
               responsibleName: data.responsibleName,
               document: data.document,
               city: data.city,
@@ -175,16 +160,16 @@ export function CreateAccountPage() {
 
             <div className="mt-2 border-t border-line pt-6">
               <p className="mb-1 text-xs font-bold uppercase tracking-[0.12em] text-coral">
-                {accountType === 'guardian' ? 'Dados do responsável' : 'Dados básicos'}
+                {accountType === 'guardian' ? 'Dados da organização' : 'Dados básicos'}
               </p>
               <h2 className="mb-1 text-[27px]">
                 {accountType === 'guardian'
-                  ? 'Informações de quem divulga os pets'
+                  ? 'Informações da instituição'
                   : 'Informações do adotante'}
               </h2>
               <p className="mb-5 text-xs leading-5 text-muted">
                 {accountType === 'guardian'
-                  ? 'Escolha se o responsável é uma pessoa física ou uma instituição.'
+                  ? 'Esses dados identificam a instituição e o responsável pela conta.'
                   : 'Esses dados pessoais serão levados automaticamente para o seu perfil.'}
               </p>
             </div>
@@ -220,94 +205,45 @@ export function CreateAccountPage() {
                 </>
               ) : (
                 <>
-                  <fieldset className="col-span-full grid gap-3">
-                    <legend className="text-xs font-bold">Tipo de responsável</legend>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <label className="flex cursor-pointer gap-3 rounded-xl border border-line p-4">
-                        <input type="radio" value="INDIVIDUAL" {...register('guardianType')} />
-                        <span>
-                          <strong className="block text-sm">Pessoa física</strong>
-                          <small className="text-muted">Protetor independente com CPF.</small>
-                        </span>
-                      </label>
-                      <label className="flex cursor-pointer gap-3 rounded-xl border border-line p-4">
-                        <input type="radio" value="ORGANIZATION" {...register('guardianType')} />
-                        <span>
-                          <strong className="block text-sm">Instituição ou ONG</strong>
-                          <small className="text-muted">Pessoa jurídica com CNPJ.</small>
-                        </span>
-                      </label>
-                    </div>
-                    {errors.guardianType?.message && (
-                      <small className="text-[#a33f2d]">{errors.guardianType.message}</small>
-                    )}
-                  </fieldset>
-                  {guardianType && (
-                    <>
-                      {guardianType === 'ORGANIZATION' && (
-                        <Field
-                          label="Nome da instituição"
-                          error={errors.organizationName?.message}
-                          tight
-                        >
-                          <Input
-                            placeholder="Ex.: Instituto Patinhas"
-                            invalid={Boolean(errors.organizationName)}
-                            {...register('organizationName')}
-                          />
-                        </Field>
-                      )}
-                      <Field
-                        label={
-                          guardianType === 'INDIVIDUAL' ? 'Nome completo' : 'Nome do responsável'
-                        }
-                        error={errors.responsibleName?.message}
-                        tight
-                      >
-                        <Input
-                          autoComplete="name"
-                          placeholder="Ex.: Ana Maria de Souza"
-                          invalid={Boolean(errors.responsibleName)}
-                          {...register('responsibleName')}
-                        />
-                      </Field>
-                      <Field
-                        label={guardianType === 'INDIVIDUAL' ? 'CPF' : 'CNPJ'}
-                        error={errors.document?.message}
-                        tight
-                      >
-                        <Input
-                          inputMode="numeric"
-                          maxLength={guardianType === 'INDIVIDUAL' ? 11 : 14}
-                          placeholder={
-                            guardianType === 'INDIVIDUAL'
-                              ? 'Ex.: 52998224725'
-                              : 'Ex.: 11222333000181'
-                          }
-                          invalid={Boolean(errors.document)}
-                          {...register(
-                            'document',
-                            digits('document', guardianType === 'INDIVIDUAL' ? 11 : 14),
-                          )}
-                        />
-                      </Field>
-                      <Field label="Cidade" error={errors.city?.message} tight>
-                        <Input
-                          placeholder="Ex.: São Paulo"
-                          invalid={Boolean(errors.city)}
-                          {...register('city')}
-                        />
-                      </Field>
-                      <Field label="Estado" error={errors.state?.message} tight>
-                        <Input
-                          maxLength={2}
-                          placeholder="Ex.: SP"
-                          invalid={Boolean(errors.state)}
-                          {...register('state')}
-                        />
-                      </Field>
-                    </>
-                  )}
+                  <Field label="Nome da instituição" error={errors.organizationName?.message} tight>
+                    <Input
+                      placeholder="Ex.: Instituto Patinhas"
+                      invalid={Boolean(errors.organizationName)}
+                      {...register('organizationName')}
+                    />
+                  </Field>
+                  <Field label="Nome do responsável" error={errors.responsibleName?.message} tight>
+                    <Input
+                      autoComplete="name"
+                      placeholder="Ex.: Ana Maria de Souza"
+                      invalid={Boolean(errors.responsibleName)}
+                      {...register('responsibleName')}
+                    />
+                  </Field>
+                  <Field label="CNPJ" error={errors.document?.message} tight>
+                    <Input
+                      inputMode="numeric"
+                      maxLength={14}
+                      placeholder="Ex.: 11222333000181"
+                      invalid={Boolean(errors.document)}
+                      {...register('document', digits('document', 14))}
+                    />
+                  </Field>
+                  <Field label="Cidade" error={errors.city?.message} tight>
+                    <Input
+                      placeholder="Ex.: São Paulo"
+                      invalid={Boolean(errors.city)}
+                      {...register('city')}
+                    />
+                  </Field>
+                  <Field label="Estado" error={errors.state?.message} tight>
+                    <Input
+                      maxLength={2}
+                      placeholder="Ex.: SP"
+                      invalid={Boolean(errors.state)}
+                      {...register('state')}
+                    />
+                  </Field>
                 </>
               )}
               <Field label="E-mail" error={errors.email?.message} tight>

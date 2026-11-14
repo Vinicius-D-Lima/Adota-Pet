@@ -509,18 +509,8 @@ export function createApp({
     const normalized = {}
     const guardian = body.accountType === 'guardian'
     if (guardian) {
-      const guardianType = body.guardianType
-      const organization = guardianType === 'ORGANIZATION'
-      if (!['INDIVIDUAL', 'ORGANIZATION'].includes(guardianType)) {
-        details.push({
-          field: 'guardianType',
-          message: 'Escolha entre pessoa física e instituição.',
-        })
-      } else {
-        normalized.guardianType = guardianType
-      }
       const required = [
-        ...(organization ? ['organizationName'] : []),
+        'organizationName',
         'responsibleName',
         'document',
         'email',
@@ -538,11 +528,8 @@ export function createApp({
         }
         if (['organizationName', 'responsibleName'].includes(key) && value.trim().length < 3)
           details.push({ field: key, message: `Preencha ${key}.` })
-        else if (key === 'document' && !(organization ? isValidCnpj(value) : isValidCpf(value)))
-          details.push({
-            field: key,
-            message: `Informe um ${organization ? 'CNPJ' : 'CPF'} válido.`,
-          })
+        else if (key === 'document' && !isValidCnpj(value))
+          details.push({ field: key, message: 'Informe um CNPJ válido.' })
         else if (key === 'email' && profileFieldError('email', value))
           details.push({ field: key, message: 'Informe um e-mail válido.' })
         else if (key === 'phone' && profileFieldError('phone', value))
@@ -560,10 +547,6 @@ export function createApp({
             ? digitsOnly(value)
             : value.trim()
       }
-      normalized.organizationName =
-        organization && typeof body.organizationName === 'string'
-          ? body.organizationName.trim()
-          : ''
       normalized.name = typeof body.responsibleName === 'string' ? body.responsibleName.trim() : ''
     } else {
       for (const key of ['name', 'cpf', 'birthDate', 'email', 'phone', 'zipCode', 'address']) {
