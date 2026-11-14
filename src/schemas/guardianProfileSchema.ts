@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 const digitsOnly = (value: string) => value.replace(/\D/g, '')
 
-const isValidCpf = (value: string) => {
+export const isValidCpf = (value: string) => {
   const cpf = digitsOnly(value)
   if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false
   const digit = (length: number) => {
@@ -16,7 +16,7 @@ const isValidCpf = (value: string) => {
   return digit(9) === Number(cpf[9]) && digit(10) === Number(cpf[10])
 }
 
-const isValidCnpj = (value: string) => {
+export const isValidCnpj = (value: string) => {
   const cnpj = digitsOnly(value)
   if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false
   const digit = (base: string, weights: number[]) => {
