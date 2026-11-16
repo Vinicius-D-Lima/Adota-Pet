@@ -45,6 +45,7 @@ export const receivedRequestSchema = z.object({
   date: z.string().min(1),
   message: z.string(),
   pet: requestPetSchema.nullable(),
+  unreadMessageCount: z.number().int().nonnegative().optional(),
   answers: z
     .object({
       motivation: z.string(),

@@ -1,6 +1,7 @@
-import { CalendarDays, Mail, Phone, UserRound } from 'lucide-react'
-import { useState } from 'react'
+import { CalendarDays, Mail, MessageCircle, Phone, UserRound } from 'lucide-react'
+import { useState, type SyntheticEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { RequestChat } from '../components/RequestChat'
 import {
   Alert,
   Button,
@@ -39,6 +40,7 @@ export function OrganizationRequestsPage() {
   const updateStatus = useUpdateReceivedRequestStatus()
   const [params, setParams] = useSearchParams()
   const [error, setError] = useState('')
+  const [openChats, setOpenChats] = useState<Record<string, boolean>>({})
 
   if (requestsQuery.isPending) return <Feedback>Carregando solicitações recebidas...</Feedback>
   if (requestsQuery.isError)
@@ -110,6 +112,14 @@ export function OrganizationRequestsPage() {
                   request={request}
                   pending={updateStatus.isPending && updateStatus.variables?.id === request.id}
                   onChange={change}
+                  chatOpen={openChats[request.id] ?? false}
+                  onChatToggle={(event) => {
+                    const isOpen = event.currentTarget.open
+                    setOpenChats((current) => ({
+                      ...current,
+                      [request.id]: isOpen,
+                    }))
+                  }}
                 />
               ))}
               {!visible.length && (
@@ -135,10 +145,14 @@ function RequestCard({
   request,
   pending,
   onChange,
+  chatOpen,
+  onChatToggle,
 }: {
   request: ReceivedRequest
   pending: boolean
   onChange: (id: string, to: 'EM_ANALISE' | 'APROVADA' | 'RECUSADA') => Promise<void>
+  chatOpen: boolean
+  onChatToggle: (event: SyntheticEvent<HTMLDetailsElement>) => void
 }) {
   return (
     <Card as="article" className="overflow-hidden">
@@ -216,6 +230,21 @@ function RequestCard({
             <Info label="Adaptação" value={request.answers?.adaptation} />
           </section>
         </div>
+      </details>
+      <details className="border-t border-line px-5 py-4 md:px-6" onToggle={onChatToggle}>
+        <summary className="flex cursor-pointer items-center gap-2 text-xs font-bold text-forest-800">
+          <MessageCircle size={16} />
+          Conversa com o adotante
+          {(request.unreadMessageCount ?? 0) > 0 && (
+            <span
+              className="rounded-full bg-coral px-2 py-0.5 text-[10px] text-white"
+              aria-label={`${request.unreadMessageCount} mensagens não lidas`}
+            >
+              {request.unreadMessageCount}
+            </span>
+          )}
+        </summary>
+        {chatOpen && <RequestChat requestId={request.id} status={request.status} />}
       </details>
     </Card>
   )

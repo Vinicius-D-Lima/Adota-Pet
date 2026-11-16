@@ -30,7 +30,7 @@ Para encerrar, use `Ctrl+C` no terminal. Não há processo em segundo plano.
 | `SOL-1041` | Tobias | `Cancelada`  | Mostra uma solicitação cancelada                           |
 | `SOL-1042` | Mimi   | `Em análise` | Única que pode ser cancelada na demonstração inicial       |
 
-A próxima solicitação criada recebe `SOL-1043`. Como o mock não tem rota para aprovar ou recusar, esses dois status só existem por causa do seed.
+A próxima solicitação criada recebe `SOL-1043`. Aprovar e recusar são ações da conta da instituição (`demo-organization`); o seed já traz um exemplo de cada status para a demonstração inicial.
 
 ## 3. Configuração
 

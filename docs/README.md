@@ -17,6 +17,7 @@ Esta pasta reúne tudo o que foi feito no frontend do AdotaPet até aqui: o que 
 | [Decisões técnicas](decisoes.md)                               | Por que as coisas foram feitas do jeito que foram                                |
 | [Histórico](historico.md)                                      | Linha do tempo de PRs e issues, inclusive o revert da acessibilidade             |
 | [Roadmap e pendências](roadmap.md)                             | O que ainda falta, limitações conhecidas e a fase do backend                     |
+| [Testes do backend](testes/README.md)                          | Catálogo de 238 testes com ID, explicação de cada um e matriz de segurança       |
 | [Manual de instalação](manual-de-instalacao.md)                | Pré-requisitos, instalação, execução, build, publicação e problemas comuns       |
 | [Manual de operação](manual-de-operacao.md)                    | Rotina, dados do mock, configuração, fluxo de PRs e resolução de problemas       |
 | [Manual do usuário](manual-do-usuario.md)                      | Passo a passo do fluxo de adoção, do perfil ao cancelamento                      |

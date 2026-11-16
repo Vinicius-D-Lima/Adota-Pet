@@ -19,6 +19,7 @@ export const adoptionRequestSchema = z.object({
   date: z.string().min(1),
   message: z.string(),
   pet: requestPetSchema.nullable(),
+  unreadMessageCount: z.number().int().nonnegative().optional(),
 })
 
 export const adoptionRequestsResponseSchema = z.object({

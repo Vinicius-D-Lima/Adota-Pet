@@ -1,18 +1,29 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { validProfile } from '../test/fixtures/profile'
 import { petFixtures } from '../test/fixtures/pets'
 import { renderWithProviders } from '../test/renderWithProviders'
+import { ApiError } from '../lib/ApiError'
 import { PetsPage } from './PetsPage'
 
-const mocks = vi.hoisted(() => ({ get: vi.fn() }))
-vi.mock('../lib/api', () => ({ api: { get: mocks.get } }))
+const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), patch: vi.fn(), delete: vi.fn() }))
+vi.mock('../lib/api', () => ({ api: mocks }))
 
 function LocationProbe() {
   const location = useLocation()
   return <output data-testid="location">{location.search}</output>
+}
+
+function HistoryControls() {
+  const navigate = useNavigate()
+  return (
+    <div>
+      <button onClick={() => navigate(-1)}>Voltar</button>
+      <button onClick={() => navigate(1)}>Avançar</button>
+    </div>
+  )
 }
 
 let profileResponse: Record<string, unknown>
@@ -24,10 +35,21 @@ beforeEach(() => {
   mocks.get.mockImplementation((path, options) => {
     if (path === '/me/favorites/ids') return Promise.resolve({ data: [], total: 0 })
     if (path === '/me/adopter-profile') return Promise.resolve(profileResponse)
+    if (path === '/me/saved-filters') return Promise.resolve({ data: [], total: 0 })
     const page = Number(options?.query?.page ?? 1)
     const start = (page - 1) * 4
     return Promise.resolve({ data: petFixtures.slice(start, start + 4), total: petFixtures.length })
   })
+  mocks.post.mockReset().mockImplementation((_path, body) =>
+    Promise.resolve({
+      ...body,
+      id: 'saved-filter-1',
+      active: false,
+      createdAt: '2026-10-01T12:00:00.000Z',
+    }),
+  )
+  mocks.patch.mockReset()
+  mocks.delete.mockReset()
 })
 
 const lastPetsCall = () => mocks.get.mock.calls.filter(([path]) => path === '/pets').slice(-1)[0]
@@ -37,6 +59,7 @@ const setup = (route = '/pets') =>
     <>
       <PetsPage />
       <LocationProbe />
+      <HistoryControls />
     </>,
     { route },
   )
@@ -99,41 +122,67 @@ describe('PetsPage - consulta e filtros', () => {
   it('salva os filtros ativos para consultar depois', async () => {
     setup('/pets?species=Gato&size=Pequeno&sex=F%C3%AAmea&sort=name')
     await screen.findByRole('heading', { name: 'Luna' })
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Salvar busca' }))
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Salvar busca' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByLabelText('Nome da busca')).toHaveValue('Gato · Pequeno · Fêmea')
+    expect(within(dialog).getByLabelText('Nome da busca')).toHaveFocus()
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar busca' }))
 
-    expect(JSON.parse(localStorage.getItem('saved-searches') ?? '[]')).toMatchObject([
-      {
-        name: 'Gato · Pequeno · Fêmea · Nome A–Z',
-        filters: {
+    await waitFor(() =>
+      expect(mocks.post).toHaveBeenCalledWith('/me/saved-filters', {
+        name: 'Gato · Pequeno · Fêmea',
+        criteria: {
           species: 'Gato',
           size: ['Pequeno'],
           sex: 'Fêmea',
-          sort: 'name',
         },
-        alertsEnabled: false,
-      },
-    ])
+        active: false,
+      }),
+    )
     expect(screen.getByText('Busca salva com sucesso.')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('impede salvar mais de 10 buscas', async () => {
-    localStorage.setItem(
-      'saved-searches',
-      JSON.stringify(
-        Array.from({ length: 10 }, (_, index) => ({
-          id: `search-${index}`,
-          name: `Busca ${index}`,
-          filters: {},
-          alertsEnabled: false,
-        })),
-      ),
-    )
+  it('exibe claramente o limite 409 retornado pela API', async () => {
+    mocks.post.mockRejectedValueOnce(new ApiError(409, 'Limite de filtros atingido'))
     setup('/pets?species=Gato')
     await screen.findByRole('heading', { name: 'Luna' })
-    await userEvent.setup().click(screen.getByRole('button', { name: 'Salvar busca' }))
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Salvar busca' }))
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Salvar busca' }),
+    )
 
-    expect(screen.getByText('Você atingiu o limite de 10 buscas salvas.')).toBeInTheDocument()
-    expect(JSON.parse(localStorage.getItem('saved-searches') ?? '[]')).toHaveLength(10)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Você atingiu o limite de 10 buscas salvas.',
+    )
+  })
+
+  it('reproduz filtros compartilhados e acompanha voltar/avançar do navegador', async () => {
+    const user = userEvent.setup()
+    setup('/pets?search=Luna&species=Gato&size=Pequeno&sex=F%C3%AAmea')
+
+    expect(screen.getByLabelText('Filtrar por espécie')).toHaveValue('Gato')
+    expect(screen.getByLabelText('Filtrar por sexo')).toHaveValue('Fêmea')
+    expect(screen.getByRole('button', { name: 'Pequeno' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByPlaceholderText('Busque por nome, raça ou cidade')).toHaveValue('Luna')
+    await waitFor(() =>
+      expect(lastPetsCall()?.[1]).toMatchObject({
+        query: { search: 'Luna', species: 'Gato', size: ['Pequeno'], sex: 'Fêmea' },
+      }),
+    )
+
+    await user.selectOptions(screen.getByLabelText('Filtrar por espécie'), 'Cachorro')
+    await waitFor(() =>
+      expect(screen.getByTestId('location')).toHaveTextContent('species=Cachorro'),
+    )
+    await user.click(screen.getByRole('button', { name: 'Voltar' }))
+    await waitFor(() => expect(screen.getByLabelText('Filtrar por espécie')).toHaveValue('Gato'))
+    await user.click(screen.getByRole('button', { name: 'Avançar' }))
+    await waitFor(() =>
+      expect(screen.getByLabelText('Filtrar por espécie')).toHaveValue('Cachorro'),
+    )
   })
 })
 

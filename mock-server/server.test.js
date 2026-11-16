@@ -466,6 +466,161 @@ describe('POST /requests/:id/transitions', () => {
   })
 })
 
+describe('chat da solicitação', () => {
+  const organization = { 'X-Demo-User-Id': 'demo-organization' }
+  const outsider = { 'X-Demo-User-Id': 'demo-empty' }
+
+  it('lista mensagens apenas para participantes e não devolve dados de contato', async () => {
+    const created = await request(app)
+      .post('/requests')
+      .send({ petId: 'luna', answers: validAnswers })
+    const requestId = created.body.id
+    await request(app)
+      .post(`/requests/${requestId}/messages`)
+      .set(organization)
+      .send({ body: 'Olá, vamos conversar?' })
+    await request(app).post(`/requests/${requestId}/messages`).send({ body: 'Claro, obrigado!' })
+    const adopterView = await request(app).get(`/requests/${requestId}/messages`)
+    expect(adopterView.status).toBe(200)
+    expect(adopterView.body).toMatchObject({
+      unreadCount: 1,
+      nextCursor: null,
+      data: [
+        { authorName: 'Instituto Patinhas', mine: false, readAt: null },
+        { authorName: 'Lucas Ferreira', mine: true, readAt: null },
+      ],
+    })
+    for (const message of adopterView.body.data) {
+      expect(message).not.toHaveProperty('authorId')
+      expect(message).not.toHaveProperty('email')
+      expect(message).not.toHaveProperty('phone')
+      expect(message).not.toHaveProperty('userId')
+    }
+
+    const organizationView = await request(app)
+      .get(`/requests/${requestId}/messages`)
+      .set(organization)
+    expect(organizationView.body.unreadCount).toBe(1)
+    expect(organizationView.body.data[0]).toMatchObject({
+      authorName: 'Instituto Patinhas',
+      mine: true,
+    })
+    expectError(
+      await request(app).get(`/requests/${requestId}/messages`).set(outsider),
+      403,
+      'Forbidden',
+    )
+  })
+
+  it('rejeita mensagens vazias, maiores que 2000 caracteres e campos extras', async () => {
+    expectError(
+      await request(app).post('/requests/SOL-1042/messages').send({ body: '  ' }),
+      400,
+      'Bad Request',
+    )
+    expectError(
+      await request(app)
+        .post('/requests/SOL-1042/messages')
+        .send({ body: 'x'.repeat(2001) }),
+      400,
+      'Bad Request',
+    )
+    expectError(
+      await request(app)
+        .post('/requests/SOL-1042/messages')
+        .send({ body: 'Olá', email: 'contato@example.com' }),
+      400,
+      'Bad Request',
+    )
+  })
+
+  it('envia texto puro e mantém o HTML como conteúdo literal', async () => {
+    const created = await request(app)
+      .post('/requests')
+      .send({ petId: 'luna', answers: validAnswers })
+    const requestId = created.body.id
+    const body = '<script>alert(1)</script>'
+    const sent = await request(app).post(`/requests/${requestId}/messages`).send({ body })
+    expect(sent.status).toBe(201)
+    expect(sent.body).toMatchObject({ body, mine: true, authorName: 'Lucas Ferreira' })
+    expect(sent.body).not.toHaveProperty('authorId')
+    const fromOrganization = await request(app)
+      .get(`/requests/${requestId}/messages`)
+      .set(organization)
+    expect(fromOrganization.body.data.at(-1)).toMatchObject({
+      body,
+      mine: false,
+      authorName: 'Lucas Ferreira',
+    })
+  })
+
+  it('pagina mensagens antigas com cursor em ordem cronológica', async () => {
+    const db = seed()
+    db.chatMessages = Array.from({ length: 23 }, (_, index) => ({
+      id: `MSG-${String(index + 1).padStart(4, '0')}`,
+      requestId: 'SOL-1042',
+      authorId: index % 2 ? 'demo' : 'demo-organization',
+      body: `Mensagem ${index + 1}`,
+      createdAt: new Date(Date.UTC(2026, 9, 25, 12, index)).toISOString(),
+      readAt: null,
+    }))
+    const pagedApp = createApp({ db, delay: 0 })
+    const first = await request(pagedApp).get('/requests/SOL-1042/messages')
+    expect(first.body.data).toHaveLength(20)
+    expect(first.body.data[0].body).toBe('Mensagem 4')
+    expect(first.body.data.at(-1).body).toBe('Mensagem 23')
+    expect(first.body.nextCursor).toBe('MSG-0004')
+
+    const previous = await request(pagedApp)
+      .get('/requests/SOL-1042/messages')
+      .query({ cursor: first.body.nextCursor })
+    expect(previous.body.data.map(({ body }) => body)).toEqual([
+      'Mensagem 1',
+      'Mensagem 2',
+      'Mensagem 3',
+    ])
+    expect(previous.body.nextCursor).toBeNull()
+  })
+
+  it('bloqueia envio após estado final e marca apenas mensagens recebidas como lidas', async () => {
+    const db = seed()
+    db.requests.find(({ id }) => id === 'SOL-1039').status = 'Aprovada'
+    const finalApp = createApp({ db, delay: 0 })
+    expectError(
+      await request(finalApp).post('/requests/SOL-1039/messages').send({ body: 'Mais uma' }),
+      409,
+      'Conflict',
+    )
+
+    const requestWithUnread = (await request(app).get('/me/requests')).body.data.find(
+      ({ id }) => id === 'SOL-1039',
+    )
+    expect(requestWithUnread.unreadMessageCount).toBe(1)
+    expect((await request(app).patch('/requests/SOL-1039/messages/read')).status).toBe(204)
+    const requestAfterRead = (await request(app).get('/me/requests')).body.data.find(
+      ({ id }) => id === 'SOL-1039',
+    )
+    expect(requestAfterRead.unreadMessageCount).toBe(0)
+    const readMessages = (await request(app).get('/requests/SOL-1039/messages')).body.data
+    expect(readMessages[0].readAt).toEqual(expect.any(String))
+    expect(readMessages[1].readAt).toBeNull()
+  })
+
+  it('impede leitura, envio e marcação de leitura para outras contas', async () => {
+    expectError(
+      await request(app).post('/requests/SOL-1042/messages').set(outsider).send({ body: 'Oi' }),
+      403,
+      'Forbidden',
+    )
+    expectError(
+      await request(app).patch('/requests/SOL-1042/messages/read').set(outsider),
+      403,
+      'Forbidden',
+    )
+    expectError(await request(app).get('/requests/inexistente/messages'), 404, 'Not Found')
+  })
+})
+
 describe('solicitações do seed', () => {
   it('traz um exemplo de cada status para demonstrar a listagem', async () => {
     const mine = await request(app).get('/me/requests')
@@ -503,6 +658,198 @@ describe('favoritos', () => {
 
   it('retorna 404 ao favoritar pet inexistente', async () => {
     expectError(await request(app).put('/me/favorites/fantasma'), 404, 'Not Found')
+  })
+})
+
+describe('notificações', () => {
+  const organization = { 'X-Demo-User-Id': 'demo-organization' }
+
+  it('lista somente notificações da conta, com unreadCount e filtro de não lidas', async () => {
+    const all = await request(app).get('/me/notifications')
+    expect(all.status).toBe(200)
+    expect(all.body.data).toHaveLength(3)
+    expect(all.body.unreadCount).toBe(2)
+    expect(all.body.data[0]).toMatchObject({
+      id: 'NOT-1003',
+      type: 'MessageReceived',
+      readAt: null,
+    })
+    expect(all.body.data[0]).not.toHaveProperty('userId')
+
+    const unread = await request(app).get('/me/notifications').query({ unread: true })
+    expect(unread.body.data).toHaveLength(2)
+    expect(unread.body.data.every((notification) => notification.readAt === null)).toBe(true)
+    expect(unread.body.unreadCount).toBe(2)
+  })
+
+  it('pagina com cursor e rejeita parâmetros inválidos', async () => {
+    const db = seed()
+    db.notifications = Array.from({ length: 7 }, (_, index) => ({
+      id: `NOT-${index}`,
+      userId: 'demo',
+      type: 'MessageReceived',
+      title: `Notificação ${index}`,
+      body: 'Mensagem de teste.',
+      link: '/solicitacoes',
+      readAt: null,
+      createdAt: new Date(Date.UTC(2026, 9, 25, 0, index)).toISOString(),
+    }))
+    const pagedApp = createApp({ db, delay: 0 })
+    const first = await request(pagedApp).get('/me/notifications')
+    expect(first.body.data).toHaveLength(5)
+    expect(first.body.nextCursor).toBe(first.body.data[4].id)
+
+    const second = await request(pagedApp)
+      .get('/me/notifications')
+      .query({ cursor: first.body.nextCursor })
+    expect(second.body.data).toHaveLength(2)
+    expect(second.body.nextCursor).toBeNull()
+
+    expectError(
+      await request(app).get('/me/notifications').query({ unread: 'yes' }),
+      400,
+      'Bad Request',
+    )
+    expectError(
+      await request(app).get('/me/notifications').query({ cursor: 'not-found' }),
+      400,
+      'Bad Request',
+    )
+  })
+
+  it('marca uma ou todas como lidas sem acessar notificações de outra conta', async () => {
+    expectError(await request(app).patch('/me/notifications/NOT-2001/read'), 404, 'Not Found')
+
+    expect((await request(app).patch('/me/notifications/NOT-1003/read')).status).toBe(204)
+    let list = await request(app).get('/me/notifications')
+    expect(list.body.unreadCount).toBe(1)
+    expect(list.body.data.find(({ id }) => id === 'NOT-1003').readAt).toEqual(expect.any(String))
+
+    expect((await request(app).patch('/me/notifications/read-all')).status).toBe(204)
+    list = await request(app).get('/me/notifications')
+    expect(list.body.unreadCount).toBe(0)
+    expect((await request(app).get('/me/notifications').set(organization)).body.unreadCount).toBe(1)
+  })
+
+  it('carrega preferências padrão e persiste a lista atualizada por usuário', async () => {
+    const initial = await request(app).get('/me/notification-preferences')
+    expect(initial.status).toBe(200)
+    expect(initial.body.data).toHaveLength(9)
+    expect(initial.body.data.find(({ type }) => type === 'MessageReceived')).toMatchObject({
+      inApp: true,
+      email: false,
+    })
+
+    const preferences = initial.body.data.map((preference) =>
+      preference.type === 'MessageReceived' ? { ...preference, email: true } : preference,
+    )
+    const updated = await request(app)
+      .put('/me/notification-preferences')
+      .send({ data: preferences })
+    expect(updated.body.data.find(({ type }) => type === 'MessageReceived').email).toBe(true)
+    expect(
+      (await request(app).get('/me/notification-preferences')).body.data.find(
+        ({ type }) => type === 'MessageReceived',
+      ).email,
+    ).toBe(true)
+    expect(
+      (await request(app).get('/me/notification-preferences').set(organization)).body.data.find(
+        ({ type }) => type === 'MessageReceived',
+      ).email,
+    ).toBe(false)
+  })
+
+  it('rejeita lista de preferências incompleta', async () => {
+    expectError(
+      await request(app).put('/me/notification-preferences').send({ data: [] }),
+      400,
+      'Bad Request',
+    )
+  })
+})
+
+describe('filtros salvos', () => {
+  const filter = {
+    name: 'Gatos pequenos',
+    criteria: { species: 'Gato', size: ['Pequeno'] },
+    active: false,
+  }
+  const organization = { 'X-Demo-User-Id': 'demo-organization' }
+
+  it('cria, lista, atualiza e exclui buscas isoladas por usuário', async () => {
+    const created = await request(app).post('/me/saved-filters').send(filter)
+    expect(created.status).toBe(201)
+    expect(created.body).toMatchObject({
+      id: expect.any(String),
+      name: filter.name,
+      criteria: filter.criteria,
+      active: false,
+      createdAt: expect.any(String),
+    })
+    expect(created.body).not.toHaveProperty('userId')
+
+    const ownList = await request(app).get('/me/saved-filters')
+    expect(ownList.body).toMatchObject({ total: 1, data: [created.body] })
+    expect((await request(app).get('/me/saved-filters').set(organization)).body.total).toBe(0)
+
+    const updated = await request(app)
+      .patch(`/me/saved-filters/${created.body.id}`)
+      .send({ name: 'Gatos pequenos em alerta', active: true })
+    expect(updated.body).toMatchObject({
+      name: 'Gatos pequenos em alerta',
+      active: true,
+      criteria: filter.criteria,
+    })
+    expect((await request(app).delete(`/me/saved-filters/${created.body.id}`)).status).toBe(204)
+    expect((await request(app).get('/me/saved-filters')).body.total).toBe(0)
+  })
+
+  it('rejeita critérios desconhecidos e valores fora dos enums', async () => {
+    const unknown = await request(app)
+      .post('/me/saved-filters')
+      .send({ ...filter, criteria: { ...filter.criteria, cityName: 'São Paulo' } })
+    expectError(unknown, 400, 'Bad Request')
+    expect(unknown.body.details).toContainEqual({
+      field: 'criteria.cityName',
+      message: 'Critério desconhecido',
+    })
+
+    const invalid = await request(app)
+      .post('/me/saved-filters')
+      .send({ ...filter, criteria: { species: 'Ave' } })
+    expectError(invalid, 400, 'Bad Request')
+    expect(invalid.body.details[0].field).toBe('criteria.species')
+  })
+
+  it('retorna 409 no 11º filtro e impede alterações de outra conta', async () => {
+    const created = await request(app).post('/me/saved-filters').send(filter)
+    for (let index = 1; index < 10; index += 1) {
+      const response = await request(app)
+        .post('/me/saved-filters')
+        .send({ ...filter, name: `Busca ${index}` })
+      expect(response.status).toBe(201)
+    }
+
+    expectError(
+      await request(app)
+        .post('/me/saved-filters')
+        .send({ ...filter, name: 'Busca 11' }),
+      409,
+      'Conflict',
+    )
+    expectError(
+      await request(app)
+        .patch(`/me/saved-filters/${created.body.id}`)
+        .set(organization)
+        .send({ active: true }),
+      404,
+      'Not Found',
+    )
+    expectError(
+      await request(app).delete(`/me/saved-filters/${created.body.id}`).set(organization),
+      404,
+      'Not Found',
+    )
   })
 })
 

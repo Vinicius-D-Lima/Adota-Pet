@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Button } from './ui'
 
@@ -7,8 +7,11 @@ interface ConfirmDialogProps {
   description: string
   confirmLabel: string
   cancelLabel?: string
+  confirmVariant?: 'danger' | 'primary' | 'secondary' | 'text'
   /** Requisição em andamento: trava os botões, o Esc e o clique fora. */
   busy?: boolean
+  children?: ReactNode
+  initialFocusRef?: RefObject<HTMLElement | null>
   onConfirm: () => void
   onClose: () => void
   /** Devolve o elemento que recebe o foco ao fechar; por padrão, o que estava focado ao abrir. */
@@ -22,7 +25,10 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   cancelLabel = 'Voltar',
+  confirmVariant = 'danger',
   busy = false,
+  children,
+  initialFocusRef,
   onConfirm,
   onClose,
   returnFocus,
@@ -40,7 +46,8 @@ export function ConfirmDialog({
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
     // O foco inicial vai para a opção segura, não para a destrutiva.
-    dialogRef.current?.querySelector('button')?.focus()
+    const initialFocus = initialFocusRef?.current ?? dialogRef.current?.querySelector('button')
+    initialFocus?.focus()
 
     // Deixa o resto da página inerte (leitor de tela e cliques) e trava a rolagem ao fundo.
     const inerted = Array.from(document.body.children).filter(
@@ -90,7 +97,7 @@ export function ConfirmDialog({
       const target = latest.current.returnFocus?.() ?? opener
       if (target?.isConnected) target.focus()
     }
-  }, [])
+  }, [initialFocusRef])
 
   // Botões desabilitados perdem o foco; mantê-lo no diálogo evita que ele caia no <body>.
   useEffect(() => {
@@ -121,11 +128,12 @@ export function ConfirmDialog({
         <p id={descriptionId} className="mb-0 text-muted">
           {description}
         </p>
+        {children}
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             {cancelLabel}
           </Button>
-          <Button variant="danger" onClick={onConfirm} disabled={busy}>
+          <Button variant={confirmVariant} onClick={onConfirm} disabled={busy}>
             {confirmLabel}
           </Button>
         </div>

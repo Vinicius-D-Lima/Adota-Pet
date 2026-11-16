@@ -1,79 +1,66 @@
-import { useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api } from '../lib/api'
+import {
+  savedSearchesResponseSchema,
+  savedSearchSchema,
+  type SavedSearchCriteria,
+} from '../schemas/savedSearchSchema'
 
-const STORAGE_KEY = 'saved-searches'
+export { type SavedSearch, type SavedSearchCriteria } from '../schemas/savedSearchSchema'
 
-export interface SavedSearch {
-  id: string
+const savedSearchKeys = {
+  all: ['saved-searches'] as const,
+}
+
+interface CreateSavedSearch {
   name: string
-  filters: {
-    search?: string
-    species?: string
-    size?: string[]
-    sex?: string
-    sort?: string
+  criteria: SavedSearchCriteria
+}
+
+interface UpdateSavedSearch {
+  id: string
+  changes: {
+    name?: string
+    active?: boolean
   }
-  alertsEnabled: boolean
-}
-
-function readStorage(): SavedSearch[] {
-  return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')
-}
-
-function writeStorage(searches: SavedSearch[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(searches))
 }
 
 export function useSavedSearches() {
-  const [searches, setSearches] = useState(readStorage)
+  const queryClient = useQueryClient()
+  const query = useQuery({
+    queryKey: savedSearchKeys.all,
+    queryFn: async ({ signal }) =>
+      savedSearchesResponseSchema.parse(await api.get<unknown>('/me/saved-filters', { signal })),
+  })
 
-  const saveSearch = (search: SavedSearch) => {
-    if (searches.length >= 10) {
-      return false
-    }
-
-    const updatedSearches = [...searches, search]
-    writeStorage(updatedSearches)
-    setSearches(updatedSearches)
-    return true
-  }
-
-  const deleteSearch = (id: string) => {
-    const updatedSearches = searches.filter((search) => search.id !== id)
-    writeStorage(updatedSearches)
-    setSearches(updatedSearches)
-  }
-
-  const renameSearch = (id: string, newName: string) => {
-    const updatedSearches = searches.map((search) =>
-      search.id === id
-        ? {
-            ...search,
-            name: newName,
-          }
-        : search,
-    )
-    writeStorage(updatedSearches)
-    setSearches(updatedSearches)
-  }
-
-  const toggleAlert = (id: string) => {
-    const updatedSearches = searches.map((search) =>
-      search.id === id
-        ? {
-            ...search,
-            alertsEnabled: !search.alertsEnabled,
-          }
-        : search,
-    )
-    writeStorage(updatedSearches)
-    setSearches(updatedSearches)
-  }
+  const saveMutation = useMutation({
+    mutationFn: async ({ name, criteria }: CreateSavedSearch) =>
+      savedSearchSchema.parse(
+        await api.post<unknown>('/me/saved-filters', { name, criteria, active: false }),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: savedSearchKeys.all }),
+  })
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, changes }: UpdateSavedSearch) =>
+      savedSearchSchema.parse(
+        await api.patch<unknown>(`/me/saved-filters/${encodeURIComponent(id)}`, changes),
+      ),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: savedSearchKeys.all }),
+  })
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/me/saved-filters/${encodeURIComponent(id)}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: savedSearchKeys.all }),
+  })
 
   return {
-    searches,
-    saveSearch,
-    deleteSearch,
-    renameSearch,
-    toggleAlert,
+    searches: query.data?.data ?? [],
+    isPending: query.isPending,
+    isError: query.isError,
+    error: query.error,
+    refetch: query.refetch,
+    saveSearch: saveMutation.mutateAsync,
+    updateSearch: (id: string, changes: UpdateSavedSearch['changes']) =>
+      updateMutation.mutateAsync({ id, changes }),
+    deleteSearch: deleteMutation.mutateAsync,
   }
 }

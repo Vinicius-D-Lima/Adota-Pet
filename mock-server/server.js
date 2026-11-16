@@ -12,8 +12,32 @@ const DEFAULT_LIMIT = 12
 const MAX_LIMIT = 100
 const ACTIVE_STATUSES = ['Enviada', 'Em análise', 'Aprovada']
 const CANCELLABLE_STATUSES = ['Enviada', 'Em análise']
+const FINAL_REQUEST_STATUSES = ['Aprovada', 'Recusada', 'Cancelada']
 const SORTS = ['recent', 'name', 'distance']
+const NOTIFICATION_TYPES = [
+  'RequestStatusChanged',
+  'AppointmentProposed',
+  'AppointmentConfirmed',
+  'MessageReceived',
+  'CheckInDue',
+  'CheckInOverdue',
+  'CheckInReviewed',
+  'NewRequestForOrganization',
+  'NewMatchingPet',
+]
+const DEFAULT_EMAIL_NOTIFICATION_TYPES = [
+  'RequestStatusChanged',
+  'AppointmentConfirmed',
+  'CheckInOverdue',
+  'NewRequestForOrganization',
+]
 const PETS_QUERY_PARAMS = ['search', 'page', 'limit', 'sort', 'species', 'size', 'sex', 'city']
+const SAVED_FILTER_FIELDS = ['search', 'species', 'size', 'sex', 'city']
+const SAVED_FILTER_ENUMS = {
+  species: ['Cachorro', 'Gato'],
+  size: ['Pequeno', 'Médio', 'Grande'],
+  sex: ['Fêmea', 'Macho'],
+}
 const PROFILE_ENUMS = {
   housing: ['Apartamento', 'Casa', 'Chácara ou sítio'],
   dailyTime: ['Até 1 hora', '2 a 3 horas', 'Mais de 3 horas'],
@@ -251,6 +275,11 @@ export function createApp({
   const server = jsonServer.create()
   const router = jsonServer.router(db)
   const store = router.db
+  if (!Array.isArray(store.get('chatMessages').value())) store.set('chatMessages', []).write()
+  if (!Array.isArray(store.get('savedFilters').value())) store.set('savedFilters', []).write()
+  if (!Array.isArray(store.get('notifications').value())) store.set('notifications', []).write()
+  if (!Array.isArray(store.get('notificationPreferences').value()))
+    store.set('notificationPreferences', []).write()
 
   const currentUserId = (req) => {
     const requested = req.get('X-Demo-User-Id')
@@ -262,6 +291,78 @@ export function createApp({
     store.get('users').find({ id: userId }).value()
   const findPet = (id) => store.get('pets').find({ id }).value()
   const myRequests = (userId) => store.get('requests').filter({ userId }).value()
+  const mySavedFilters = (userId) =>
+    store
+      .get('savedFilters')
+      .filter({ userId })
+      .value()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  const presentSavedFilter = ({ userId: _userId, ...savedFilter }) => savedFilter
+  const validateSavedFilter = (body, partial = false) => {
+    const details = []
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return [{ field: 'body', message: 'Envie um objeto JSON' }]
+    }
+
+    for (const key of Object.keys(body)) {
+      if (!['name', 'criteria', 'active'].includes(key)) {
+        details.push({ field: key, message: 'Campo desconhecido' })
+      }
+    }
+    if (!partial || Object.hasOwn(body, 'name')) {
+      if (isBlank(body.name) || body.name.trim().length > 80) {
+        details.push({ field: 'name', message: 'Informe um nome com até 80 caracteres' })
+      }
+    }
+    if (!partial || Object.hasOwn(body, 'criteria')) {
+      const criteria = body.criteria
+      if (!criteria || typeof criteria !== 'object' || Array.isArray(criteria)) {
+        details.push({ field: 'criteria', message: 'Informe os critérios como um objeto' })
+      } else {
+        for (const key of Object.keys(criteria)) {
+          if (!SAVED_FILTER_FIELDS.includes(key)) {
+            details.push({ field: `criteria.${key}`, message: 'Critério desconhecido' })
+          } else if (key === 'size') {
+            if (
+              !Array.isArray(criteria.size) ||
+              criteria.size.length === 0 ||
+              criteria.size.some((value) => !SAVED_FILTER_ENUMS.size.includes(value)) ||
+              new Set(criteria.size).size !== criteria.size.length
+            ) {
+              details.push({
+                field: 'criteria.size',
+                message: 'Informe portes válidos e sem repetição',
+              })
+            }
+          } else if (SAVED_FILTER_ENUMS[key]) {
+            if (!SAVED_FILTER_ENUMS[key].includes(criteria[key])) {
+              details.push({
+                field: `criteria.${key}`,
+                message: `Valor inválido para ${key}`,
+              })
+            }
+          } else if (
+            isBlank(criteria[key]) ||
+            (key === 'city' && criteria[key].trim().length < 2)
+          ) {
+            details.push({ field: `criteria.${key}`, message: 'Informe um valor válido' })
+          }
+        }
+        if (Object.keys(criteria).length === 0) {
+          details.push({ field: 'criteria', message: 'Informe ao menos um critério de busca' })
+        }
+      }
+    }
+    if (!partial || Object.hasOwn(body, 'active')) {
+      if (typeof body.active !== 'boolean') {
+        details.push({ field: 'active', message: 'active deve ser verdadeiro ou falso' })
+      }
+    }
+    if (partial && Object.keys(body).length === 0) {
+      details.push({ field: 'body', message: 'Informe ao menos um campo para atualizar' })
+    }
+    return details
+  }
   const withPet = (request) => ({
     ...request,
     pet: findPet(request.petId) ?? null,
@@ -312,13 +413,41 @@ export function createApp({
     const { name } = organizationIdentity(userId)
     return store.get('pets').filter({ organization: name }).value()
   }
+  const isChatParticipant = (request, userId) =>
+    request.userId === userId || organizationPets(userId).some(({ id }) => id === request.petId)
+  const messagesForRequest = (requestId) =>
+    store
+      .get('chatMessages')
+      .filter({ requestId })
+      .value()
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))
+  const unreadChatCount = (requestId, userId) =>
+    messagesForRequest(requestId).filter(
+      (message) => message.authorId !== userId && !message.readAt,
+    ).length
+  const presentChatMessage = (message, userId) => {
+    const request = store.get('requests').find({ id: message.requestId }).value()
+    const authorName =
+      message.authorId === request?.userId
+        ? getProfile(message.authorId).name || demoUser(message.authorId)?.name || 'Adotante'
+        : organizationIdentity(message.authorId).name
+    return {
+      id: message.id,
+      authorName,
+      mine: message.authorId === userId,
+      body: message.body,
+      createdAt: message.createdAt,
+      readAt: message.readAt,
+    }
+  }
   const presentOrganizationPet = (pet) => ({ ...pet, distance: null, distanceKm: null })
-  const withReceivedRequest = (request) => {
+  const withReceivedRequest = (request, viewerId) => {
     const user = demoUser(request.userId) ?? {}
     const profile = getProfile(request.userId)
     const completed = PROFILE_FIELDS.length - profile.missingFields.length
     return {
       ...withPet(request),
+      unreadMessageCount: unreadChatCount(request.id, viewerId),
       adopter: {
         id: request.userId,
         name: profile.name || user.name || '',
@@ -624,19 +753,21 @@ export function createApp({
 
   server.get('/me/received-requests', (req, res) => {
     if (!requireGuardian(req, res)) return
-    const petIds = new Set(organizationPets(currentUserId(req)).map(({ id }) => id))
+    const userId = currentUserId(req)
+    const petIds = new Set(organizationPets(userId).map(({ id }) => id))
     const requests = store
       .get('requests')
       .value()
       .filter(({ petId }) => petIds.has(petId))
       .reverse()
-      .map(withReceivedRequest)
+      .map((request) => withReceivedRequest(request, userId))
     res.json(list(requests))
   })
 
   server.post('/me/received-requests/:id/transitions', (req, res) => {
     if (!requireGuardian(req, res)) return
-    const petIds = new Set(organizationPets(currentUserId(req)).map(({ id }) => id))
+    const userId = currentUserId(req)
+    const petIds = new Set(organizationPets(userId).map(({ id }) => id))
     const request = store.get('requests').find({ id: req.params.id }).value()
     if (!request || !petIds.has(request.petId))
       return sendError(res, 404, 'Solicitação não encontrada')
@@ -659,7 +790,7 @@ export function createApp({
     }
     const updated = { ...request, status, message: messages[status] }
     store.get('requests').find({ id: request.id }).assign(updated).write()
-    res.json(withReceivedRequest(updated))
+    res.json(withReceivedRequest(updated, userId))
   })
 
   // --- Pets -------------------------------------------------------------------
@@ -794,7 +925,13 @@ export function createApp({
   })
 
   server.get('/me/requests', (req, res) => {
-    const requests = myRequests(currentUserId(req)).reverse().map(withPet)
+    const userId = currentUserId(req)
+    const requests = myRequests(userId)
+      .reverse()
+      .map((request) => ({
+        ...withPet(request),
+        unreadMessageCount: unreadChatCount(request.id, userId),
+      }))
     res.json(list(requests))
   })
 
@@ -827,6 +964,103 @@ export function createApp({
     }
     store.get('requests').find({ id: request.id }).assign(updated).write()
     res.json(withPet(updated))
+  })
+
+  // --- Chat da solicitação (API simulada) --------------------------------------
+  server.get('/requests/:id/messages', (req, res) => {
+    const userId = currentUserId(req)
+    const adoptionRequest = store.get('requests').find({ id: req.params.id }).value()
+    if (!adoptionRequest) return sendError(res, 404, 'Solicitação não encontrada')
+    if (!isChatParticipant(adoptionRequest, userId)) {
+      return sendError(res, 403, 'Somente os participantes podem acessar esta conversa')
+    }
+    if (Object.keys(req.query).some((key) => key !== 'cursor')) {
+      return sendError(res, 400, 'Parâmetro desconhecido', [
+        { field: 'query', message: 'Apenas cursor é aceito' },
+      ])
+    }
+    const allMessages = messagesForRequest(adoptionRequest.id)
+    const cursor = req.query.cursor
+    let end = allMessages.length
+    if (cursor !== undefined) {
+      if (typeof cursor !== 'string') {
+        return sendError(res, 400, 'Cursor inválido', [
+          { field: 'cursor', message: 'Informe um cursor válido' },
+        ])
+      }
+      end = allMessages.findIndex(({ id }) => id === cursor)
+      if (end < 0) {
+        return sendError(res, 400, 'Cursor inválido', [
+          { field: 'cursor', message: 'O cursor não pertence a esta conversa' },
+        ])
+      }
+    }
+    const start = Math.max(0, end - 20)
+    const page = allMessages.slice(start, end)
+    res.json({
+      data: page.map((message) => presentChatMessage(message, userId)),
+      unreadCount: unreadChatCount(adoptionRequest.id, userId),
+      nextCursor: start > 0 ? page[0].id : null,
+    })
+  })
+
+  server.post('/requests/:id/messages', (req, res) => {
+    const userId = currentUserId(req)
+    const adoptionRequest = store.get('requests').find({ id: req.params.id }).value()
+    if (!adoptionRequest) return sendError(res, 404, 'Solicitação não encontrada')
+    if (!isChatParticipant(adoptionRequest, userId)) {
+      return sendError(res, 403, 'Somente os participantes podem enviar mensagens')
+    }
+    if (FINAL_REQUEST_STATUSES.includes(adoptionRequest.status)) {
+      return sendError(res, 409, 'O chat está bloqueado para solicitações encerradas')
+    }
+    const body = req.body
+    if (
+      !body ||
+      typeof body !== 'object' ||
+      Array.isArray(body) ||
+      Object.keys(body).some((key) => key !== 'body') ||
+      typeof body.body !== 'string' ||
+      !body.body.trim() ||
+      body.body.length > 2000
+    ) {
+      return sendError(res, 400, 'Mensagem inválida', [
+        { field: 'body', message: 'A mensagem deve ter entre 1 e 2000 caracteres' },
+      ])
+    }
+    const nextId =
+      store
+        .get('chatMessages')
+        .value()
+        .reduce((max, message) => Math.max(max, Number(message.id.replace(/\D/g, '')) || 0), 0) + 1
+    const message = {
+      id: `MSG-${String(nextId).padStart(4, '0')}`,
+      requestId: adoptionRequest.id,
+      authorId: userId,
+      body: body.body,
+      createdAt: new Date().toISOString(),
+      readAt: null,
+    }
+    store.get('chatMessages').push(message).write()
+    res.status(201).json(presentChatMessage(message, userId))
+  })
+
+  server.patch('/requests/:id/messages/read', (req, res) => {
+    const userId = currentUserId(req)
+    const adoptionRequest = store.get('requests').find({ id: req.params.id }).value()
+    if (!adoptionRequest) return sendError(res, 404, 'Solicitação não encontrada')
+    if (!isChatParticipant(adoptionRequest, userId)) {
+      return sendError(res, 403, 'Somente os participantes podem marcar mensagens como lidas')
+    }
+    const readAt = new Date().toISOString()
+    store
+      .get('chatMessages')
+      .filter({ requestId: adoptionRequest.id })
+      .each((message) => {
+        if (message.authorId !== userId && !message.readAt) message.readAt = readAt
+      })
+      .write()
+    res.status(204).end()
   })
 
   // --- Favoritos ---------------------------------------------------------------
@@ -873,6 +1107,196 @@ export function createApp({
       .remove({ userId: currentUserId(req), petId: req.params.petId })
       .write()
     res.status(204).end()
+  })
+
+  // --- Filtros salvos (API simulada) -------------------------------------------
+  server.get('/me/saved-filters', (req, res) => {
+    const data = mySavedFilters(currentUserId(req)).map(presentSavedFilter)
+    res.json({ data, total: data.length })
+  })
+
+  server.post('/me/saved-filters', (req, res) => {
+    const details = validateSavedFilter(req.body)
+    if (details.length) return sendError(res, 400, 'Critérios de busca inválidos', details)
+
+    const userId = currentUserId(req)
+    if (mySavedFilters(userId).length >= 10) {
+      return sendError(res, 409, 'Você atingiu o limite de 10 buscas salvas')
+    }
+
+    const nextId =
+      store
+        .get('savedFilters')
+        .value()
+        .reduce((max, filter) => Math.max(max, Number(filter.id) || 0), 0) + 1
+    const savedFilter = {
+      id: String(nextId),
+      userId,
+      name: req.body.name.trim(),
+      criteria: req.body.criteria,
+      active: req.body.active,
+      createdAt: new Date().toISOString(),
+    }
+    store.get('savedFilters').push(savedFilter).write()
+    res.status(201).json(presentSavedFilter(savedFilter))
+  })
+
+  server.patch('/me/saved-filters/:id', (req, res) => {
+    const userId = currentUserId(req)
+    const savedFilter = mySavedFilters(userId).find(({ id }) => id === req.params.id)
+    if (!savedFilter) return sendError(res, 404, 'Busca salva não encontrada')
+
+    const details = validateSavedFilter(req.body, true)
+    if (details.length) return sendError(res, 400, 'Atualização inválida', details)
+
+    const updated = {
+      ...savedFilter,
+      ...req.body,
+      name: req.body.name?.trim() ?? savedFilter.name,
+    }
+    store.get('savedFilters').find({ id: savedFilter.id, userId }).assign(updated).write()
+    res.json(presentSavedFilter(updated))
+  })
+
+  server.delete('/me/saved-filters/:id', (req, res) => {
+    const userId = currentUserId(req)
+    const savedFilter = mySavedFilters(userId).find(({ id }) => id === req.params.id)
+    if (!savedFilter) return sendError(res, 404, 'Busca salva não encontrada')
+    store.get('savedFilters').remove({ id: savedFilter.id, userId }).write()
+    res.status(204).end()
+  })
+
+  // --- Notificações (API simulada) ----------------------------------------------
+  const myNotifications = (userId) =>
+    store
+      .get('notifications')
+      .filter({ userId })
+      .value()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id))
+
+  const myNotificationPreferences = (userId) => {
+    const saved = store.get('notificationPreferences').filter({ userId }).value()
+    if (saved.length) return saved
+
+    const defaults = NOTIFICATION_TYPES.map((type) => ({
+      userId,
+      type,
+      inApp: true,
+      email: DEFAULT_EMAIL_NOTIFICATION_TYPES.includes(type),
+    }))
+    store
+      .get('notificationPreferences')
+      .push(...defaults)
+      .write()
+    return defaults
+  }
+
+  server.get('/me/notifications', (req, res) => {
+    const userId = currentUserId(req)
+    const unreadParam = req.query.unread
+    if (unreadParam !== undefined && !['true', 'false'].includes(unreadParam)) {
+      return sendError(res, 400, 'Parâmetro unread inválido', [
+        { field: 'unread', message: 'Use true ou false.' },
+      ])
+    }
+
+    const all = myNotifications(userId)
+    const unreadCount = all.filter((notification) => !notification.readAt).length
+    const matching =
+      unreadParam === 'true' ? all.filter((notification) => !notification.readAt) : all
+    const cursor = req.query.cursor
+    const cursorIndex =
+      cursor === undefined ? -1 : matching.findIndex((notification) => notification.id === cursor)
+    if (cursor !== undefined && cursorIndex < 0) {
+      return sendError(res, 400, 'Cursor inválido', [
+        { field: 'cursor', message: 'O cursor não pertence a esta lista.' },
+      ])
+    }
+
+    const page = matching.slice(cursorIndex + 1, cursorIndex + 1 + 5)
+    const hasMore = cursorIndex + 1 + page.length < matching.length
+    res.json({
+      data: page.map(({ userId: _userId, ...notification }) => notification),
+      unreadCount,
+      nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    })
+  })
+
+  server.patch('/me/notifications/read-all', (req, res) => {
+    const userId = currentUserId(req)
+    const readAt = new Date().toISOString()
+    store
+      .get('notifications')
+      .filter({ userId })
+      .each((notification) => {
+        if (!notification.readAt) notification.readAt = readAt
+      })
+      .write()
+    res.status(204).end()
+  })
+
+  server.patch('/me/notifications/:id/read', (req, res) => {
+    const userId = currentUserId(req)
+    const notification = store.get('notifications').find({ id: req.params.id, userId }).value()
+    if (!notification) return sendError(res, 404, 'Notificação não encontrada')
+
+    store
+      .get('notifications')
+      .find({ id: notification.id, userId })
+      .assign({ readAt: notification.readAt ?? new Date().toISOString() })
+      .write()
+    res.status(204).end()
+  })
+
+  server.get('/me/notification-preferences', (req, res) => {
+    const preferences = myNotificationPreferences(currentUserId(req)).map(
+      ({ userId: _userId, ...preference }) => preference,
+    )
+    res.json({ data: preferences })
+  })
+
+  server.put('/me/notification-preferences', (req, res) => {
+    const body = req.body?.data
+    if (!Array.isArray(body)) {
+      return sendError(res, 400, 'Corpo da requisição inválido', [
+        { field: 'data', message: 'Envie a lista completa de preferências.' },
+      ])
+    }
+
+    const details = []
+    const seen = new Set()
+    for (const [index, preference] of body.entries()) {
+      if (
+        !preference ||
+        !NOTIFICATION_TYPES.includes(preference.type) ||
+        typeof preference.inApp !== 'boolean' ||
+        typeof preference.email !== 'boolean' ||
+        seen.has(preference.type)
+      ) {
+        details.push({
+          field: `data.${index}`,
+          message: 'Informe um tipo válido e os canais inApp/email sem duplicar tipos.',
+        })
+      } else {
+        seen.add(preference.type)
+      }
+    }
+    if (seen.size !== NOTIFICATION_TYPES.length) {
+      details.push({
+        field: 'data',
+        message: 'Inclua exatamente uma preferência para cada tipo de notificação.',
+      })
+    }
+    if (details.length) return sendError(res, 400, 'Validação falhou', details)
+
+    const userId = currentUserId(req)
+    const stored = body.map((preference) => ({ ...preference, userId }))
+    store.get('notificationPreferences').remove({ userId }).write()
+    store
+      .get('notificationPreferences')
+      .push(...stored)
+      .write()
+    res.json({ data: body })
   })
 
   // --- Respostas do json-server no formato do contrato --------------------------

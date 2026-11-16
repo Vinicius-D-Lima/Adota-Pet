@@ -26,6 +26,8 @@ export const petSchema = z.object({
   neutered: z.boolean(),
   organization: z.string().min(1),
   organizationInitials: z.string().min(1),
+  organizationRating: z.number().min(0).max(5).nullable().optional(),
+  organizationRatingCount: z.number().int().nonnegative().optional(),
   lat: z.number(),
   lng: z.number(),
   createdAt: z.string().min(1),
