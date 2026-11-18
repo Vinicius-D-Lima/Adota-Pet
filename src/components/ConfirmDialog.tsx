@@ -8,6 +8,8 @@ interface ConfirmDialogProps {
   confirmLabel: string
   cancelLabel?: string
   confirmVariant?: 'danger' | 'primary' | 'secondary' | 'text'
+  /** Impede confirmar (por exemplo, enquanto um campo obrigatório do diálogo está inválido). */
+  confirmDisabled?: boolean
   /** Requisição em andamento: trava os botões, o Esc e o clique fora. */
   busy?: boolean
   children?: ReactNode
@@ -26,6 +28,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel = 'Voltar',
   confirmVariant = 'danger',
+  confirmDisabled = false,
   busy = false,
   children,
   initialFocusRef,
@@ -133,7 +136,7 @@ export function ConfirmDialog({
           <Button variant="secondary" onClick={onClose} disabled={busy}>
             {cancelLabel}
           </Button>
-          <Button variant={confirmVariant} onClick={onConfirm} disabled={busy}>
+          <Button variant={confirmVariant} onClick={onConfirm} disabled={busy || confirmDisabled}>
             {confirmLabel}
           </Button>
         </div>

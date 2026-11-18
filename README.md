@@ -27,6 +27,8 @@ A documentação completa está em [`docs/`](docs/README.md):
 7. Acompanhamento e cancelamento de solicitações (com confirmação)
 8. Favoritos
 9. Edição do perfil usado na compatibilidade
+10. Área da organização com painel e cadastro de pets
+11. Gestão das solicitações recebidas: triagem, entrevista, recusa com motivo e aprovação (somente administradores)
 
 ## Executar
 
@@ -36,6 +38,8 @@ O app consome uma API REST simulada com [json-server](https://github.com/typicod
 npm install
 npm run dev:mock
 ```
+
+O `dev:mock` pergunta o perfil de demonstração: adotante, instituição administradora, instituição **voluntária** (sem permissão de aprovar) ou perfil vazio. O perfil escolhido define `VITE_DEMO_USER_ID` e `VITE_DEMO_ROLE`, enviados como `X-Demo-User-Id` e `X-Demo-Role`.
 
 - Frontend: http://localhost:5173 · API simulada: http://localhost:3001 (o Vite faz proxy de `/api` → `http://localhost:3001`, sem CORS).
 - `VITE_API_URL=/api` (veja `.env.example`). Para apontar para outra API, basta trocar essa variável.

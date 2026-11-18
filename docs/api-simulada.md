@@ -161,18 +161,42 @@ Toda solicitação devolvida traz o **pet embutido** (`pet`, ou `null` se o pet 
 
 Exclusivas de contas com o papel `GUARDIAN` (instituição ou protetor). Qualquer outra conta recebe **403** ("Esta área é exclusiva para instituições e protetores").
 
-| Rota                                                    | O que faz                                               |
-| ------------------------------------------------------- | ------------------------------------------------------- |
-| `PUT /me/account`                                       | Grava os dados da conta criada em `/criar-conta`        |
-| `GET /me/guardian-profile` · `PUT /me/guardian-profile` | Perfil da instituição ou do protetor                    |
-| `GET /me/organization-pets`                             | Pets da instituição                                     |
-| `POST /me/organization-pets`                            | Cadastra um pet (201); o `id` é gerado a partir do nome |
-| `PUT /me/organization-pets/:id`                         | Edita um pet da própria instituição                     |
-| `DELETE /me/organization-pets/:id`                      | Remove um pet da própria instituição                    |
-| `GET /me/received-requests`                             | Solicitações dos pets da instituição                    |
-| `POST /me/received-requests/:id/transitions`            | `{ "to": "EM_ANALISE" \| "APROVADA" \| "RECUSADA" }`    |
+| Rota                                                    | O que faz                                                               |
+| ------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `PUT /me/account`                                       | Grava os dados da conta criada em `/criar-conta`                        |
+| `GET /me/guardian-profile` · `PUT /me/guardian-profile` | Perfil da instituição ou do protetor                                    |
+| `GET /me/organization-pets`                             | Pets da instituição                                                     |
+| `POST /me/organization-pets`                            | Cadastra um pet (201); o `id` é gerado a partir do nome                 |
+| `PUT /me/organization-pets/:id`                         | Edita um pet da própria instituição                                     |
+| `DELETE /me/organization-pets/:id`                      | Remove um pet da própria instituição                                    |
+| `GET /me/permissions`                                   | Papel (`ADMIN`/`VOLUNTEER`), permissões e dados da organização          |
+| `GET /me/received-requests`                             | Solicitações dos pets da instituição                                    |
+| `GET /me/received-requests/:id`                         | Detalhe de uma solicitação da instituição (404 para outra instituição)  |
+| `POST /me/received-requests/:id/interview`              | Propõe de 1 a 3 horários futuros: `{ "type", "proposedSlots": [...] }`  |
+| `POST /me/received-requests/:id/interview/complete`     | Marca a entrevista/visita como realizada                                |
+| `POST /me/received-requests/:id/transitions`            | `{ "to": "EM_ANALISE" \| "APROVADA" \| "RECUSADA", "reason"?: string }` |
+
+`GET /me/permissions` usa o cabeçalho `X-Demo-Role` (ou `?role=`) para simular o papel:
+
+```json
+{
+  "role": "ADMIN",
+  "canApprove": true,
+  "permissions": ["requests:view", "requests:review", "requests:approve", "requests:reject"],
+  "organization": { "id": "demo-organization", "name": "Instituto Patinhas", "initials": "IP" }
+}
+```
+
+Com `VOLUNTEER`, `requests:approve` e `canApprove: false` não são devolvidos. No frontend, o perfil do `npm run dev:mock` "Instituto — voluntário(a)" envia esse cabeçalho.
 
 As transições da instituição aceitas são `Enviada` → `Em análise` ou `Recusada`, e `Em análise` → `Aprovada` ou `Recusada`. Destino desconhecido retorna **400**, transição fora dessa tabela retorna **409**, e solicitação de pet de outra instituição retorna **404**.
+
+Regras adicionais:
+
+- **Recusa:** `reason` é obrigatório e precisa ter pelo menos 10 caracteres; sem ele a API responde **400** com `details` no campo `reason`. O motivo é gravado em `rejectionReason` e aparece na mensagem da solicitação.
+- **Entrevista:** só pode ser agendada com a solicitação em `Em análise` (senão **409**); os horários precisam ser datas ISO **futuras** e a quantidade fica entre 1 e 3 (senão **400**).
+- **Aprovação:** exige uma entrevista com `status: "REALIZADA"` (`completed: true`). Sem isso, a API responde **400**; com papel `VOLUNTEER`, responde **403**.
+- **Marcar como realizado:** exige entrevista previamente agendada (**400** se não existir).
 
 ## Formato de erro
 
@@ -199,8 +223,8 @@ Os dois rodam no ambiente `node` (`// @vitest-environment node`), enquanto os te
 
 ## Limitações conhecidas
 
-- Um único usuário, sem autenticação nem permissões.
-- O adotante só cria e cancela. `Aprovada` e `Recusada` são decididas pela instituição, pelas rotas da seção anterior, mas sem etapas intermediárias (entrevista, visita), sem motivo obrigatório e sem distinção entre administrador e voluntário. As quatro solicitações do seed mostram cada status desde o primeiro uso.
+- Um único usuário base, sem autenticação real. O papel dentro da organização é simulado por `X-Demo-Role` (`ADMIN` ou `VOLUNTEER`), sem cadastro de vínculos entre pessoas e organizações.
+- O adotante só cria e cancela. A instituição conduz a análise, propõe horários, marca a entrevista como realizada, recusa com motivo obrigatório e — só com papel `ADMIN` — aprova. A pessoa adotante ainda não escolhe o horário da entrevista nem recebe notificações reais de agendamento. As quatro solicitações do seed mostram cada status desde o primeiro uso.
 - Sem upload de fotos: os pets usam URLs externas.
 - Sem concorrência real: é um arquivo JSON e um processo.
 - A compatibilidade é calculada **no frontend**; o mock não tem rota de recomendação.

@@ -1,7 +1,8 @@
 import { lazy, type ReactNode, Suspense } from 'react'
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Layout } from './components/Layout'
+import { OrganizacaoGuard } from './components/OrganizacaoGuard'
 import { useAdopterProfile } from './hooks/useAdopterProfile'
 import { useGuardianProfile } from './hooks/useGuardianProfile'
 import { useDemoAccount } from './hooks/useDemoAccount'
@@ -43,6 +44,10 @@ const OrganizationRequestsPage = named(
   () => import('./pages/OrganizationRequestsPage'),
   'OrganizationRequestsPage',
 )
+const OrganizationRequestDetailPage = named(
+  () => import('./pages/OrganizationRequestDetailPage'),
+  'OrganizationRequestDetailPage',
+)
 const NotFoundPage = named(() => import('./pages/NotFoundPage'), 'NotFoundPage')
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -69,6 +74,14 @@ function AccountTypeRoute({
   if ((type === 'guardian') !== isGuardian)
     return <Navigate to={isGuardian ? '/organizacao' : '/'} replace />
   return children
+}
+
+function OrganizationArea() {
+  return (
+    <OrganizacaoGuard>
+      <Outlet />
+    </OrganizacaoGuard>
+  )
 }
 
 export default function App() {
@@ -166,46 +179,17 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/organizacao"
-              element={
-                <AccountTypeRoute type="guardian">
-                  <OrganizationDashboardPage />
-                </AccountTypeRoute>
-              }
-            />
-            <Route
-              path="/organizacao/pets"
-              element={
-                <AccountTypeRoute type="guardian">
-                  <OrganizationPetsPage />
-                </AccountTypeRoute>
-              }
-            />
-            <Route
-              path="/organizacao/pets/novo"
-              element={
-                <AccountTypeRoute type="guardian">
-                  <OrganizationPetFormPage />
-                </AccountTypeRoute>
-              }
-            />
-            <Route
-              path="/organizacao/pets/:petId/editar"
-              element={
-                <AccountTypeRoute type="guardian">
-                  <OrganizationPetFormPage />
-                </AccountTypeRoute>
-              }
-            />
-            <Route
-              path="/organizacao/solicitacoes"
-              element={
-                <AccountTypeRoute type="guardian">
-                  <OrganizationRequestsPage />
-                </AccountTypeRoute>
-              }
-            />
+            <Route element={<OrganizationArea />}>
+              <Route path="/organizacao" element={<OrganizationDashboardPage />} />
+              <Route path="/organizacao/pets" element={<OrganizationPetsPage />} />
+              <Route path="/organizacao/pets/novo" element={<OrganizationPetFormPage />} />
+              <Route path="/organizacao/pets/:petId/editar" element={<OrganizationPetFormPage />} />
+              <Route path="/organizacao/solicitacoes" element={<OrganizationRequestsPage />} />
+              <Route
+                path="/organizacao/solicitacoes/:requestId"
+                element={<OrganizationRequestDetailPage />}
+              />
+            </Route>
             <Route path="/cadastro" element={<CreateAccountPage />} />
             <Route path="/criar-conta" element={<CreateAccountPage />} />
             <Route path="/entrar" element={<LoginPage />} />

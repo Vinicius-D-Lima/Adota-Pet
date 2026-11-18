@@ -45,6 +45,14 @@ describe('api', () => {
     expect(new Headers(init.headers).get('X-Demo-User-Id')).toBe('demo-organization')
   })
 
+  it('envia o papel da organização para simular administrador ou voluntário', async () => {
+    vi.stubEnv('VITE_DEMO_ROLE', 'VOLUNTEER')
+    const fetchMock = mockFetch(() => Promise.resolve(json(200, {})))
+    await api.get('/me/permissions')
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(new Headers(init.headers).get('X-Demo-Role')).toBe('VOLUNTEER')
+  })
+
   it('retorna o JSON em caso de sucesso', async () => {
     mockFetch(() => Promise.resolve(json(200, [{ id: 'luna' }])))
     await expect(api.get('/pets')).resolves.toEqual([{ id: 'luna' }])

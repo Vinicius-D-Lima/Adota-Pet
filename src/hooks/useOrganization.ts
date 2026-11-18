@@ -4,6 +4,7 @@ import { petSchema, petsResponseSchema, type Pet } from '../schemas/petSchema'
 import {
   receivedRequestSchema,
   receivedRequestsResponseSchema,
+  type InterviewFormData,
   type OrganizationPetPayload,
 } from '../schemas/organizationSchema'
 
@@ -11,7 +12,10 @@ export const organizationKeys = {
   all: ['organization'] as const,
   pets: () => [...organizationKeys.all, 'pets'] as const,
   requests: () => [...organizationKeys.all, 'requests'] as const,
+  request: (id: string) => [...organizationKeys.requests(), id] as const,
 }
+
+export type OrganizationRequestTransition = 'EM_ANALISE' | 'APROVADA' | 'RECUSADA'
 
 export function useOrganizationPets(enabled = true) {
   return useQuery({
@@ -27,6 +31,17 @@ export function useReceivedRequests(enabled = true) {
     queryFn: async () =>
       receivedRequestsResponseSchema.parse(await api.get('/me/received-requests')).data,
     enabled,
+  })
+}
+
+export function useReceivedRequest(requestId: string | undefined) {
+  return useQuery({
+    queryKey: organizationKeys.request(requestId ?? ''),
+    queryFn: async () =>
+      receivedRequestSchema.parse(
+        await api.get(`/me/received-requests/${encodeURIComponent(requestId ?? '')}`),
+      ),
+    enabled: Boolean(requestId),
   })
 }
 
@@ -61,9 +76,49 @@ export function useDeleteOrganizationPet() {
 export function useUpdateReceivedRequestStatus() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, to }: { id: string; to: 'EM_ANALISE' | 'APROVADA' | 'RECUSADA' }) =>
+    mutationFn: async ({
+      id,
+      to,
+      reason,
+    }: {
+      id: string
+      to: OrganizationRequestTransition
+      reason?: string
+    }) =>
       receivedRequestSchema.parse(
-        await api.post(`/me/received-requests/${encodeURIComponent(id)}/transitions`, { to }),
+        await api.post(`/me/received-requests/${encodeURIComponent(id)}/transitions`, {
+          to,
+          ...(reason ? { reason } : {}),
+        }),
+      ),
+    // Também no erro: um 409 indica que o estado mudou e a lista precisa recarregar.
+    onSettled: () => queryClient.invalidateQueries({ queryKey: organizationKeys.requests() }),
+  })
+}
+
+export function useScheduleInterview() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string
+      data: { type: InterviewFormData['type']; proposedSlots: string[] }
+    }) =>
+      receivedRequestSchema.parse(
+        await api.post(`/me/received-requests/${encodeURIComponent(id)}/interview`, data),
+      ),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: organizationKeys.requests() }),
+  })
+}
+
+export function useCompleteInterview() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) =>
+      receivedRequestSchema.parse(
+        await api.post(`/me/received-requests/${encodeURIComponent(id)}/interview/complete`),
       ),
     onSettled: () => queryClient.invalidateQueries({ queryKey: organizationKeys.requests() }),
   })

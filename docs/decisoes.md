@@ -63,7 +63,7 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 ## 12. A compatibilidade é calculada no cliente
 
 - **Decisão:** `calculateCompatibility` roda no navegador, com 7 critérios de peso igual.
-- **Consequência:** simples e testável, sem rota no mock. Quando existir o serviço de matching no backend (#19), a tela passa a consumir o resultado da API.
+- **Consequência:** simples e testável, sem rota no mock. A área da organização reutiliza o mesmo cálculo para mostrar o score no detalhe da solicitação, com um adaptador para o perfil resumido que a API devolve. Quando existir o serviço de matching no backend (#19), as telas passam a consumir o resultado da API.
 
 ## 13. Sem Next.js
 

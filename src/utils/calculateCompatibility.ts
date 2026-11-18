@@ -1,19 +1,24 @@
 import type { Pet, ProfileDraft } from '../types'
 
-interface CompatibilityCheck {
+export type CompatibilityPet = Omit<Pet, 'distance' | 'distanceKm'>
+
+export interface CompatibilityCheck {
   ok: boolean
   good: string
   attention: string
 }
 
-interface CompatibilityResult {
+export interface CompatibilityResult {
   score: number
   level: 'Alta' | 'Média' | 'Baixa'
   good: CompatibilityCheck[]
   attention: CompatibilityCheck[]
 }
 
-export function calculateCompatibility(pet: Pet, profile: ProfileDraft): CompatibilityResult {
+export function calculateCompatibility(
+  pet: CompatibilityPet,
+  profile: ProfileDraft,
+): CompatibilityResult {
   const checks: CompatibilityCheck[] = [
     {
       ok: pet.energy !== 'Alta' || profile.activityLevel === 'Ativo',

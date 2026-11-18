@@ -1,131 +1,136 @@
-import { CalendarDays, Mail, MessageCircle, Phone, UserRound } from 'lucide-react'
-import { useState, type SyntheticEvent } from 'react'
+import { CalendarDays, ChevronRight, Mail, Phone, Search } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
-import { RequestChat } from '../components/RequestChat'
 import {
-  Alert,
-  Button,
+  Badge,
   Card,
   Container,
   EmptyState,
   Feedback,
+  Field,
+  LinkButton,
   PageIntro,
   PageSurface,
+  Select,
   StatusPill,
   cx,
 } from '../components/ui'
-import { useReceivedRequests, useUpdateReceivedRequestStatus } from '../hooks/useOrganization'
-import type { ReceivedRequest, RequestStatus } from '../types'
+import { useReceivedRequests } from '../hooks/useOrganization'
+import type { ReceivedRequest } from '../types'
 import { formatRequestDate } from '../utils/formatRequestDate'
-
-const stages = [
-  { key: 'all', label: 'Todas', statuses: null },
-  { key: 'sent', label: 'Novas', statuses: ['Enviada'] },
-  { key: 'review', label: 'Em análise', statuses: ['Em análise'] },
-  { key: 'approved', label: 'Aprovadas', statuses: ['Aprovada'] },
-  { key: 'declined', label: 'Recusadas', statuses: ['Recusada', 'Cancelada'] },
-] as const satisfies ReadonlyArray<{
-  key: string
-  label: string
-  statuses: readonly RequestStatus[] | null
-}>
-
-type Stage = (typeof stages)[number]['key']
-const isStage = (value: string | null): value is Stage => stages.some(({ key }) => key === value)
-const matches = (request: ReceivedRequest, stage: (typeof stages)[number]) =>
-  !stage.statuses || stage.statuses.includes(request.status as never)
+import {
+  ORGANIZATION_REQUEST_STAGES,
+  countByStage,
+  isOrganizationRequestStage,
+} from '../utils/organizationRequestStage'
 
 export function OrganizationRequestsPage() {
   const requestsQuery = useReceivedRequests()
-  const updateStatus = useUpdateReceivedRequestStatus()
   const [params, setParams] = useSearchParams()
-  const [error, setError] = useState('')
-  const [openChats, setOpenChats] = useState<Record<string, boolean>>({})
 
   if (requestsQuery.isPending) return <Feedback>Carregando solicitações recebidas...</Feedback>
   if (requestsQuery.isError)
     return <Feedback error>Não foi possível carregar as solicitações recebidas.</Feedback>
 
-  const selectedKey: Stage = isStage(params.get('estagio'))
-    ? (params.get('estagio') as Stage)
-    : 'all'
-  const selected = stages.find(({ key }) => key === selectedKey) ?? stages[0]
-  const visible = requestsQuery.data.filter((request) => matches(request, selected))
-  const change = async (id: string, to: 'EM_ANALISE' | 'APROVADA' | 'RECUSADA') => {
-    setError('')
-    try {
-      await updateStatus.mutateAsync({ id, to })
-    } catch {
-      setError('Não foi possível atualizar a solicitação. Recarregue a página e tente novamente.')
-    }
+  const requests = requestsQuery.data
+  const stageFromUrl = params.get('estagio')
+  const stageKey = isOrganizationRequestStage(stageFromUrl) ? stageFromUrl : 'all'
+  const stage =
+    ORGANIZATION_REQUEST_STAGES.find(({ key }) => key === stageKey) ??
+    ORGANIZATION_REQUEST_STAGES[0]
+  const petFromUrl = params.get('pet') ?? ''
+  const counts = countByStage(requests)
+  const pets = Array.from(
+    new Map(
+      requests
+        .filter((request) => request.pet)
+        .map((request) => [request.petId, request.pet!] as const),
+    ).values(),
+  ).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  const visible = requests
+    .filter((request) => stage.matches(request))
+    .filter((request) => !petFromUrl || request.petId === petFromUrl)
+
+  const updateFilters = (nextStage: string, nextPet: string) => {
+    setParams((current) => {
+      const next = new URLSearchParams(current)
+      if (nextStage === 'all') next.delete('estagio')
+      else next.set('estagio', nextStage)
+      if (!nextPet) next.delete('pet')
+      else next.set('pet', nextPet)
+      return next
+    })
   }
 
   return (
     <PageSurface>
       <Container as="section" className="pb-24 pt-10 md:pt-14">
         <PageIntro
-          eyebrow="Área da instituição"
+          eyebrow="Área da organização"
           title="Solicitações recebidas"
-          description="Analise o perfil e o questionário de cada pessoa antes de avançar no processo de adoção."
+          description="Acompanhe cada etapa, agende entrevistas e decida com base no perfil e na compatibilidade de cada pessoa."
         />
-        {error && <Alert>{error}</Alert>}
-        {requestsQuery.data.length ? (
+        {requests.length ? (
           <>
-            <div
-              className="mb-7 flex gap-2 overflow-x-auto rounded-2xl border border-line bg-white p-2"
-              role="group"
-              aria-label="Filtrar solicitações por estágio"
-            >
-              {stages.map((stage) => {
-                const count = requestsQuery.data.filter((request) => matches(request, stage)).length
-                const active = stage.key === selected.key
-                return (
-                  <button
-                    key={stage.key}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setParams(stage.key === 'all' ? {} : { estagio: stage.key })}
-                    className={cx(
-                      'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border-0 px-4 text-xs font-bold',
-                      active
-                        ? 'bg-forest-800 text-white'
-                        : 'bg-transparent text-muted hover:bg-forest-50',
-                    )}
-                  >
-                    <span>{stage.label}</span>
-                    <span
+            <div className="mb-7 grid gap-3 rounded-2xl border border-line bg-white p-3 md:grid-cols-[1fr_260px] md:items-end">
+              <div
+                className="flex gap-2 overflow-x-auto"
+                role="group"
+                aria-label="Filtrar solicitações por etapa"
+              >
+                {ORGANIZATION_REQUEST_STAGES.map((item) => {
+                  const active = item.key === stage.key
+                  const count = counts[item.key]
+                  return (
+                    <button
+                      key={item.key}
+                      type="button"
+                      aria-pressed={active}
+                      aria-label={`${item.label}: ${count} ${count === 1 ? 'solicitação' : 'solicitações'}`}
+                      onClick={() => updateFilters(item.key, petFromUrl)}
                       className={cx(
-                        'rounded-full px-2 py-0.5 text-[10px]',
-                        active ? 'bg-white/20' : 'bg-forest-100 text-forest-700',
+                        'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl border-0 px-4 text-xs font-bold',
+                        active
+                          ? 'bg-forest-800 text-white'
+                          : 'bg-transparent text-muted hover:bg-forest-50',
                       )}
                     >
-                      {count}
-                    </span>
-                  </button>
-                )
-              })}
+                      <span>{item.label}</span>
+                      <span
+                        className={cx(
+                          'rounded-full px-2 py-0.5 text-[10px]',
+                          active ? 'bg-white/20' : 'bg-forest-100 text-forest-700',
+                        )}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+              <Field label="Filtrar por pet" tight>
+                <Select
+                  value={petFromUrl}
+                  onChange={(event) => updateFilters(stage.key, event.target.value)}
+                >
+                  <option value="">Todos os pets</option>
+                  {pets.map((pet) => (
+                    <option key={pet.id} value={pet.id}>
+                      {pet.name}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
             </div>
+
             <div className="grid gap-5">
               {visible.map((request) => (
-                <RequestCard
-                  key={request.id}
-                  request={request}
-                  pending={updateStatus.isPending && updateStatus.variables?.id === request.id}
-                  onChange={change}
-                  chatOpen={openChats[request.id] ?? false}
-                  onChatToggle={(event) => {
-                    const isOpen = event.currentTarget.open
-                    setOpenChats((current) => ({
-                      ...current,
-                      [request.id]: isOpen,
-                    }))
-                  }}
-                />
+                <RequestCard key={request.id} request={request} />
               ))}
               {!visible.length && (
                 <EmptyState
-                  title="Nenhuma solicitação neste estágio"
-                  description="Quando uma solicitação mudar para este estágio, ela aparecerá aqui."
+                  icon={<Search size={28} className="text-forest-700" />}
+                  title="Nenhuma solicitação com estes filtros"
+                  description="Mude a etapa ou o pet para ver outras solicitações."
                 />
               )}
             </div>
@@ -133,7 +138,7 @@ export function OrganizationRequestsPage() {
         ) : (
           <EmptyState
             title="Nenhuma solicitação recebida"
-            description="As solicitações enviadas para os pets da instituição aparecerão aqui."
+            description="As solicitações enviadas para os pets da organização aparecerão aqui."
           />
         )}
       </Container>
@@ -141,33 +146,33 @@ export function OrganizationRequestsPage() {
   )
 }
 
-function RequestCard({
-  request,
-  pending,
-  onChange,
-  chatOpen,
-  onChatToggle,
-}: {
-  request: ReceivedRequest
-  pending: boolean
-  onChange: (id: string, to: 'EM_ANALISE' | 'APROVADA' | 'RECUSADA') => Promise<void>
-  chatOpen: boolean
-  onChatToggle: (event: SyntheticEvent<HTMLDetailsElement>) => void
-}) {
+function RequestCard({ request }: { request: ReceivedRequest }) {
   return (
     <Card as="article" className="overflow-hidden">
-      <div className="grid gap-5 p-5 md:grid-cols-[120px_1fr_auto] md:p-6">
-        {request.pet && (
+      <div className="grid gap-5 p-5 md:grid-cols-[120px_1fr_auto] md:items-center md:p-6">
+        {request.pet ? (
           <img
             src={request.pet.image}
             alt={request.pet.name}
             className="h-28 w-full rounded-2xl object-cover md:w-[120px]"
           />
+        ) : (
+          <div className="grid h-28 w-full place-items-center rounded-2xl bg-forest-50 text-xs text-muted md:w-[120px]">
+            Pet indisponível
+          </div>
         )}
         <div>
-          <div className="mb-2 flex flex-wrap items-center gap-3">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-[.12em] text-coral">
+            Solicitação {request.id}
+          </p>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <h2 className="m-0 text-2xl">{request.pet?.name ?? 'Pet indisponível'}</h2>
             <StatusPill status={request.status} />
+            {request.interview && (
+              <Badge tone={request.interview.completed ? 'approved' : 'review'}>
+                {request.interview.completed ? 'Entrevista realizada' : 'Entrevista agendada'}
+              </Badge>
+            )}
           </div>
           <p className="mb-2 text-sm font-bold text-forest-800">
             {request.adopter.name || 'Adotante'}
@@ -184,79 +189,17 @@ function RequestCard({
             </span>
           </div>
         </div>
-        <div className="flex items-start gap-2 md:justify-end">
-          {request.status === 'Enviada' && (
-            <Button size="sm" loading={pending} onClick={() => onChange(request.id, 'EM_ANALISE')}>
-              Iniciar análise
-            </Button>
-          )}
-          {request.status === 'Em análise' && (
-            <Button size="sm" loading={pending} onClick={() => onChange(request.id, 'APROVADA')}>
-              Aprovar
-            </Button>
-          )}
-          {['Enviada', 'Em análise'].includes(request.status) && (
-            <Button
-              size="sm"
-              variant="danger"
-              disabled={pending}
-              onClick={() => onChange(request.id, 'RECUSADA')}
-            >
-              Recusar
-            </Button>
-          )}
+        <div className="flex md:justify-end">
+          <LinkButton
+            to={`/organizacao/solicitacoes/${encodeURIComponent(request.id)}`}
+            variant="secondary"
+            size="sm"
+            aria-label={`Analisar solicitação ${request.id} de ${request.adopter.name || 'adotante'} para ${request.pet?.name ?? 'pet indisponível'}`}
+          >
+            Analisar solicitação <ChevronRight size={16} />
+          </LinkButton>
         </div>
       </div>
-      <details className="border-t border-line px-5 py-4 md:px-6">
-        <summary className="cursor-pointer text-xs font-bold text-forest-800">
-          <UserRound size={16} className="mr-2 inline" />
-          Ver perfil e questionário do adotante
-        </summary>
-        <div className="mt-5 grid gap-5 md:grid-cols-2">
-          <section>
-            <h3 className="mb-3 text-lg">Perfil</h3>
-            <Info label="Completude" value={`${request.adopter.completion}%`} />
-            <Info label="Moradia" value={request.adopter.housing} />
-            <Info label="Tempo diário" value={request.adopter.dailyTime} />
-            <Info label="Experiência" value={request.adopter.experience} />
-            <Info label="Crianças na casa" value={yesNo(request.adopter.hasChildren)} />
-            <Info label="Outros pets" value={yesNo(request.adopter.hasOtherPets)} />
-          </section>
-          <section>
-            <h3 className="mb-3 text-lg">Questionário</h3>
-            <Info label="Motivação" value={request.answers?.motivation} />
-            <Info label="Rotina" value={request.answers?.routine} />
-            <Info label="Tempo sozinho" value={request.answers?.aloneTime} />
-            <Info label="Adaptação" value={request.answers?.adaptation} />
-          </section>
-        </div>
-      </details>
-      <details className="border-t border-line px-5 py-4 md:px-6" onToggle={onChatToggle}>
-        <summary className="flex cursor-pointer items-center gap-2 text-xs font-bold text-forest-800">
-          <MessageCircle size={16} />
-          Conversa com o adotante
-          {(request.unreadMessageCount ?? 0) > 0 && (
-            <span
-              className="rounded-full bg-coral px-2 py-0.5 text-[10px] text-white"
-              aria-label={`${request.unreadMessageCount} mensagens não lidas`}
-            >
-              {request.unreadMessageCount}
-            </span>
-          )}
-        </summary>
-        {chatOpen && <RequestChat requestId={request.id} status={request.status} />}
-      </details>
     </Card>
-  )
-}
-
-function yesNo(value?: boolean) {
-  return value === undefined ? undefined : value ? 'Sim' : 'Não'
-}
-function Info({ label, value }: { label: string; value?: string }) {
-  return (
-    <p className="mb-2 text-xs leading-5">
-      <strong>{label}:</strong> <span className="text-muted">{value || 'Não informado'}</span>
-    </p>
   )
 }

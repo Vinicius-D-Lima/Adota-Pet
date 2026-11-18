@@ -49,6 +49,13 @@ export function getDemoAccountId(): DemoAccountId {
     : DEFAULT_DEMO_ACCOUNT_ID
 }
 
+export type DemoRole = 'ADMIN' | 'VOLUNTEER'
+
+/** Papel dentro da organização; o padrão do mock é administrador. */
+export function getDemoRole(): DemoRole {
+  return import.meta.env.VITE_DEMO_ROLE === 'VOLUNTEER' ? 'VOLUNTEER' : 'ADMIN'
+}
+
 export function getDemoAccount(accountId = getDemoAccountId()) {
   return demoAccounts.find(({ id }) => id === accountId) ?? demoAccounts[0]
 }

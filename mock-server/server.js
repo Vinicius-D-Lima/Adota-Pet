@@ -87,6 +87,7 @@ const ORGANIZATION_REQUEST_TRANSITIONS = {
   APROVADA: 'Aprovada',
   RECUSADA: 'Recusada',
 }
+const INTERVIEW_TYPES = ['Entrevista online', 'Visita presencial']
 const ORGANIZATION_PET_FIELDS = [
   'name',
   'species',
@@ -413,6 +414,16 @@ export function createApp({
     const { name } = organizationIdentity(userId)
     return store.get('pets').filter({ organization: name }).value()
   }
+  const demoRole = (req) =>
+    String(
+      req.headers['x-demo-role'] || req.query.role || req.cookies?.demoRole || '',
+    ).toUpperCase() === 'VOLUNTEER'
+      ? 'VOLUNTEER'
+      : 'ADMIN'
+  const permissionsForRole = (role) =>
+    role === 'ADMIN'
+      ? ['requests:view', 'requests:review', 'requests:approve', 'requests:reject']
+      : ['requests:view', 'requests:review', 'requests:reject']
   const isChatParticipant = (request, userId) =>
     request.userId === userId || organizationPets(userId).some(({ id }) => id === request.petId)
   const messagesForRequest = (requestId) =>
@@ -464,6 +475,11 @@ export function createApp({
         experience: profile.experience,
         hasChildren: profile.hasChildren,
         hasOtherPets: profile.hasOtherPets,
+        preferredSpecies: profile.preferredSpecies,
+        preferredSize: profile.preferredSize,
+        zipCode: profile.zipCode,
+        address: profile.address,
+        city: user.city,
       },
     }
   }
@@ -775,18 +791,18 @@ export function createApp({
 
   server.get('/me/permissions', (req, res) => {
     if (!requireGuardian(req, res)) return
-    const roleHeader = String(
-      req.headers['x-demo-role'] || req.query.role || req.cookies?.demoRole || '',
-    ).toUpperCase()
-    const role = roleHeader === 'VOLUNTEER' ? 'VOLUNTEER' : 'ADMIN'
-    const permissions =
-      role === 'ADMIN'
-        ? ['requests:view', 'requests:review', 'requests:approve', 'requests:reject']
-        : ['requests:view', 'requests:review', 'requests:reject']
+    const userId = currentUserId(req)
+    const role = demoRole(req)
+    const identity = organizationIdentity(userId)
     res.json({
       role,
       canApprove: role === 'ADMIN',
-      permissions,
+      permissions: permissionsForRole(role),
+      organization: {
+        id: userId,
+        name: identity.name,
+        initials: identity.initials,
+      },
     })
   })
 
@@ -803,6 +819,22 @@ export function createApp({
     res.json(list(requests))
   })
 
+  server.get('/me/received-requests/:id', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const userId = currentUserId(req)
+    const petIds = new Set(organizationPets(userId).map(({ id }) => id))
+    const request = store.get('requests').find({ id: req.params.id }).value()
+    if (!request || !petIds.has(request.petId))
+      return sendError(res, 404, 'Solicitação não encontrada')
+    res.json(withReceivedRequest(request, userId))
+  })
+
+  const isFutureDate = (value) => {
+    if (typeof value !== 'string' || isBlank(value)) return false
+    const date = new Date(value)
+    return !Number.isNaN(date.getTime()) && date.getTime() > Date.now()
+  }
+
   server.post('/me/received-requests/:id/interview', (req, res) => {
     if (!requireGuardian(req, res)) return
     const userId = currentUserId(req)
@@ -810,11 +842,32 @@ export function createApp({
     const request = store.get('requests').find({ id: req.params.id }).value()
     if (!request || !petIds.has(request.petId))
       return sendError(res, 404, 'Solicitação não encontrada')
-    const proposedSlots = Array.isArray(req.body?.proposedSlots) ? req.body.proposedSlots : []
-    if (proposedSlots.length === 0 || proposedSlots.length > 3) {
-      return sendError(res, 400, 'Proponha de 1 a 3 horários para a entrevista.')
+    if (request.status !== 'Em análise') {
+      return sendError(
+        res,
+        409,
+        'Só é possível agendar uma entrevista com a solicitação em análise.',
+      )
     }
-    const type = req.body?.type || 'Entrevista online'
+    if (request.interview?.completed) {
+      return sendError(res, 409, 'A entrevista desta solicitação já foi realizada.')
+    }
+    const proposedSlots = Array.isArray(req.body?.proposedSlots) ? req.body.proposedSlots : []
+    const details = []
+    if (proposedSlots.length === 0 || proposedSlots.length > 3) {
+      details.push({
+        field: 'proposedSlots',
+        message: 'Proponha de 1 a 3 horários para a entrevista.',
+      })
+    }
+    if (proposedSlots.some((slot) => !isFutureDate(slot))) {
+      details.push({
+        field: 'proposedSlots',
+        message: 'Todos os horários precisam ser datas futuras.',
+      })
+    }
+    if (details.length) return sendError(res, 400, 'Validação falhou', details)
+    const type = INTERVIEW_TYPES.includes(req.body?.type) ? req.body.type : 'Entrevista online'
     const interview = {
       type,
       proposedSlots,
@@ -836,6 +889,9 @@ export function createApp({
       return sendError(res, 404, 'Solicitação não encontrada')
     if (!request.interview) {
       return sendError(res, 400, 'Nenhuma entrevista foi agendada para esta solicitação.')
+    }
+    if (!['Em análise', 'Aprovada'].includes(request.status)) {
+      return sendError(res, 409, 'Esta solicitação não está em etapa de entrevista.')
     }
     const interview = {
       ...request.interview,
@@ -859,18 +915,17 @@ export function createApp({
     const status = ORGANIZATION_REQUEST_TRANSITIONS[to]
     if (!status) return sendError(res, 400, 'Transição não suportada')
 
-    const roleHeader = String(
-      req.headers['x-demo-role'] || req.query.role || req.cookies?.demoRole || '',
-    ).toUpperCase()
-    if (roleHeader === 'VOLUNTEER' && status === 'Aprovada') {
+    const role = demoRole(req)
+    if (role === 'VOLUNTEER' && status === 'Aprovada') {
       return sendError(res, 403, 'Apenas administradores podem aprovar solicitações.')
     }
 
-    if (status === 'Aprovada' && request.interview && !request.interview.completed) {
+    if (status === 'Aprovada' && request.interview?.completed !== true) {
       return sendError(
         res,
         400,
         'O agendamento da etapa precisa estar marcado como realizado antes de aprovar.',
+        [{ field: 'interview', message: 'Marque a entrevista como realizada antes de aprovar.' }],
       )
     }
 
@@ -884,6 +939,11 @@ export function createApp({
         `Não é possível alterar uma solicitação com status "${request.status}" para "${status}"`,
       )
     const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
+    if (status === 'Recusada' && reason.length < 10) {
+      return sendError(res, 400, 'Informe o motivo da recusa', [
+        { field: 'reason', message: 'O motivo deve ter pelo menos 10 caracteres.' },
+      ])
+    }
     const messages = {
       'Em análise': 'A instituição iniciou a análise da sua solicitação.',
       Aprovada: 'Sua solicitação foi aprovada pela instituição.',
