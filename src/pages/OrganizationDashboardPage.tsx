@@ -32,16 +32,16 @@ export function OrganizationDashboardPage() {
   return (
     <PageSurface>
       <Container as="section" className="pb-24 pt-10 md:pt-14">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <PageIntro
-            eyebrow="Área da instituição"
-            title="Painel de adoções"
-            description="Gerencie os animais divulgados e acompanhe as pessoas interessadas em adotá-los."
-          />
-          <LinkButton to="/organizacao/pets/novo">
-            <Plus size={18} /> Cadastrar pet
-          </LinkButton>
-        </div>
+        <PageIntro
+          eyebrow="Área da instituição"
+          title="Painel de adoções"
+          action={
+            <LinkButton to="/organizacao/pets/novo">
+              <Plus size={18} /> Cadastrar pet
+            </LinkButton>
+          }
+          description="Gerencie os animais divulgados e acompanhe as pessoas interessadas em adotá-los."
+        />
 
         <div className="my-8 grid gap-4 sm:grid-cols-3">
           <Metric icon={PawPrint} value={pets.length} label="Pets publicados" />
