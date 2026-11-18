@@ -35,16 +35,16 @@ export function OrganizationPetsPage() {
   return (
     <PageSurface>
       <Container as="section" className="pb-24 pt-10 md:pt-14">
-        <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-          <PageIntro
-            eyebrow="Área da instituição"
-            title="Meus pets"
-            description="Cadastre, revise e mantenha atualizadas as informações dos animais disponíveis para adoção."
-          />
-          <LinkButton to="/organizacao/pets/novo">
-            <Plus size={18} /> Cadastrar pet
-          </LinkButton>
-        </div>
+        <PageIntro
+          eyebrow="Área da instituição"
+          title="Meus pets"
+          action={
+            <LinkButton to="/organizacao/pets/novo">
+              <Plus size={18} /> Cadastrar pet
+            </LinkButton>
+          }
+          description="Cadastre, revise e mantenha atualizadas as informações dos animais disponíveis para adoção."
+        />
         {error && <Alert>{error}</Alert>}
         {!petsQuery.data.length ? (
           <EmptyState
