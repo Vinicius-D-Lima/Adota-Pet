@@ -147,13 +147,22 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
               </NavLink>
             ))}
             {!account.isAuthenticated && (
-              <Link
-                className="rounded-[9px] bg-coral px-4 py-3 text-center text-sm font-bold text-white md:hidden"
-                to="/criar-conta"
-                onClick={() => setOpen(false)}
-              >
-                Entrar ou criar conta
-              </Link>
+              <div className="mt-2 grid gap-2 border-t border-line pt-3 md:hidden">
+                <Link
+                  className="rounded-[9px] px-3 py-2.5 text-center text-sm font-semibold text-forest-800 hover:bg-forest-50"
+                  to="/entrar"
+                  onClick={() => setOpen(false)}
+                >
+                  Entrar
+                </Link>
+                <Link
+                  className="rounded-[9px] bg-coral px-4 py-3 text-center text-sm font-bold text-white shadow-[0_8px_18px_rgba(233,120,82,0.22)] hover:bg-coral-dark"
+                  to="/cadastro"
+                  onClick={() => setOpen(false)}
+                >
+                  Criar conta
+                </Link>
+              </div>
             )}
             {account.isAuthenticated && (
               <button
@@ -219,12 +228,25 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
               )}
             </div>
           ) : (
-            <Link
-              className="hidden rounded-lg bg-coral px-4 py-2.5 text-sm font-bold text-white md:inline-flex"
-              to="/criar-conta"
-            >
-              Entrar ou criar conta
-            </Link>
+            <div className="hidden md:flex md:items-center md:gap-6">
+              <NavLink
+                to="/entrar"
+                className={({ isActive }) =>
+                  cx(
+                    'text-sm font-semibold transition hover:text-forest-800',
+                    isActive ? 'text-coral' : 'text-[#52625a]',
+                  )
+                }
+              >
+                Entrar
+              </NavLink>
+              <Link
+                className="rounded-xl bg-coral px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_22px_rgba(210,95,59,0.22)] transition hover:bg-coral-dark"
+                to="/cadastro"
+              >
+                Criar conta
+              </Link>
+            </div>
           )}
         </Container>
       </header>

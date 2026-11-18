@@ -39,10 +39,14 @@ export function OrganizationPetsPage() {
           eyebrow="Área da instituição"
           title="Meus pets"
           action={
-            <LinkButton to="/organizacao/pets/novo">
+            <LinkButton
+              to="/organizacao/pets/novo"
+              className="rounded-full shadow-[0_8px_25px_rgba(233,120,82,0.45)] md:rounded-xl md:shadow-[0_10px_22px_rgba(210,95,59,0.22)]"
+            >
               <Plus size={18} /> Cadastrar pet
             </LinkButton>
           }
+          actionFloatingMobile
           description="Cadastre, revise e mantenha atualizadas as informações dos animais disponíveis para adoção."
         />
         {error && <Alert>{error}</Alert>}

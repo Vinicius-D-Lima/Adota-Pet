@@ -32,8 +32,7 @@ describe('Layout - sessão e menu do perfil', () => {
 
     await user.click(screen.getByRole('menuitem', { name: /sair/i }))
     expect(screen.queryByRole('menuitem', { name: /sair/i })).not.toBeInTheDocument()
-    expect(screen.getAllByRole('link', { name: /entrar ou criar conta/i }).length).toBeGreaterThan(
-      0,
-    )
+    expect(screen.getAllByRole('link', { name: /criar conta/i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: /entrar/i }).length).toBeGreaterThan(0)
   })
 })

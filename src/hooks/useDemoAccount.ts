@@ -3,6 +3,7 @@ import {
   getDemoAccountSnapshot,
   getDemoProfilePath,
   hasDemoAccount,
+  loginDemoAccount,
   logoutDemoAccount,
   subscribeDemoAccount,
 } from '../lib/demoAccount'
@@ -12,6 +13,7 @@ export function useDemoAccount() {
   return {
     isAuthenticated: hasDemoAccount(),
     profilePath: getDemoProfilePath(),
+    login: loginDemoAccount,
     logout: logoutDemoAccount,
   }
 }

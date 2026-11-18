@@ -36,10 +36,14 @@ export function OrganizationDashboardPage() {
           eyebrow="Área da instituição"
           title="Painel de adoções"
           action={
-            <LinkButton to="/organizacao/pets/novo">
+            <LinkButton
+              to="/organizacao/pets/novo"
+              className="rounded-full shadow-[0_8px_25px_rgba(233,120,82,0.45)] md:rounded-xl md:shadow-[0_10px_22px_rgba(210,95,59,0.22)]"
+            >
               <Plus size={18} /> Cadastrar pet
             </LinkButton>
           }
+          actionFloatingMobile
           description="Gerencie os animais divulgados e acompanhe as pessoas interessadas em adotá-los."
         />
 
