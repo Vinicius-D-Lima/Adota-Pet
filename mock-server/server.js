@@ -448,6 +448,8 @@ export function createApp({
     return {
       ...withPet(request),
       unreadMessageCount: unreadChatCount(request.id, viewerId),
+      interview: request.interview ?? null,
+      rejectionReason: request.rejectionReason ?? null,
       adopter: {
         id: request.userId,
         name: profile.name || user.name || '',
@@ -456,6 +458,9 @@ export function createApp({
         completion: Math.round((completed / PROFILE_FIELDS.length) * 100),
         housing: profile.housing,
         dailyTime: profile.dailyTime,
+        activityLevel: profile.activityLevel || 'Moderado',
+        hasOutdoorArea: profile.hasOutdoorArea ?? false,
+        acceptsSpecialCare: profile.acceptsSpecialCare ?? false,
         experience: profile.experience,
         hasChildren: profile.hasChildren,
         hasOtherPets: profile.hasOtherPets,
@@ -768,6 +773,23 @@ export function createApp({
     res.status(204).end()
   })
 
+  server.get('/me/permissions', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const roleHeader = String(
+      req.headers['x-demo-role'] || req.query.role || req.cookies?.demoRole || '',
+    ).toUpperCase()
+    const role = roleHeader === 'VOLUNTEER' ? 'VOLUNTEER' : 'ADMIN'
+    const permissions =
+      role === 'ADMIN'
+        ? ['requests:view', 'requests:review', 'requests:approve', 'requests:reject']
+        : ['requests:view', 'requests:review', 'requests:reject']
+    res.json({
+      role,
+      canApprove: role === 'ADMIN',
+      permissions,
+    })
+  })
+
   server.get('/me/received-requests', (req, res) => {
     if (!requireGuardian(req, res)) return
     const userId = currentUserId(req)
@@ -781,6 +803,51 @@ export function createApp({
     res.json(list(requests))
   })
 
+  server.post('/me/received-requests/:id/interview', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const userId = currentUserId(req)
+    const petIds = new Set(organizationPets(userId).map(({ id }) => id))
+    const request = store.get('requests').find({ id: req.params.id }).value()
+    if (!request || !petIds.has(request.petId))
+      return sendError(res, 404, 'Solicitação não encontrada')
+    const proposedSlots = Array.isArray(req.body?.proposedSlots) ? req.body.proposedSlots : []
+    if (proposedSlots.length === 0 || proposedSlots.length > 3) {
+      return sendError(res, 400, 'Proponha de 1 a 3 horários para a entrevista.')
+    }
+    const type = req.body?.type || 'Entrevista online'
+    const interview = {
+      type,
+      proposedSlots,
+      status: 'AGENDADA',
+      completed: false,
+      scheduledAt: new Date().toISOString(),
+    }
+    const updated = { ...request, interview }
+    store.get('requests').find({ id: request.id }).assign(updated).write()
+    res.json(withReceivedRequest(updated, userId))
+  })
+
+  server.post('/me/received-requests/:id/interview/complete', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const userId = currentUserId(req)
+    const petIds = new Set(organizationPets(userId).map(({ id }) => id))
+    const request = store.get('requests').find({ id: req.params.id }).value()
+    if (!request || !petIds.has(request.petId))
+      return sendError(res, 404, 'Solicitação não encontrada')
+    if (!request.interview) {
+      return sendError(res, 400, 'Nenhuma entrevista foi agendada para esta solicitação.')
+    }
+    const interview = {
+      ...request.interview,
+      status: 'REALIZADA',
+      completed: true,
+      completedAt: new Date().toISOString(),
+    }
+    const updated = { ...request, interview }
+    store.get('requests').find({ id: request.id }).assign(updated).write()
+    res.json(withReceivedRequest(updated, userId))
+  })
+
   server.post('/me/received-requests/:id/transitions', (req, res) => {
     if (!requireGuardian(req, res)) return
     const userId = currentUserId(req)
@@ -791,6 +858,22 @@ export function createApp({
     const to = String(req.body?.to ?? '').toUpperCase()
     const status = ORGANIZATION_REQUEST_TRANSITIONS[to]
     if (!status) return sendError(res, 400, 'Transição não suportada')
+
+    const roleHeader = String(
+      req.headers['x-demo-role'] || req.query.role || req.cookies?.demoRole || '',
+    ).toUpperCase()
+    if (roleHeader === 'VOLUNTEER' && status === 'Aprovada') {
+      return sendError(res, 403, 'Apenas administradores podem aprovar solicitações.')
+    }
+
+    if (status === 'Aprovada' && request.interview && !request.interview.completed) {
+      return sendError(
+        res,
+        400,
+        'O agendamento da etapa precisa estar marcado como realizado antes de aprovar.',
+      )
+    }
+
     const allowed =
       (request.status === 'Enviada' && ['Em análise', 'Recusada'].includes(status)) ||
       (request.status === 'Em análise' && ['Aprovada', 'Recusada'].includes(status))
@@ -800,12 +883,20 @@ export function createApp({
         409,
         `Não é possível alterar uma solicitação com status "${request.status}" para "${status}"`,
       )
+    const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
     const messages = {
       'Em análise': 'A instituição iniciou a análise da sua solicitação.',
       Aprovada: 'Sua solicitação foi aprovada pela instituição.',
-      Recusada: 'A instituição encerrou esta solicitação.',
+      Recusada: reason
+        ? `A instituição encerrou esta solicitação: ${reason}`
+        : 'A instituição encerrou esta solicitação.',
     }
-    const updated = { ...request, status, message: messages[status] }
+    const updated = {
+      ...request,
+      status,
+      message: messages[status],
+      ...(status === 'Recusada' && reason ? { rejectionReason: reason } : {}),
+    }
     store.get('requests').find({ id: request.id }).assign(updated).write()
     res.json(withReceivedRequest(updated, userId))
   })
