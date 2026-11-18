@@ -20,6 +20,7 @@ const RequestsPage = named(() => import('./pages/RequestsPage'), 'RequestsPage')
 const RequestSuccessPage = named(() => import('./pages/RequestSuccessPage'), 'RequestSuccessPage')
 const ProfilePage = named(() => import('./pages/ProfilePage'), 'ProfilePage')
 const CreateAccountPage = named(() => import('./pages/CreateAccountPage'), 'CreateAccountPage')
+const LoginPage = named(() => import('./pages/LoginPage'), 'LoginPage')
 const NotificationsPage = named(() => import('./pages/NotificationsPage'), 'NotificationsPage')
 const NotificationPreferencesPage = named(
   () => import('./pages/NotificationPreferencesPage'),
@@ -48,7 +49,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   const account = useDemoAccount()
   const location = useLocation()
   if (!account.isAuthenticated) {
-    return <Navigate to="/criar-conta" replace state={{ from: location.pathname }} />
+    return <Navigate to="/entrar" replace state={{ from: location.pathname }} />
   }
   return children
 }
@@ -63,7 +64,7 @@ function AccountTypeRoute({
   const account = useDemoAccount()
   const location = useLocation()
   if (!account.isAuthenticated)
-    return <Navigate to="/criar-conta" replace state={{ from: location.pathname }} />
+    return <Navigate to="/entrar" replace state={{ from: location.pathname }} />
   const isGuardian = account.profilePath === '/perfil?tipo=responsavel'
   if ((type === 'guardian') !== isGuardian)
     return <Navigate to={isGuardian ? '/organizacao' : '/'} replace />
@@ -85,7 +86,7 @@ export default function App() {
   return (
     <Layout
       profileName={account.isAuthenticated ? profileName : ''}
-      profilePath={account.isAuthenticated ? account.profilePath : '/criar-conta'}
+      profilePath={account.isAuthenticated ? account.profilePath : '/cadastro'}
     >
       <ErrorBoundary resetKeys={[pathname]}>
         <Suspense fallback={<div className="app-feedback">Carregando...</div>}>
@@ -205,7 +206,9 @@ export default function App() {
                 </AccountTypeRoute>
               }
             />
+            <Route path="/cadastro" element={<CreateAccountPage />} />
             <Route path="/criar-conta" element={<CreateAccountPage />} />
+            <Route path="/entrar" element={<LoginPage />} />
             <Route
               path="/denuncias/nova"
               element={

@@ -101,6 +101,33 @@ export function createDemoAccount(
   notifyDemoAccountChange()
 }
 
+export function loginDemoAccount(options?: {
+  accountType?: 'adopter' | 'guardian'
+  email?: string
+  name?: string
+}) {
+  const isGuardian = options?.accountType === 'guardian'
+  const profilePath: CreatedAccountState['profilePath'] = isGuardian
+    ? '/perfil?tipo=responsavel'
+    : '/perfil'
+  const current = getCreatedAccount()
+  sessionStorage.setItem(
+    accountStateKey(),
+    JSON.stringify({
+      profilePath,
+      profileComplete: true,
+      personalData: current?.personalData ?? {
+        guardianType: isGuardian ? 'ORGANIZATION' : undefined,
+        organizationName: isGuardian ? 'Instituto Patinhas' : undefined,
+        name: isGuardian ? 'Instituto Patinhas' : options?.name || 'Luquinhas',
+        email: options?.email || (isGuardian ? 'contato@patinhas.org' : 'lucas@exemplo.com'),
+      },
+      authenticated: true,
+    }),
+  )
+  notifyDemoAccountChange()
+}
+
 export function getDemoPersonalData(): DemoPersonalData | null {
   return getCreatedAccount()?.personalData ?? null
 }

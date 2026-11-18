@@ -7,6 +7,7 @@ interface PageIntroProps {
   eyebrow?: ReactNode
   title: ReactNode
   action?: ReactNode
+  actionFloatingMobile?: boolean
   description?: ReactNode
   children?: ReactNode
 }
@@ -15,6 +16,7 @@ export function PageIntro({
   eyebrow,
   title,
   action,
+  actionFloatingMobile = false,
   description,
   children,
   className,
@@ -25,7 +27,14 @@ export function PageIntro({
       {action ? (
         <div className="mb-[13px] flex flex-wrap items-center justify-between gap-4">
           <h1 className="mb-0 text-[clamp(40px,5vw,58px)] leading-[1.08]">{title}</h1>
-          {action}
+          <div
+            className={cx(
+              actionFloatingMobile &&
+                'fixed bottom-6 right-6 z-40 drop-shadow-xl md:static md:bottom-auto md:right-auto md:z-auto md:drop-shadow-none',
+            )}
+          >
+            {action}
+          </div>
         </div>
       ) : (
         <h1 className="mb-[13px] text-[clamp(40px,5vw,58px)] leading-[1.08]">{title}</h1>

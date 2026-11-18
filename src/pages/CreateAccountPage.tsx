@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { PawPrint, UserRoundPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { type Resolver, useForm, useWatch } from 'react-hook-form'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Alert, Button, Card, Container, Field, Input, PageSurface } from '../components/ui'
 import { adopterProfileKey } from '../hooks/useAdopterProfile'
 import { guardianProfileKey } from '../hooks/useGuardianProfile'
@@ -368,6 +368,13 @@ export function CreateAccountPage() {
             <Button type="submit" fullWidth className="mt-2" loading={isSubmitting}>
               {isSubmitting ? 'Criando conta…' : 'Criar minha conta'} <PawPrint size={18} />
             </Button>
+
+            <p className="mt-4 text-center text-sm text-muted">
+              Já tem conta?{' '}
+              <Link to="/entrar" className="font-semibold text-coral hover:underline">
+                Entrar
+              </Link>
+            </p>
           </form>
         </Card>
       </Container>

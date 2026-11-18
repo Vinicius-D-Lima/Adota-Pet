@@ -111,7 +111,7 @@ export function HomePage() {
       }))
       .filter((group) => group.missingFields.length > 0)
   }, [profileCompletion])
-  const profilePath = account.isAuthenticated ? account.profilePath : '/criar-conta'
+  const profilePath = account.isAuthenticated ? account.profilePath : '/cadastro'
 
   return (
     <>
@@ -226,7 +226,7 @@ export function HomePage() {
                     você e para o pet.
                   </p>
                   <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-                    <LinkButton to="/criar-conta" className="w-full sm:w-auto">
+                    <LinkButton to="/cadastro" className="w-full sm:w-auto">
                       Criar meu perfil <ArrowRight size={18} />
                     </LinkButton>
                     <LinkButton variant="secondary" to="/pets" className="w-full sm:w-auto">
