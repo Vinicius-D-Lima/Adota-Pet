@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isValidCnpj, isValidCpf } from './guardianProfileSchema'
 import { profileSchema } from './profileSchema'
 
 const phone = z
@@ -25,25 +26,52 @@ const adopterAccountSchema = z.object({
   document: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
+  guardianType: z.enum(['INDIVIDUAL', 'ORGANIZATION']).optional(),
 })
 
-const guardianAccountSchema = z.object({
-  accountType: z.literal('guardian'),
-  ...base,
-  organizationName: z.string().trim().min(3, 'Informe o nome da instituição.'),
-  responsibleName: z.string().trim().min(3, 'Informe o nome do responsável.'),
-  document: z
-    .string()
-    .trim()
-    .refine((value) => /^\d{14}$/.test(value), 'Informe um CNPJ com 14 dígitos.'),
-  city: z.string().trim().min(2, 'Informe a cidade.'),
-  state: z.string().trim().length(2, 'Use a sigla do estado com 2 letras.'),
-  zipCode: profileSchema.shape.zipCode,
-  address: profileSchema.shape.address,
-  name: z.string().optional(),
-  cpf: z.string().optional(),
-  birthDate: z.string().optional(),
-})
+const guardianAccountSchema = z
+  .object({
+    accountType: z.literal('guardian'),
+    guardianType: z.enum(
+      ['INDIVIDUAL', 'ORGANIZATION'],
+      'Escolha entre pessoa física e instituição.',
+    ),
+    ...base,
+    organizationName: z.string().trim().optional(),
+    responsibleName: z.string().trim().min(3, 'Informe o nome completo do responsável.'),
+    document: z.string().trim().min(1, 'Informe o CPF ou CNPJ.'),
+    city: z.string().trim().min(2, 'Informe a cidade.'),
+    state: z.string().trim().length(2, 'Use a sigla do estado com 2 letras.'),
+    zipCode: profileSchema.shape.zipCode,
+    address: profileSchema.shape.address,
+    name: z.string().optional(),
+    cpf: z.string().optional(),
+    birthDate: z.string().optional(),
+  })
+  .superRefine((account, context) => {
+    if (
+      account.guardianType === 'ORGANIZATION' &&
+      (!account.organizationName || account.organizationName.length < 3)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['organizationName'],
+        message: 'Informe o nome da instituição.',
+      })
+    }
+
+    const validDocument =
+      account.guardianType === 'ORGANIZATION'
+        ? isValidCnpj(account.document)
+        : isValidCpf(account.document)
+    if (!validDocument) {
+      context.addIssue({
+        code: 'custom',
+        path: ['document'],
+        message: `Informe um ${account.guardianType === 'ORGANIZATION' ? 'CNPJ' : 'CPF'} válido.`,
+      })
+    }
+  })
 
 export const createAccountSchema = z.discriminatedUnion('accountType', [
   adopterAccountSchema,
