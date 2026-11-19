@@ -11,3 +11,8 @@ dist/
 
 # Banco em uso do mock (copiado do seed na primeira execução)
 mock-server/db.json
+
+# OpenCode — configurações locais, não versionar
+.opencode/
+opencode.json
+opencode.jsonc

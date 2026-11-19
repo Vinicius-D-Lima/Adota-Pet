@@ -4,18 +4,22 @@ Descrição de cada tela e das regras de negócio. Todas leem e gravam dados pel
 
 ## Mapa de rotas
 
-| Rota                               | Tela                  | Observação                                       |
-| ---------------------------------- | --------------------- | ------------------------------------------------ |
-| `/`                                | Início                | Pet em destaque e os 3 pets mais recentes        |
-| `/pets`                            | Encontrar pets        | Busca, filtros e paginação; filtros ficam na URL |
-| `/pets/:petId`                     | Detalhe do pet        | Etapa 1 do fluxo                                 |
-| `/pets/:petId/compatibilidade`     | Compatibilidade       | Etapa 2                                          |
-| `/pets/:petId/questionario`        | Questionário          | Etapa 3                                          |
-| `/solicitacoes/:requestId/enviada` | Confirmação           | Etapa 4                                          |
-| `/solicitacoes`                    | Minhas solicitações   | Acompanhamento e cancelamento                    |
-| `/favoritos`                       | Favoritos             | Pets favoritados                                 |
-| `/perfil`                          | Meu perfil            | Dados usados na compatibilidade e na solicitação |
-| qualquer outra                     | Página não encontrada | Não redireciona: o endereço da barra não muda    |
+| Rota                               | Tela                   | Observação                                       |
+| ---------------------------------- | ---------------------- | ------------------------------------------------ |
+| `/`                                | Início                 | Pet em destaque e os 3 pets mais recentes        |
+| `/pets`                            | Encontrar pets         | Busca, filtros e paginação; filtros ficam na URL |
+| `/pets/:petId`                     | Detalhe do pet         | Etapa 1 do fluxo                                 |
+| `/pets/:petId/compatibilidade`     | Compatibilidade        | Etapa 2                                          |
+| `/pets/:petId/questionario`        | Questionário           | Etapa 3                                          |
+| `/solicitacoes/:requestId/enviada` | Confirmação            | Etapa 4                                          |
+| `/solicitacoes`                    | Minhas solicitações    | Acompanhamento e cancelamento                    |
+| `/organizacao`                     | Painel da organização  | Indicadores, fila recente e atalhos              |
+| `/organizacao/pets`                | Pets da organização    | Cadastro e edição dos pets divulgados            |
+| `/organizacao/solicitacoes`        | Solicitações recebidas | Filtros por etapa e por pet, com contadores      |
+| `/organizacao/solicitacoes/:id`    | Detalhe da solicitação | Análise, entrevista, recusa e aprovação          |
+| `/favoritos`                       | Favoritos              | Pets favoritados                                 |
+| `/perfil`                          | Meu perfil             | Dados usados na compatibilidade e na solicitação |
+| qualquer outra                     | Página não encontrada  | Não redireciona: o endereço da barra não muda    |
 
 O fluxo de adoção tem quatro etapas, mostradas pelo componente `FlowSteps`: **Conhecer o pet → Compatibilidade → Questionário → Solicitação**.
 
@@ -119,6 +123,28 @@ Mostra o código da solicitação, a organização, o pet e **a data real de env
   - Depois de cancelar, o foco vai para o cartão da solicitação (o botão "Cancelar" some junto com o status).
   - **409** (o status mudou no servidor) e falha de rede mostram mensagens próprias, e a lista é recarregada.
 - Estado vazio ("Nenhuma solicitação ainda") e estado de erro. Se o pet de uma solicitação não existir mais, aparece "Pet indisponível".
+
+## Área da organização (`/organizacao`)
+
+Rotas protegidas por `OrganizacaoGuard`: sem sessão, a pessoa vai para `/entrar`; sem vínculo com uma organização (403 em `GET /me/permissions`), volta para a home. Erros de rede mostram "Tentar novamente" em vez de expulsar a pessoa.
+
+- **Painel (`/organizacao`)**: total de pets publicados, solicitações aguardando decisão, adoções aprovadas e atalhos para pets e solicitações.
+- **Pets (`/organizacao/pets`)**: cadastro, edição e remoção dos pets da organização.
+- **Solicitações recebidas (`/organizacao/solicitacoes`)**:
+  - lista só as solicitações dos pets da organização;
+  - filtros por **etapa** e por **pet**, guardados na URL (`?estagio=interview&pet=luna`);
+  - contadores por etapa: Todas, Novas, Em entrevista, Entrevista realizada, Aprovadas e Encerradas;
+  - cada cartão mostra pet, pessoa adotante, data, status, situação da entrevista e link para o detalhe.
+- **Detalhe (`/organizacao/solicitacoes/:id`)**:
+  - respostas completas do questionário, perfil da pessoa adotante e **score de compatibilidade** com pontos fortes e de atenção (calculado no cliente, com os mesmos critérios da tela do adotante);
+  - conversa da solicitação, quando houver mensagens;
+  - ações conforme estado e permissões: "Avançar para entrevista", "Propor horários", "Marcar como realizado", "Recusar" e "Aprovar adoção";
+  - **permissões**: `requests:review` conduz a entrevista; `requests:reject` recusa; `requests:approve` (ou `canApprove`) aprova. Voluntários não veem "Aprovar adoção"; administradores veem. Botões sem permissão não são renderizados.
+  - **aprovação** só é liberada com a entrevista em `REALIZADA`; enquanto não estiver, o botão fica desabilitado com a explicação "Marque a entrevista como realizada para liberar a aprovação".
+  - **recusa** abre um modal com motivo obrigatório (mínimo de 10 caracteres). O botão de confirmar só habilita com o motivo válido, e o servidor rejeita recusa sem motivo.
+  - **agendamento**: de 1 a 3 horários futuros; o campo `datetime-local` tem `min` e o Zod bloqueia datas no passado com "Escolha um horário no futuro.".
+  - Depois de cada ação, as queries da lista e do detalhe são invalidadas pelo React Query, então a tela se atualiza sem recarregar a página.
+- Para testar como voluntário, use `npm run dev:mock` e escolha "Instituto — voluntário(a)"; o script envia `X-Demo-Role: VOLUNTEER`.
 
 ## Favoritos (`/favoritos`)
 

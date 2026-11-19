@@ -4,23 +4,27 @@ import { stdin as input, stdout as output } from 'node:process'
 
 const accounts = {
   1: { id: 'demo', label: 'Adotante — adotante preenchido' },
-  2: { id: 'demo-organization', label: 'Instituto — instituição preenchida' },
-  3: { id: 'demo-empty', label: 'Perfil vazio' },
+  2: { id: 'demo-organization', label: 'Instituto — administrador(a)' },
+  3: { id: 'demo-organization', role: 'VOLUNTEER', label: 'Instituto — voluntário(a)' },
+  4: { id: 'demo-empty', label: 'Perfil vazio' },
 }
 
 const terminal = createInterface({ input, output })
 output.write('\nEscolha o perfil de teste:\n')
 output.write('  1. Adotante — adotante preenchido\n')
-output.write('  2. Instituto — instituição preenchida\n')
-output.write('  3. Perfil vazio\n\n')
-const answer = (await terminal.question('Digite 1, 2 ou 3: ')).trim()
+output.write('  2. Instituto — administrador(a)\n')
+output.write('  3. Instituto — voluntário(a), sem permissão de aprovar\n')
+output.write('  4. Perfil vazio\n\n')
+const answer = (await terminal.question('Digite 1, 2, 3 ou 4: ')).trim()
 terminal.close()
 
 const account = accounts[answer]
 if (!account) {
-  console.error('\nOpção inválida. Execute npm run dev:mock novamente e escolha 1, 2 ou 3.')
+  console.error('\nOpção inválida. Execute npm run dev:mock novamente e escolha de 1 a 4.')
   process.exit(1)
 }
+
+const role = account.role ?? 'ADMIN'
 
 console.log(`\nIniciando como ${account.label}...\n`)
 
@@ -33,7 +37,9 @@ if (!npmCli) {
 const environment = {
   ...process.env,
   DEMO_USER_ID: account.id,
+  DEMO_ROLE: role,
   VITE_DEMO_USER_ID: account.id,
+  VITE_DEMO_ROLE: role,
   VITE_DEMO_SESSION_ID: String(Date.now()),
 }
 const children = [

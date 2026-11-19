@@ -38,6 +38,51 @@ export const organizationPetPayloadSchema = organizationPetFormSchema.transform(
   neutered: data.neutered === 'true',
 }))
 
+export const interviewStatuses = ['AGENDADA', 'REALIZADA'] as const
+export const interviewTypes = ['Entrevista online', 'Visita presencial'] as const
+
+/**
+ * `datetime-local` entrega uma data/hora local sem fuso; `new Date` a interpreta no
+ * fuso do navegador. Comparar com `Date.now()` evita gravar um horário que já passou.
+ */
+export const isFutureDateTime = (value: string) => {
+  if (!value) return false
+  const date = new Date(value)
+  return !Number.isNaN(date.getTime()) && date.getTime() > Date.now()
+}
+
+export const interviewSchema = z.object({
+  type: z.string().min(1),
+  proposedSlots: z.array(z.string().min(1)).min(1).max(3),
+  status: z.enum(interviewStatuses),
+  completed: z.boolean(),
+  scheduledAt: z.string().optional(),
+  completedAt: z.string().optional(),
+})
+
+/** Até 3 horários futuros; o formulário começa com um e permite adicionar mais dois. */
+export const interviewFormSchema = z.object({
+  type: z.enum(interviewTypes, 'Selecione o tipo de encontro.'),
+  slots: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1, 'Informe o horário.')
+        .refine(isFutureDateTime, 'Escolha um horário no futuro.'),
+    )
+    .min(1, 'Proponha ao menos um horário.')
+    .max(3, 'Proponha no máximo 3 horários.'),
+})
+
+export const rejectionFormSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(10, 'Escreva um motivo com pelo menos 10 caracteres.')
+    .max(500, 'O motivo deve ter no máximo 500 caracteres.'),
+})
+
 export const receivedRequestSchema = z.object({
   id: z.string().min(1),
   petId: z.string().min(1),
@@ -46,6 +91,8 @@ export const receivedRequestSchema = z.object({
   message: z.string(),
   pet: requestPetSchema.nullable(),
   unreadMessageCount: z.number().int().nonnegative().optional(),
+  interview: interviewSchema.nullable().optional(),
+  rejectionReason: z.string().nullable().optional(),
   answers: z
     .object({
       motivation: z.string(),
@@ -64,9 +111,17 @@ export const receivedRequestSchema = z.object({
     completion: z.number().min(0).max(100),
     housing: z.string().optional(),
     dailyTime: z.string().optional(),
+    activityLevel: z.string().optional(),
+    hasOutdoorArea: z.boolean().optional(),
+    acceptsSpecialCare: z.boolean().optional(),
     experience: z.string().optional(),
     hasChildren: z.boolean().optional(),
     hasOtherPets: z.boolean().optional(),
+    preferredSpecies: z.string().optional(),
+    preferredSize: z.string().optional(),
+    zipCode: z.string().optional(),
+    address: z.string().optional(),
+    city: z.string().optional(),
   }),
 })
 
@@ -78,3 +133,6 @@ export const receivedRequestsResponseSchema = z.object({
 export type OrganizationPetFormData = z.input<typeof organizationPetFormSchema>
 export type OrganizationPetPayload = z.output<typeof organizationPetPayloadSchema>
 export type ReceivedRequest = z.infer<typeof receivedRequestSchema>
+export type Interview = z.infer<typeof interviewSchema>
+export type InterviewFormData = z.infer<typeof interviewFormSchema>
+export type RejectionFormData = z.infer<typeof rejectionFormSchema>

@@ -888,6 +888,8 @@ describe('filtros salvos', () => {
 
 describe('área da instituição', () => {
   const guardian = { 'X-Demo-User-Id': 'demo-organization' }
+  const volunteer = { ...guardian, 'X-Demo-Role': 'VOLUNTEER' }
+  const futureDate = (hours = 24) => new Date(Date.now() + hours * 3_600_000).toISOString()
   const petPayload = {
     name: 'Pet Teste Institucional',
     species: 'Gato',
@@ -908,6 +910,30 @@ describe('área da instituição', () => {
     vaccinated: true,
     neutered: true,
   }
+
+  const createRequest = async (petId = 'luna') => {
+    const response = await request(app).post('/requests').send({ petId, answers: validAnswers })
+    expect(response.status).toBe(201)
+    return response.body
+  }
+
+  const moveToReview = async (id) => {
+    const response = await request(app)
+      .post(`/me/received-requests/${id}/transitions`)
+      .set(guardian)
+      .send({ to: 'EM_ANALISE' })
+    expect(response.status).toBe(200)
+    return response.body
+  }
+
+  const scheduleInterview = (id, headers = guardian) =>
+    request(app)
+      .post(`/me/received-requests/${id}/interview`)
+      .set(headers)
+      .send({ type: 'Entrevista online', proposedSlots: [futureDate(), futureDate(48)] })
+
+  const completeInterview = (id, headers = guardian) =>
+    request(app).post(`/me/received-requests/${id}/interview/complete`).set(headers)
 
   it('lista somente os pets da instituição autenticada', async () => {
     const res = await request(app).get('/me/organization-pets').set(guardian)
@@ -934,30 +960,177 @@ describe('área da instituição', () => {
     ).toBe(204)
   })
 
-  it('lista solicitações dos próprios pets e permite analisar e aprovar', async () => {
-    const created = await request(app)
-      .post('/requests')
-      .send({ petId: 'luna', answers: validAnswers })
+  it('lista e detalha uma solicitação com os dados usados no score de compatibilidade', async () => {
+    const created = await createRequest('luna')
     const list = await request(app).get('/me/received-requests').set(guardian)
-    expect(list.body.data.find(({ id }) => id === created.body.id)).toMatchObject({
+    expect(list.body.data.find(({ id }) => id === created.id)).toMatchObject({
       petId: 'luna',
-      adopter: { name: 'Lucas Ferreira', completion: 100 },
+      interview: null,
+      rejectionReason: null,
+      adopter: {
+        name: 'Lucas Ferreira',
+        completion: 100,
+        activityLevel: 'Moderado',
+        hasOutdoorArea: false,
+        acceptsSpecialCare: true,
+      },
     })
 
-    const review = await request(app)
-      .post(`/me/received-requests/${created.body.id}/transitions`)
-      .set(guardian)
-      .send({ to: 'EM_ANALISE' })
-    expect(review.body.status).toBe('Em análise')
+    const detail = await request(app).get(`/me/received-requests/${created.id}`).set(guardian)
+    expect(detail.status).toBe(200)
+    expect(detail.body).toMatchObject({ id: created.id, pet: { id: 'luna' } })
+    expect(detail.body.adopter).toMatchObject({ email: 'demo@adotapet.local' })
+
+    expectError(
+      await request(app).get('/me/received-requests/SOL-inexistente').set(guardian),
+      404,
+      'Not Found',
+    )
+  })
+
+  it('permite analisar, agendar, realizar a entrevista e aprovar', async () => {
+    const created = await createRequest('luna')
+    expect((await moveToReview(created.id)).status).toBe('Em análise')
+
+    expectError(
+      await request(app)
+        .post(`/me/received-requests/${created.id}/transitions`)
+        .set(guardian)
+        .send({ to: 'APROVADA' }),
+      400,
+      'Bad Request',
+    )
+
+    const scheduled = await scheduleInterview(created.id)
+    expect(scheduled.status).toBe(200)
+    expect(scheduled.body.interview).toMatchObject({
+      status: 'AGENDADA',
+      completed: false,
+      proposedSlots: expect.any(Array),
+    })
+
+    expectError(
+      await request(app)
+        .post(`/me/received-requests/${created.id}/transitions`)
+        .set(guardian)
+        .send({ to: 'APROVADA' }),
+      400,
+      'Bad Request',
+    )
+
+    const completed = await completeInterview(created.id)
+    expect(completed.body.interview).toMatchObject({ status: 'REALIZADA', completed: true })
+
     const approved = await request(app)
-      .post(`/me/received-requests/${created.body.id}/transitions`)
+      .post(`/me/received-requests/${created.id}/transitions`)
       .set(guardian)
       .send({ to: 'APROVADA' })
     expect(approved.body.status).toBe('Aprovada')
   })
 
+  it('bloqueia horários no passado, vazios ou em quantidade fora de 1 a 3', async () => {
+    const created = await createRequest('luna')
+    await moveToReview(created.id)
+
+    const past = await request(app)
+      .post(`/me/received-requests/${created.id}/interview`)
+      .set(guardian)
+      .send({ proposedSlots: [futureDate(-24)] })
+    expectError(past, 400, 'Bad Request')
+    expect(past.body.details).toContainEqual({
+      field: 'proposedSlots',
+      message: 'Todos os horários precisam ser datas futuras.',
+    })
+
+    const empty = await request(app)
+      .post(`/me/received-requests/${created.id}/interview`)
+      .set(guardian)
+      .send({ proposedSlots: [] })
+    expectError(empty, 400, 'Bad Request')
+
+    const tooMany = await request(app)
+      .post(`/me/received-requests/${created.id}/interview`)
+      .set(guardian)
+      .send({ proposedSlots: [futureDate(), futureDate(24), futureDate(48), futureDate(72)] })
+    expectError(tooMany, 400, 'Bad Request')
+  })
+
+  it('só agenda depois de iniciar a análise e não repete entrevista já realizada', async () => {
+    const created = await createRequest('luna')
+    expectError(await scheduleInterview(created.id), 409, 'Conflict')
+
+    await moveToReview(created.id)
+    await scheduleInterview(created.id)
+    await completeInterview(created.id)
+    expectError(await scheduleInterview(created.id), 409, 'Conflict')
+  })
+
+  it('exige motivo com pelo menos 10 caracteres para recusar', async () => {
+    const created = await createRequest('luna')
+    await moveToReview(created.id)
+
+    const withoutReason = await request(app)
+      .post(`/me/received-requests/${created.id}/transitions`)
+      .set(guardian)
+      .send({ to: 'RECUSADA' })
+    expectError(withoutReason, 400, 'Bad Request')
+    expect(withoutReason.body.details).toContainEqual({
+      field: 'reason',
+      message: 'O motivo deve ter pelo menos 10 caracteres.',
+    })
+    expectError(
+      await request(app)
+        .post(`/me/received-requests/${created.id}/transitions`)
+        .set(guardian)
+        .send({ to: 'RECUSADA', reason: 'curto' }),
+      400,
+      'Bad Request',
+    )
+
+    const rejected = await request(app)
+      .post(`/me/received-requests/${created.id}/transitions`)
+      .set(guardian)
+      .send({ to: 'RECUSADA', reason: 'A rotina informada não combina com o pet.' })
+    expect(rejected.body).toMatchObject({
+      status: 'Recusada',
+      rejectionReason: 'A rotina informada não combina com o pet.',
+    })
+  })
+
+  it('mostra permissões diferentes para administrador e voluntário', async () => {
+    const admin = await request(app).get('/me/permissions').set(guardian)
+    expect(admin.body).toMatchObject({
+      role: 'ADMIN',
+      canApprove: true,
+      organization: { name: 'Instituto Patinhas' },
+    })
+    expect(admin.body.permissions).toContain('requests:approve')
+
+    const member = await request(app).get('/me/permissions').set(volunteer)
+    expect(member.body).toMatchObject({ role: 'VOLUNTEER', canApprove: false })
+    expect(member.body.permissions).not.toContain('requests:approve')
+    expect(member.body.organization).toMatchObject({ name: 'Instituto Patinhas' })
+  })
+
+  it('impede o voluntário de aprovar, mas permite conduzir a entrevista', async () => {
+    const created = await createRequest('luna')
+    await moveToReview(created.id)
+    expect((await scheduleInterview(created.id, volunteer)).status).toBe(200)
+    expect((await completeInterview(created.id, volunteer)).status).toBe(200)
+
+    expectError(
+      await request(app)
+        .post(`/me/received-requests/${created.id}/transitions`)
+        .set(volunteer)
+        .send({ to: 'APROVADA' }),
+      403,
+      'Forbidden',
+    )
+  })
+
   it('impede que uma conta de adotante use as rotas institucionais', async () => {
     expectError(await request(app).get('/me/organization-pets'), 403, 'Forbidden')
     expectError(await request(app).get('/me/received-requests'), 403, 'Forbidden')
+    expectError(await request(app).get('/me/permissions'), 403, 'Forbidden')
   })
 })
