@@ -11,7 +11,7 @@ Como colocar o AdotaPet para rodar em uma máquina nova, do zero até a primeira
 | Git     | qualquer versão recente           | `git --version`  |
 | Browser | Chrome, Edge ou Firefox           | versão atual     |
 
-Não é preciso instalar banco de dados nem backend: a API é simulada (json-server) e sobe junto com o frontend.
+Para o dia a dia com `npm run dev:mock` não é preciso instalar banco: a API simulada (json-server) sobe junto com o frontend. Para usar a API real, instale e configure PostgreSQL (ver item 4).
 
 ## 2. Obter o código
 
@@ -29,21 +29,33 @@ npm ci        # instala exatamente o que está no package-lock.json (recomendado
 npm install   # atualiza o lock se necessário
 ```
 
-As principais dependências são React 18, Vite 6, TypeScript, **Tailwind CSS 4**, **react-hook-form** + Zod, TanStack Query e json-server. O detalhe está em [Arquitetura](arquitetura.md#stack).
+O `npm ci` instala os três workspaces (`apps/web`, `apps/api` e `packages/shared`). As principais dependências são React 18, Vite 6, TypeScript, **Tailwind CSS 4**, **react-hook-form** + Zod (em `@adotapet/shared`), TanStack Query, Express/Prisma e json-server. O detalhe está em [Arquitetura](arquitetura.md#stack).
 
 ## 4. Configurar o ambiente
 
-Copie o exemplo (opcional no modo mock, porque o valor padrão já é `/api`):
+Copie os exemplos (o do web é opcional no modo mock, porque o padrão já é `/api`):
 
 ```bash
-cp .env.example .env
+cp apps/web/.env.example apps/web/.env
+cp apps/api/.env.example apps/api/.env   # somente para a API real
 ```
 
-| Variável        | Padrão | Onde         | Descrição                                   |
-| --------------- | ------ | ------------ | ------------------------------------------- |
-| `VITE_API_URL`  | `/api` | Frontend     | URL base da API. Troque para usar outra API |
-| `MOCK_PORT`     | `3001` | API simulada | Porta do json-server                        |
-| `MOCK_DELAY_MS` | `300`  | API simulada | Latência simulada, em milissegundos         |
+| Variável                | Padrão                  | Onde         | Descrição                                                    |
+| ----------------------- | ----------------------- | ------------ | ------------------------------------------------------------ |
+| `VITE_API_URL`          | `/api`                  | Frontend     | URL base da API. Troque para usar outra API                  |
+| `VITE_API_PROXY_TARGET` | `localhost:3002`        | Frontend     | Destino do proxy; `dev:mock` ajusta para `localhost:3001`    |
+| `MOCK_PORT`             | `3001`                  | API simulada | Porta do json-server                                         |
+| `MOCK_DELAY_MS`         | `300`                   | API simulada | Latência simulada, em milissegundos                          |
+| `DATABASE_URL`          | —                       | API real     | String de conexão do Postgres na nuvem (obrigatória)         |
+| `TEST_DATABASE_URL`     | sufixo `_test`          | API real     | Banco de teste separado; nunca aponta os testes ao principal |
+| `PORT`                  | `3002`                  | API real     | Porta do Express                                             |
+| `CORS_ORIGIN`           | `http://localhost:5173` | API real     | Origens liberadas pelo CORS, separadas por vírgula           |
+| `RATE_LIMIT_MAX`        | `100`                   | API real     | Requisições permitidas por janela                            |
+| `RATE_LIMIT_WINDOW_MS`  | `60000`                 | API real     | Janela do rate limit, em ms                                  |
+| `BODY_LIMIT`            | `100kb`                 | API real     | Limite do corpo JSON                                         |
+| `LOG_LEVEL`             | `info`                  | API real     | Nível dos logs estruturados                                  |
+
+O banco é gerenciado na nuvem (Neon), sem Docker. A API valida as variáveis na inicialização: se `DATABASE_URL` estiver ausente, ela encerra com uma mensagem que cita a variável. A URL de testes é derivada da principal por padrão (`.../adotapet` → `.../adotapet_test`) e o setup do Vitest cria e migra esse database separado.
 
 ## 5. Subir o projeto
 
@@ -52,18 +64,18 @@ npm run dev:mock
 ```
 
 - Frontend: <http://localhost:5173>
-- API simulada: <http://localhost:3001> (o Vite faz proxy de `/api`, então não há CORS)
+- API simulada: <http://localhost:3001> (`dev:mock` aponta o proxy `/api` para ela, então não há CORS)
 
-Na primeira execução o servidor cria `mock-server/db.json` a partir de `mock-server/db.seed.json`. Esse arquivo guarda favoritos, perfil e solicitações entre reinícios e **não vai para o git**.
+Na primeira execução o servidor cria `apps/web/mock-server/db.json` a partir de `apps/web/mock-server/db.seed.json`. Esse arquivo guarda favoritos, perfil e solicitações entre reinícios e **não vai para o git**.
 
 ### Rodando no GitHub Codespaces
 
-O Codespace entrega o site por um endereço próprio (`https://<nome>-5173.app.github.dev`), e o Vite só aceitava `localhost`. Por isso o `vite.config.ts` libera `*.app.github.dev`, e não é preciso configurar nada.
+O Codespace entrega o site por um endereço próprio (`https://<nome>-5173.app.github.dev`), e o Vite só aceitava `localhost`. Por isso o `apps/web/vite.config.ts` libera `*.app.github.dev`, e não é preciso configurar nada.
 
 1. Confira o Node: `node --version`. Os testes (Vitest 5) exigem **22.12 ou superior**, e o Codespace padrão costuma vir com a 20. Se for menor, rode `nvm install 22 && nvm use 22`.
 2. `npm ci` e `npm run dev:mock`, escolhendo o perfil quando ele perguntar.
 3. Abra a porta **5173** na aba "Portas". A 3001 (API simulada) não precisa ser aberta, porque o Vite fala com ela por dentro do Codespace.
-4. Se a página mostrar `Blocked request. This host is not allowed`, o endereço não é `*.app.github.dev` (por exemplo, outro serviço de nuvem). Libere-o em `server.allowedHosts` no `vite.config.ts`, ou exporte `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.dominio.com` antes de subir.
+4. Se a página mostrar `Blocked request. This host is not allowed`, o endereço não é `*.app.github.dev` (por exemplo, outro serviço de nuvem). Libere-o em `server.allowedHosts` no `apps/web/vite.config.ts`, ou exporte `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.dominio.com` antes de subir.
 
 ## 6. Conferir a instalação
 
@@ -72,6 +84,11 @@ O Codespace entrega o site por um endereço próprio (`https://<nome>-5173.app.g
 3. Rode a bateria completa (mesma ordem do CI):
 
 ```bash
+npm run check:workspaces
+npm run check:shared-imports
+npm run check:deps
+npm run check:contract
+npm run db:generate
 npm run lint
 npm run format:check
 npm run typecheck
@@ -82,11 +99,11 @@ npm run build
 ## 7. Build de produção
 
 ```bash
-npm run build      # checagem de tipos + build do Vite, saída em dist/
-npm run preview    # serve o build em http://localhost:4173
+npm run build            # shared → web → api; saídas em packages/shared/dist, apps/web/dist e apps/api/dist
+npm run preview          # preview do Vite em http://localhost:4173
 ```
 
-O `preview` também precisa da API simulada (`npm run mock` em outro terminal).
+O `preview` também precisa da API simulada (`npm run mock` em outro terminal) ou da API real.
 
 ## 8. Publicação
 
@@ -94,7 +111,7 @@ O json-server é um processo Node, e hospedagens estáticas (Vercel, Netlify, Gi
 
 1. Hospede a API simulada à parte (Render, Railway ou similar), com `npm run mock`.
 2. Gere o frontend com `VITE_API_URL=https://sua-api.exemplo.com npm run build`.
-3. Publique a pasta `dist/` na hospedagem estática.
+3. Publique a pasta `apps/web/dist/` na hospedagem estática.
 
 O CI **não faz deploy**: ele só valida (ver [Qualidade, testes e CI](qualidade-e-ci.md)).
 
@@ -103,7 +120,7 @@ O CI **não faz deploy**: ele só valida (ver [Qualidade, testes e CI](qualidade
 | Sintoma                                                      | Causa provável                                    | O que fazer                                                                 |
 | ------------------------------------------------------------ | ------------------------------------------------- | --------------------------------------------------------------------------- |
 | Página com `Blocked request. This host is not allowed` (403) | O Vite recusa endereços que não sejam `localhost` | No Codespaces já vem liberado; em outro ambiente, ver a seção do Codespaces |
-| `EADDRINUSE` na porta 3001 ou 5173                           | Outra instância rodando                           | Encerre a outra instância ou use `MOCK_PORT=3002 npm run dev:mock`          |
+| `EADDRINUSE` na porta 3001 ou 5173                           | Outra instância rodando                           | Encerre a outra instância ou use `MOCK_PORT=3101 npm run dev:mock`          |
 | Telas em "Carregando…" para sempre                           | API simulada fora do ar                           | Rode `npm run dev:mock` (ou `npm run mock` em outro terminal)               |
 | Perfil "incompleto" e erro 422 ao enviar solicitação         | `db.json` de uma versão antiga                    | `npm run mock:reset`                                                        |
 | Dados estranhos depois de testar bastante                    | Estado acumulado em `db.json`                     | `npm run mock:reset`                                                        |

@@ -14,9 +14,60 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run format:check
-      - run: npm run typecheck
-      - run: npm test
-      - run: npm run build
+
+      - name: MONO-01 - npm ci instala os três workspaces
+        run: npm ci
+      - name: MONO-01 - verificar workspaces
+        run: npm run check:workspaces
+      - name: MONO-03 - shared importado por web e api
+        run: npm run check:shared-imports
+      - name: MONO-06 - uma única versão das bibliotecas críticas
+        run: npm run check:deps
+      - name: MONO-04 - contrato quebra quem não acompanhou
+        run: npm run check:contract
+      - name: Gerar cliente Prisma
+        run: npm run db:generate
+
+      - name: MONO-05 - lint de cada workspace
+        run: npm run lint
+      - name: MONO-05 - formatação de cada workspace
+        run: npm run format:check
+      - name: MONO-05 - tipos de cada workspace
+        run: npm run typecheck
+      - name: MONO-05 - testes de cada workspace
+        run: npm test
+      - name: MONO-02 - build do web a partir da raiz
+        run: npm run build:web
+      - name: MONO-05 - build de shared e api a partir da raiz
+        run: npm run build:shared && npm run build:api
+
+  backend:
+    name: Backend - #47 padrões transversais
+    runs-on: ubuntu-latest
+    env:
+      # Secrets do Postgres na nuvem: a URL administrativa cria/migra o database
+      # apontado por TEST_DATABASE_URL (deve terminar em _test e ser diferente da
+      # principal). Se TEST_DATABASE_URL estiver vazio, o setup deriva o sufixo.
+      # Sem nenhuma URL, INF-11/INF-12 são ignorados; os outros testes seguem.
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
+      CORS_ORIGIN: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: INF-01 - instalar e validar configuração
+        run: |
+          npm ci
+          npm run db:generate
+      - name: INF-05 - lint da API
+        run: npm run lint -w @adotapet/api
+      - name: INF-05 - tipos da API
+        run: npm run typecheck -w @adotapet/api
+      - name: INF-01 a INF-12 - testes de integração da API
+        run: npm test -w @adotapet/api
+      - name: INF-10 - build da API
+        run: npm run build -w @adotapet/api

@@ -1,0 +1,39 @@
+{
+  "name": "@adotapet/web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "predev": "npm run build -w @adotapet/shared",
+    "dev": "vite",
+    "predev:mock": "npm run build -w @adotapet/shared",
+    "dev:mock": "node scripts/dev-mock.js",
+    "mock": "node mock-server/server.js",
+    "mock:reset": "node mock-server/reset.js",
+    "prebuild": "npm run build -w @adotapet/shared",
+    "build": "tsc -b && vite build",
+    "prepreview": "npm run build -w @adotapet/shared",
+    "preview": "vite preview",
+    "pretypecheck": "npm run build -w @adotapet/shared",
+    "typecheck": "tsc -b --noEmit",
+    "pretest": "npm run build -w @adotapet/shared",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@adotapet/shared": "*",
+    "@hookform/resolvers": "^5.9.1",
+    "@tanstack/react-query": "^5.104.1",
+    "@tanstack/react-query-devtools": "^5.104.1",
+    "json-server": "0.17.4",
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.89.0",
+    "react-router-dom": "^7.1.1",
+    "tailwind-merge": "^3.7.0",
+    "zod": "^4.6.5"
+  }
+}

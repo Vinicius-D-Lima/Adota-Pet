@@ -35,7 +35,7 @@ Comparação entre o [Plano de Projeto](plano-de-projeto.md) (versão 1.0, de 01
 | --------- | ------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | RNF-01    | React + TypeScript                         | ✅       | React 18, TypeScript `strict`                                                                                                 |
 | RNF-02    | Rotas do frontend                          | ✅       | react-router-dom 7, rotas do plano mais `/favoritos` e a página 404                                                           |
-| RNF-03    | Componentes reutilizáveis                  | ✅       | Biblioteca em `src/components/ui` (ver [Componentes de UI](componentes-ui.md))                                                |
+| RNF-03    | Componentes reutilizáveis                  | ✅       | Biblioteca em `apps/web/src/components/ui` (ver [Componentes de UI](componentes-ui.md))                                       |
 | RNF-04    | Interface responsiva                       | ✅       | Classes responsivas do Tailwind (`md:`, `lg:`), com menu móvel                                                                |
 | RNF-05    | Identificação adequada para acessibilidade | ⚠️       | Parcial: rótulos, `aria-*` em formulários e modal, `jsx-a11y` no lint. O pacote completo (#57) foi **revertido** (ver abaixo) |
 | RNF-06    | Mensagens claras para vazio e erro         | ➕       | Estados de carregamento, vazio, erro, 404 e Error Boundary em todas as telas                                                  |
@@ -49,10 +49,11 @@ Comparação entre o [Plano de Projeto](plano-de-projeto.md) (versão 1.0, de 01
 ### 1. API simulada e persistência em vez de dados locais
 
 - **Plano:** dados "mantidos em variáveis e estado dos componentes", sem API, sem persistência (seções 2.3, 2.4, 2.5 e 12.3; RNF-07). `App.tsx` guardaria perfil, favoritos e solicitações.
-- **Entregue:** o frontend consome uma API REST simulada (json-server) em `mock-server/`, com validação, códigos de erro e persistência em `db.json`.
+- **Entregue:** o frontend consome uma API REST simulada (json-server) em `apps/web/mock-server/`, com validação, códigos de erro e persistência em `db.json`.
 - **Por quê:** o desenvolvimento do frontend foi organizado em issues que já separavam frontend e backend (épicos #45 a #51). Para que o backend real entre depois **sem reescrever o frontend**, o contrato foi fixado cedo: o frontend só conhece a `VITE_API_URL`. O mock também permitiu testar regras de servidor (400, 404, 409, 422) e um **teste de contrato** que pegou um bug real.
 - **Efeito no escopo:** não é um backend próprio, e o plano continua valendo no essencial: nenhum dado real, autenticação ou banco de produção. O usuário é um **demo fixo**. O que muda é que os dados sobrevivem a recarregamentos (o plano dizia que não haveria persistência).
 - **Custo:** para publicar um link é preciso hospedar o mock à parte (ver [Manual de instalação → Publicação](manual-de-instalacao.md#8-publicação)).
+- **Situação atual:** o monorepo já inclui o backend real em `apps/api/` e o contrato Zod em `packages/shared/`; o mock permanece como referência e para demos sem banco. A autenticação de verdade ainda não entrou.
 
 ### 2. Sete critérios de compatibilidade em vez de seis
 
@@ -66,7 +67,7 @@ Comparação entre o [Plano de Projeto](plano-de-projeto.md) (versão 1.0, de 01
 - **Plano:** pode cancelar qualquer solicitação com status diferente de `Cancelada` ou `Recusada`. Na prática, isso inclui `Aprovada`.
 - **Entregue:** só `Enviada` e `Em análise` cancelam. `Aprovada`, `Recusada` e `Cancelada` não. O servidor responde **409** para as demais, e a interface não mostra o botão.
 - **Por quê (justificativa inferida; a regra veio do mock, e o motivo não está registrado no repositório):** uma adoção já aprovada é um acordo com a organização, e cancelá-la com um clique pertence à futura máquina de estados da solicitação (issues #20 a #22). A equipe deve confirmar se é essa a intenção.
-- **Pendência:** se a equipe quiser seguir o texto do REQ-18 ao pé da letra, a mudança é pequena (`CANCELLABLE_STATUSES` em `src/utils/requestStatus.ts` e a regra equivalente em `mock-server/server.js`). Fica como **decisão da equipe**; ver [Pendências](#5-pendências-em-relação-ao-plano).
+- **Pendência:** se a equipe quiser seguir o texto do REQ-18 ao pé da letra, a mudança é pequena (`CANCELLABLE_STATUSES` em `apps/web/src/utils/requestStatus.ts` e a regra equivalente em `apps/web/mock-server/server.js`). Fica como **decisão da equipe**; ver [Pendências](#5-pendências-em-relação-ao-plano).
 
 ### 4. Decisão da instituição sem as etapas do processo
 
@@ -89,7 +90,7 @@ Comparação entre o [Plano de Projeto](plano-de-projeto.md) (versão 1.0, de 01
 | Confirmação acessível antes de cancelar                | `ConfirmDialog`                                 |
 | Página 404, Error Boundary e carregamento sob demanda  | `NotFoundPage`, `ErrorBoundary`, `React.lazy`   |
 | Filtros na URL e atalho "Usar minhas preferências"     | `PetsPage`                                      |
-| Teste de contrato entre mock e schemas Zod             | `mock-server/contract.test.js`                  |
+| Teste de contrato entre mock e schemas Zod             | `apps/web/mock-server/contract.test.js`         |
 | CI (lint, formato, tipos, testes e build) e 169 testes | `.github/workflows/ci.yml`                      |
 | Tailwind CSS 4 e react-hook-form                       | Ver [Decisões 16 e 17](decisoes.md)             |
 | Manuais de instalação, operação e do usuário           | `docs/manual-*.md`                              |

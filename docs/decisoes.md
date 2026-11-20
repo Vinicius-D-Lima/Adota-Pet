@@ -5,7 +5,7 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 ## 1. Entregar só o frontend, com API simulada
 
 - **Contexto:** o prazo é de entregar o frontend. O backend, a autenticação e a organização de ONGs vêm depois.
-- **Decisão:** o frontend não depende de backend. Ele consome uma API REST simulada com **json-server** (`mock-server/`), com contrato, validação e erros próprios. Foi considerada a alternativa de interceptar as requisições no navegador (MSW); a escolha foi o json-server por ser um servidor de verdade, com persistência em arquivo.
+- **Decisão:** o frontend não depende de backend. Ele consome uma API REST simulada com **json-server** (`apps/web/mock-server/`), com contrato, validação e erros próprios. Foi considerada a alternativa de interceptar as requisições no navegador (MSW); a escolha foi o json-server por ser um servidor de verdade, com persistência em arquivo.
 - **Consequência:** o contrato do mock é o contrato que o backend real vai implementar. O frontend só precisa trocar `VITE_API_URL`. Em troca, é preciso hospedar o mock à parte para publicar um link (ver [Visão geral](visao-geral.md#publicar-o-frontend)).
 
 ## 2. TypeScript em modo `strict`
@@ -21,7 +21,7 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 ## 4. O contrato é testado, não só descrito
 
 - **Contexto:** a lista de solicitações ficou em "Carregando…" no navegador, mesmo com todos os testes unitários passando. O schema do pet embutido exigia `distanceKm`, que o servidor não manda nessa rota.
-- **Decisão:** `requestPetSchema` omite `distance` e `distanceKm`, e `mock-server/contract.test.js` valida as respostas **reais** do servidor contra os schemas do frontend.
+- **Decisão:** `requestPetSchema` omite `distance` e `distanceKm`, e `apps/web/mock-server/contract.test.js` valida as respostas **reais** do servidor contra os schemas do frontend.
 - **Consequência:** uma divergência entre mock e frontend vira um teste vermelho, e não um bug visual.
 
 ## 5. Filtros na URL
@@ -57,7 +57,7 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 
 ## 11. Biblioteca de componentes própria, sem framework de componentes
 
-- **Decisão:** componentes em `src/components/ui` com props consistentes (`variant`, `size`, `loading`, `invalid`...). A variante `ghost` foi renomeada para `secondary`. Na época os estilos eram CSS puro; hoje são Tailwind (ver decisão 16).
+- **Decisão:** componentes em `apps/web/src/components/ui` com props consistentes (`variant`, `size`, `loading`, `invalid`...). A variante `ghost` foi renomeada para `secondary`. Na época os estilos eram CSS puro; hoje são Tailwind (ver decisão 16).
 - **Consequência:** telas mais curtas e uniformes. O custo foi converter todas as páginas, e quem escrever código novo deve usar os componentes (e não classes `button ...` soltas).
 
 ## 12. A compatibilidade é calculada no cliente
@@ -83,13 +83,13 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 ## 16. Tailwind CSS em vez de CSS puro
 
 - **Contexto:** o plano da disciplina pede um framework CSS de mercado, e o projeto tinha cerca de 2.400 linhas de CSS global em `styles.css` e `ui.css`. O pedido não dizia qual framework usar.
-- **Decisão:** **Tailwind CSS 4**, pelo plugin `@tailwindcss/vite`, com as cores, as fontes e a sombra do projeto como tokens no `@theme` (`src/index.css`) e `tailwind-merge` para combinar classes. Alternativas consideradas: Bootstrap e Chakra UI (trazem componentes e visual prontos, o que obrigaria a refazer o layout; o Tailwind permite manter o desenho atual).
+- **Decisão:** **Tailwind CSS 4**, pelo plugin `@tailwindcss/vite`, com as cores, as fontes e a sombra do projeto como tokens no `@theme` (`apps/web/src/index.css`) e `tailwind-merge` para combinar classes. Alternativas consideradas: Bootstrap e Chakra UI (trazem componentes e visual prontos, o que obrigaria a refazer o layout; o Tailwind permite manter o desenho atual).
 - **Consequência:** `styles.css` e `ui.css` deixaram de existir; as classes ficam no JSX; os breakpoints antigos (720, 820 e 920 px) foram consolidados em `md` (768 px) e `lg` (1024 px). Como o Tailwind redefine alguns padrões do navegador (altura de linha, margens de títulos e parágrafos), a camada `base` de `index.css` os restaura para manter o visual. A escolha é uma **suposição de quem executou a tarefa** e pode ser trocada em outra rodada.
 
 ## 17. react-hook-form nos formulários
 
 - **Decisão:** o questionário e o perfil usam react-hook-form com `zodResolver`, reaproveitando os schemas Zod do contrato. `watch` foi trocado por `useWatch` (compatível com a regra `react-hooks/incompatible-library`), e as mensagens de "perfil atualizado" e de falha do envio são derivadas da identidade dos valores do formulário, e não de `useEffect`.
-- **Consequência:** a validação por campo e o estado `isDirty` vêm da biblioteca, e `src/utils/zodFieldErrors.ts` foi removido. Erros 400 do servidor entram com `setError`. Os campos de seleção de sim ou não usam `setValueAs`, que também é aplicado aos valores iniciais e por isso aceita booleanos.
+- **Consequência:** a validação por campo e o estado `isDirty` vêm da biblioteca, e `apps/web/src/utils/zodFieldErrors.ts` foi removido. Erros 400 do servidor entram com `setError`. Os campos de seleção de sim ou não usam `setValueAs`, que também é aplicado aos valores iniciais e por isso aceita booleanos.
 
 ## 18. Seed com 12 pets e uma solicitação de cada status
 
@@ -137,8 +137,8 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 
 ## 26. Monorepo com npm workspaces
 
-- **Decisão:** `apps/web`, `apps/api` e `packages/shared`, este último com os schemas Zod compartilhados entre frontend e backend (#3).
-- **Consequência:** o contrato de dados passa a ser único: mudar um campo obrigatório no pacote compartilhado quebra o `typecheck` de quem não acompanhou.
+- **Decisão:** `apps/web`, `apps/api` e `packages/shared`, este último com os schemas Zod compartilhados entre frontend e backend (#3). A raiz declara `"workspaces": ["apps/*", "packages/*"]` e delega `dev`, `build`, `test`, `lint` e `typecheck` para os pacotes. Não há Turborepo nem pnpm nesta etapa.
+- **Consequência:** o contrato de dados passa a ser único: mudar um campo obrigatório no pacote compartilhado quebra o `typecheck` de quem não acompanhou. Os IDs `MONO-01` a `MONO-06` registram a instalação, os builds, o consumo do shared por web e api, a quebra de contrato, os checks por workspace no CI e a versão única de `zod`/`@casl/ability` (veja [`docs/testes/monorepo.md`](testes/monorepo.md)).
 
 ## 27. Testes do backend com Vitest e supertest, catalogados por ID
 
@@ -147,13 +147,19 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 
 ## 28. Docker para o projeto inteiro, com Hadolint e Trivy
 
-- **Decisão:** web, api, banco, storage e e-mail de desenvolvimento (Mailpit) sobem com `docker compose` (#96). O **Hadolint** revisa os Dockerfiles e o **Trivy** varre imagens e configuração; o CI falha em vulnerabilidades **HIGH** e **CRITICAL que já tenham correção disponível**.
+- **Decisão original:** web, api, banco, storage e e-mail de desenvolvimento (Mailpit) sobem com `docker compose` (#96). O **Hadolint** revisa os Dockerfiles e o **Trivy** varre imagens e configuração; o CI falha em vulnerabilidades **HIGH** e **CRITICAL que já tenham correção disponível**.
 - **Consequência:** vulnerabilidades sem correção não bloqueiam, para não travar o projeto por algo que ninguém consegue resolver. Elas aparecem no relatório.
+- **Revisão (#47):** o Postgres já está na nuvem (Neon), então **não usaremos Docker neste projeto**. O plano de contêineres para banco/storage/e-mail fica suspenso; os testes de API usam um database separado no mesmo servidor gerenciado.
 
 ## 29. Segurança no pipeline
 
 - **Decisão:** Dependabot, `npm audit`, Gitleaks, CodeQL, permissões mínimas no workflow e actions fixadas por SHA (#97), mais ZAP e Schemathesis em execução noturna (#98).
 - **Consequência:** o que roda em todo PR é rápido e grátis. Os testes dinâmicos, mais lentos, rodam à noite para não atrasar os PRs.
+
+## 30. Base transversal da API, sem Docker (#47)
+
+- **Decisão:** `apps/api` centraliza configuração validada por Zod (fail-fast), erro padrão com `details`, validação de `body`/`query`/`params` pelos schemas de `@adotapet/shared`, helmet, CORS por origem configurada, rate limit, limite de corpo, logs pino com `requestId` e redação de dados sensíveis, health com consulta ao banco e OpenAPI derivada das rotas e dos schemas. O banco de desenvolvimento e o de teste ficam no Neon: o setup do Vitest cria um database com sufixo `_test`, aplica migrations e trunca as tabelas entre testes.
+- **Consequência:** todo módulo seguinte herda a mesma base sem reimplementar infraestrutura. Nenhum teste aponta para o banco principal; se não houver URL de teste, só os dois testes de integração são ignorados. Os 12 IDs `INF-01` a `INF-12` estão em [`docs/testes/infra-api.md`](testes/infra-api.md).
 
 ## Decisão pendente: acessibilidade
 

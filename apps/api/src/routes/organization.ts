@@ -1,0 +1,316 @@
+import { Router } from 'express'
+import {
+  demoRole,
+  organizationIdentity,
+  organizationPets,
+  permissionsForRole,
+  requireGuardian,
+  withGallery,
+  withReceivedRequest,
+} from '../context.js'
+import { prisma } from '../db.js'
+import type { Pet, Prisma } from '../generated/prisma/client.js'
+import type { FieldError } from '../http.js'
+import { isBlank, list, sendError } from '../http.js'
+import { ORGANIZATION_PET_FIELDS, asRecord, validateOrganizationPet } from '../validation.js'
+
+export const organizationRouter = Router()
+
+const ORGANIZATION_REQUEST_TRANSITIONS: Record<string, string> = {
+  EM_ANALISE: 'Em análise',
+  APROVADA: 'Aprovada',
+  RECUSADA: 'Recusada',
+}
+const INTERVIEW_TYPES = ['Entrevista online', 'Visita presencial']
+
+const presentOrganizationPet = (pet: Pet) => ({
+  ...withGallery(pet),
+  distance: null,
+  distanceKm: null,
+})
+
+const isFutureDate = (value: unknown) => {
+  if (typeof value !== 'string' || isBlank(value)) return false
+  const date = new Date(value)
+  return !Number.isNaN(date.getTime()) && date.getTime() > Date.now()
+}
+
+/** Solicitação dos pets da instituição ou `null` (com 404 já enviado). */
+async function receivedRequestOf(req: { params: { id: string } }, viewerId: string) {
+  const petIds = (await organizationPets(viewerId)).map(({ id }) => id)
+  const request = await prisma.adoptionRequest.findFirst({
+    where: { id: req.params.id, petId: { in: petIds } },
+  })
+  return request
+}
+
+organizationRouter.get('/me/organization-pets', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const pets = await organizationPets(viewer.id)
+  res.json(list(pets.map(presentOrganizationPet)))
+})
+
+organizationRouter.post('/me/organization-pets', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const details = validateOrganizationPet(req.body)
+  if (details.length) return sendError(res, 400, 'Validação falhou', details)
+
+  const body = asRecord(req.body)
+  if (!body)
+    return sendError(res, 400, 'Validação falhou', [
+      { field: 'body', message: 'Envie um objeto JSON' },
+    ])
+
+  const {
+    name: organization,
+    initials: organizationInitials,
+    user,
+  } = await organizationIdentity(viewer.id)
+  const baseId =
+    String(body.name)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'pet'
+  let id = baseId
+  let suffix = 2
+  while (await prisma.pet.findUnique({ where: { id } })) id = `${baseId}-${suffix++}`
+
+  const data: Partial<Prisma.PetUncheckedCreateInput> = {
+    id,
+    ageLabel: `${body.age} ${body.age === 1 ? 'ano' : 'anos'}`,
+    gallery: [String(body.image)],
+    organization,
+    organizationInitials,
+    lat: typeof user?.lat === 'number' ? user.lat : -23.5505,
+    lng: typeof user?.lng === 'number' ? user.lng : -46.6333,
+    createdAt: new Date(),
+  }
+  // Campos validados por ORGANIZATION_PET_FIELDS (o Prisma exige todos de uma vez).
+  for (const key of ORGANIZATION_PET_FIELDS) Object.assign(data, { [key]: body[key] })
+
+  const pet = await prisma.pet.create({ data: data as Prisma.PetUncheckedCreateInput })
+  res.status(201).json(presentOrganizationPet(pet))
+})
+
+organizationRouter.put('/me/organization-pets/:id', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const identity = await organizationIdentity(viewer.id)
+  const existing = await prisma.pet.findFirst({
+    where: { id: req.params.id, organization: identity.name },
+  })
+  if (!existing) return sendError(res, 404, 'Pet não encontrado entre os cadastros da instituição')
+
+  const details = validateOrganizationPet(req.body)
+  if (details.length) return sendError(res, 400, 'Validação falhou', details)
+
+  const body = asRecord(req.body)
+  if (!body)
+    return sendError(res, 400, 'Validação falhou', [
+      { field: 'body', message: 'Envie um objeto JSON' },
+    ])
+
+  const image = String(body.image)
+  const data: Prisma.PetUncheckedUpdateInput = {
+    ageLabel: `${body.age} ${body.age === 1 ? 'ano' : 'anos'}`,
+    gallery: existing.gallery?.length
+      ? [image, ...existing.gallery.filter((item) => item !== image)]
+      : [image],
+  }
+  for (const key of ORGANIZATION_PET_FIELDS) Object.assign(data, { [key]: body[key] })
+
+  const updated = await prisma.pet.update({ where: { id: existing.id }, data })
+  res.json(presentOrganizationPet(updated))
+})
+
+organizationRouter.delete('/me/organization-pets/:id', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const identity = await organizationIdentity(viewer.id)
+  const existing = await prisma.pet.findFirst({
+    where: { id: req.params.id, organization: identity.name },
+  })
+  if (!existing) return sendError(res, 404, 'Pet não encontrado entre os cadastros da instituição')
+
+  const requests = await prisma.adoptionRequest.count({ where: { petId: existing.id } })
+  if (requests > 0)
+    return sendError(res, 409, 'Não é possível remover um pet que possui solicitações')
+
+  // Favoritos caem em cascata (onDelete: Cascade no schema).
+  await prisma.pet.delete({ where: { id: existing.id } })
+  res.status(204).end()
+})
+
+organizationRouter.get('/me/permissions', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const role = demoRole(req)
+  const identity = await organizationIdentity(viewer.id)
+  res.json({
+    role,
+    canApprove: role === 'ADMIN',
+    permissions: permissionsForRole(role),
+    organization: { id: viewer.id, name: identity.name, initials: identity.initials },
+  })
+})
+
+organizationRouter.get('/me/received-requests', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const petIds = (await organizationPets(viewer.id)).map(({ id }) => id)
+  const requests = await prisma.adoptionRequest.findMany({
+    where: { petId: { in: petIds } },
+    orderBy: [{ date: 'desc' }, { id: 'desc' }],
+  })
+  const data = await Promise.all(requests.map((request) => withReceivedRequest(request, viewer.id)))
+  res.json(list(data))
+})
+
+organizationRouter.get('/me/received-requests/:id', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const request = await receivedRequestOf(req, viewer.id)
+  if (!request) return sendError(res, 404, 'Solicitação não encontrada')
+  res.json(await withReceivedRequest(request, viewer.id))
+})
+
+organizationRouter.post('/me/received-requests/:id/interview', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const request = await receivedRequestOf(req, viewer.id)
+  if (!request) return sendError(res, 404, 'Solicitação não encontrada')
+  if (request.status !== 'Em análise') {
+    return sendError(res, 409, 'Só é possível agendar uma entrevista com a solicitação em análise.')
+  }
+  const scheduled = asRecord(request.interview)
+  if (scheduled?.completed) {
+    return sendError(res, 409, 'A entrevista desta solicitação já foi realizada.')
+  }
+
+  const body = asRecord(req.body)
+  const proposedSlots = Array.isArray(body?.proposedSlots) ? body.proposedSlots : []
+  const details: FieldError[] = []
+  if (proposedSlots.length === 0 || proposedSlots.length > 3) {
+    details.push({
+      field: 'proposedSlots',
+      message: 'Proponha de 1 a 3 horários para a entrevista.',
+    })
+  }
+  if (proposedSlots.some((slot) => !isFutureDate(slot))) {
+    details.push({
+      field: 'proposedSlots',
+      message: 'Todos os horários precisam ser datas futuras.',
+    })
+  }
+  if (details.length) return sendError(res, 400, 'Validação falhou', details)
+
+  const requestedType = body?.type
+  const type =
+    typeof requestedType === 'string' && INTERVIEW_TYPES.includes(requestedType)
+      ? requestedType
+      : 'Entrevista online'
+  const updated = await prisma.adoptionRequest.update({
+    where: { id: request.id },
+    data: {
+      interview: {
+        type,
+        proposedSlots,
+        status: 'AGENDADA',
+        completed: false,
+        scheduledAt: new Date().toISOString(),
+      },
+    },
+  })
+  res.json(await withReceivedRequest(updated, viewer.id))
+})
+
+organizationRouter.post('/me/received-requests/:id/interview/complete', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const request = await receivedRequestOf(req, viewer.id)
+  if (!request) return sendError(res, 404, 'Solicitação não encontrada')
+
+  const interview = asRecord(request.interview)
+  if (!interview) {
+    return sendError(res, 400, 'Nenhuma entrevista foi agendada para esta solicitação.')
+  }
+  if (!['Em análise', 'Aprovada'].includes(request.status)) {
+    return sendError(res, 409, 'Esta solicitação não está em etapa de entrevista.')
+  }
+  const updated = await prisma.adoptionRequest.update({
+    where: { id: request.id },
+    data: {
+      interview: {
+        ...interview,
+        status: 'REALIZADA',
+        completed: true,
+        completedAt: new Date().toISOString(),
+      },
+    },
+  })
+  res.json(await withReceivedRequest(updated, viewer.id))
+})
+
+organizationRouter.post('/me/received-requests/:id/transitions', async (req, res) => {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return
+  const request = await receivedRequestOf(req, viewer.id)
+  if (!request) return sendError(res, 404, 'Solicitação não encontrada')
+
+  const body = asRecord(req.body)
+  const status = ORGANIZATION_REQUEST_TRANSITIONS[String(body?.to ?? '').toUpperCase()]
+  if (!status) return sendError(res, 400, 'Transição não suportada')
+
+  const role = demoRole(req)
+  if (role === 'VOLUNTEER' && status === 'Aprovada') {
+    return sendError(res, 403, 'Apenas administradores podem aprovar solicitações.')
+  }
+
+  const interview = asRecord(request.interview)
+  if (status === 'Aprovada' && interview?.completed !== true) {
+    return sendError(
+      res,
+      400,
+      'O agendamento da etapa precisa estar marcado como realizado antes de aprovar.',
+      [{ field: 'interview', message: 'Marque a entrevista como realizada antes de aprovar.' }],
+    )
+  }
+
+  const allowed =
+    (request.status === 'Enviada' && ['Em análise', 'Recusada'].includes(status)) ||
+    (request.status === 'Em análise' && ['Aprovada', 'Recusada'].includes(status))
+  if (!allowed)
+    return sendError(
+      res,
+      409,
+      `Não é possível alterar uma solicitação com status "${request.status}" para "${status}"`,
+    )
+
+  const reasonValue = body?.reason
+  const reason = typeof reasonValue === 'string' ? reasonValue.trim() : ''
+  if (status === 'Recusada' && reason.length < 10) {
+    return sendError(res, 400, 'Informe o motivo da recusa', [
+      { field: 'reason', message: 'O motivo deve ter pelo menos 10 caracteres.' },
+    ])
+  }
+  const messages: Record<string, string> = {
+    'Em análise': 'A instituição iniciou a análise da sua solicitação.',
+    Aprovada: 'Sua solicitação foi aprovada pela instituição.',
+    Recusada: reason
+      ? `A instituição encerrou esta solicitação: ${reason}`
+      : 'A instituição encerrou esta solicitação.',
+  }
+  const updated = await prisma.adoptionRequest.update({
+    where: { id: request.id },
+    data: {
+      status,
+      message: messages[status],
+      ...(status === 'Recusada' && reason ? { rejectionReason: reason } : {}),
+    },
+  })
+  res.json(await withReceivedRequest(updated, viewer.id))
+})

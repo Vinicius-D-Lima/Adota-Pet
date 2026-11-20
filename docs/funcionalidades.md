@@ -57,7 +57,7 @@ Apresentação do produto, chamada para o perfil, explicação do fluxo em três
 
 ## Compatibilidade (`/pets/:petId/compatibilidade`)
 
-Compara o perfil do adotante com o pet. O cálculo é feito **no cliente** (`src/utils/calculateCompatibility.ts`), com 7 critérios de peso igual:
+Compara o perfil do adotante com o pet. O cálculo é feito **no cliente** (`apps/web/src/utils/calculateCompatibility.ts`), com 7 critérios de peso igual:
 
 | #   | Critério           | Vira "ponto de atenção" quando...                                           |
 | --- | ------------------ | --------------------------------------------------------------------------- |

@@ -2,6 +2,8 @@
 
 > Issue [#9](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/9) · prefixo `DB` · **7 testes** (0 funcionais, 2 de segurança, 5 de integração)
 
+> **Revisão (#47):** o banco já roda na nuvem (Neon) e não usamos Docker. Os testes `DB-01`, `DB-02`, `DB-04` e `DB-07` abaixo ainda descrevem a especificação original com contêineres; ao implementar a issue #9, traduza-os para conectividade gerenciada, persistência no provedor, segredos por variável de ambiente e reset do database de teste. O banco de testes da API já segue esse modelo em [`infra-api.md`](infra-api.md).
+
 Garante que o banco sobe com um comando, persiste dados, aplica migrations e seed de forma repetível e sem credenciais no repositório.
 
 ## Como ler

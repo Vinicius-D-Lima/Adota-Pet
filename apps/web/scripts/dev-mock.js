@@ -1,0 +1,77 @@
+import { spawn } from 'node:child_process'
+import { createInterface } from 'node:readline/promises'
+import { stdin as input, stdout as output } from 'node:process'
+
+const accounts = {
+  1: { id: 'demo', label: 'Adotante — adotante preenchido' },
+  2: { id: 'demo-organization', label: 'Instituto — administrador(a)' },
+  3: { id: 'demo-organization', role: 'VOLUNTEER', label: 'Instituto — voluntário(a)' },
+  4: { id: 'demo-empty', label: 'Perfil vazio' },
+}
+
+const terminal = createInterface({ input, output })
+output.write('\nEscolha o perfil de teste:\n')
+output.write('  1. Adotante — adotante preenchido\n')
+output.write('  2. Instituto — administrador(a)\n')
+output.write('  3. Instituto — voluntário(a), sem permissão de aprovar\n')
+output.write('  4. Perfil vazio\n\n')
+const answer = (await terminal.question('Digite 1, 2, 3 ou 4: ')).trim()
+terminal.close()
+
+const account = accounts[answer]
+if (!account) {
+  console.error('\nOpção inválida. Execute npm run dev:mock novamente e escolha de 1 a 4.')
+  process.exit(1)
+}
+
+const role = account.role ?? 'ADMIN'
+
+console.log(`\nIniciando como ${account.label}...\n`)
+
+const npmCli = process.env.npm_execpath
+if (!npmCli) {
+  console.error('Não foi possível localizar o npm CLI. Execute este script com "npm run dev:mock".')
+  process.exit(1)
+}
+
+const environment = {
+  ...process.env,
+  DEMO_USER_ID: account.id,
+  DEMO_ROLE: role,
+  VITE_DEMO_USER_ID: account.id,
+  VITE_DEMO_ROLE: role,
+  VITE_DEMO_SESSION_ID: String(Date.now()),
+  VITE_API_PROXY_TARGET: `http://localhost:${process.env.MOCK_PORT ?? 3001}`,
+}
+const children = [
+  spawn(process.execPath, [npmCli, 'run', 'dev'], { env: environment, stdio: 'inherit' }),
+  spawn(process.execPath, [npmCli, 'run', 'mock'], { env: environment, stdio: 'inherit' }),
+]
+
+let stopping = false
+const stop = (signal = 'SIGTERM') => {
+  if (stopping) return
+  stopping = true
+  for (const child of children) if (!child.killed) child.kill(signal)
+}
+
+process.on('SIGINT', () => stop('SIGINT'))
+process.on('SIGTERM', () => stop('SIGTERM'))
+
+const exitCodes = await Promise.all(
+  children.map(
+    (child) =>
+      new Promise((resolve) => {
+        child.on('error', (error) => {
+          console.error(`Não foi possível iniciar um processo filho: ${error.message}`)
+          stop()
+          resolve(1)
+        })
+        child.on('close', (code) => {
+          stop()
+          resolve(code ?? 0)
+        })
+      }),
+  ),
+)
+process.exit(exitCodes.find((code) => code !== 0) ?? 0)

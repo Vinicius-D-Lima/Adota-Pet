@@ -2,6 +2,8 @@
 
 > Issue [#96](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/96) · prefixo `DOCK` · **10 testes** (0 funcionais, 7 de segurança, 3 de integração)
 
+> **Suspenso (#47):** o projeto não usará Docker — o Postgres já está na nuvem (Neon). Este catálogo segue como registro da especificação original da issue #96; não implemente nem cobre estes testes sem uma decisão nova.
+
 Garante que web, api, banco, storage e e-mail sobem em contêineres, com Dockerfiles revisados e imagens sem vulnerabilidades corrigíveis.
 
 ## Como ler

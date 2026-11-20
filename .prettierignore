@@ -1,4 +1,6 @@
-dist
-node_modules
+**/dist
+**/node_modules
 package-lock.json
+apps/api/src/generated
 docs/plano-de-projeto.md
+apps/web/mock-server/db.json

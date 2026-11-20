@@ -40,7 +40,7 @@ Cada rodada saiu de uma issue, virou um PR pequeno sobre a `dev`, passou por rev
 | 7      | 04 a 05/10 | URL errada ou erro de render deixavam tela em branco ou redirecionavam sem aviso          | Página 404, Error Boundary, estados de "não encontrado" e lazy loading (#76)                      |
 | 8      | 05/10      | A pessoa preenchia o questionário inteiro para só então receber o 409                     | Bloqueio proativo de duplicadas e confirmação antes de cancelar (#78), com 5 correções de revisão |
 | 9      | 05/10      | Dados que existiam e não apareciam (vacinação, castração, tempo disponível)               | Selos de saúde, 7º critério da compatibilidade e atalho de preferências (#80)                     |
-| 10     | 05/10      | Estilos e componentes repetidos em cada tela                                              | Biblioteca de componentes `src/components/ui` (#79)                                               |
+| 10     | 05/10      | Estilos e componentes repetidos em cada tela                                              | Biblioteca de componentes `apps/web/src/components/ui` (#79)                                      |
 | 11     | 05/10      | Documentação espalhada                                                                    | Pasta `docs/` (#83)                                                                               |
 | 12     | 05/10      | CSS global de ~2.400 linhas, formulários com estado manual e poucos dados de demonstração | Tailwind CSS, react-hook-form e seed ampliado (esta entrega)                                      |
 
@@ -56,7 +56,7 @@ Cada rodada saiu de uma issue, virou um PR pequeno sobre a `dev`, passou por rev
 
 ### O que mudou
 
-- **Estilo:** toda a interface passou de CSS puro (`styles.css` e `ui.css`) para **Tailwind CSS 4**, com tokens de cor e fonte no `@theme` (`src/index.css`). Os componentes de `src/components/ui` continuam com as mesmas props, então as páginas quase não mudaram de API.
+- **Estilo:** toda a interface passou de CSS puro (`styles.css` e `ui.css`) para **Tailwind CSS 4**, com tokens de cor e fonte no `@theme` (`apps/web/src/index.css`). Os componentes de `apps/web/src/components/ui` continuam com as mesmas props, então as páginas quase não mudaram de API.
 - **Formulários:** questionário e perfil usam **react-hook-form** com `zodResolver`, mantendo os mesmos schemas Zod. Erros do servidor (400) continuam apontando o campo, e 409 e 422 continuam com suas mensagens.
 - **Dados de demonstração:** o seed passou de 6 para **12 pets** e de 1 para **4 solicitações**, uma por status (`Aprovada`, `Recusada`, `Cancelada` e `Em análise`).
 
@@ -66,5 +66,5 @@ As telas principais foram capturadas **antes e depois** com o Chromium do Playwr
 
 ### Pontos de atenção
 
-- As fotos dos 6 pets novos usam URLs do Unsplash que **não puderam ser verificadas** no ambiente em que foram escritas (sem acesso à internet aberta). Se alguma não carregar, basta trocar o campo `image` e `gallery` no `mock-server/db.seed.json`.
+- As fotos dos 6 pets novos usam URLs do Unsplash que **não puderam ser verificadas** no ambiente em que foram escritas (sem acesso à internet aberta). Se alguma não carregar, basta trocar o campo `image` e `gallery` no `apps/web/mock-server/db.seed.json`.
 - A escolha do **Tailwind** como "framework CSS de mercado" foi uma decisão de quem executou a tarefa, porque o pedido não indicava qual. Alternativas razoáveis: Bootstrap ou Chakra UI. Ver [Decisões](decisoes.md#16-tailwind-css-em-vez-de-css-puro).
