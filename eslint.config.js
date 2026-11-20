@@ -7,14 +7,21 @@ import tseslint from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['**/dist', 'node_modules', 'backend/src/generated'] },
+  {
+    ignores: [
+      '**/dist',
+      '**/node_modules',
+      'apps/api/src/generated',
+      'apps/web/tsconfig*.tsbuildinfo',
+    ],
+  },
   {
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommended,
       jsxA11y.flatConfigs.recommended,
     ],
-    files: ['src/**/*.{ts,tsx}', 'vite.config.ts'],
+    files: ['apps/web/src/**/*.{ts,tsx}', 'apps/web/vite.config.ts'],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
     rules: {
@@ -27,10 +34,17 @@ export default tseslint.config(
     },
   },
   {
-    // Backend (workspace): Node, sem regras de React.
-    files: ['backend/**/*.ts'],
+    // API e pacote compartilhado: Node, sem regras de React.
+    // `_` na frente marca parâmetro/variável omitido de propósito.
+    files: ['apps/api/**/*.ts', 'packages/shared/**/*.ts'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    languageOptions: { globals: globals.node },
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      ],
+    },
   },
   prettier,
 )

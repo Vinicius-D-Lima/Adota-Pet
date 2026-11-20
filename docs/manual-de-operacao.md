@@ -1,29 +1,29 @@
 # Manual de operação
 
-Para quem mantém o AdotaPet rodando: subir e derrubar, manter os dados do mock, acompanhar o CI e atender problemas. O produto é um protótipo de frontend, então "operar" aqui significa cuidar da API simulada, do build e do fluxo de trabalho da equipe.
+Para quem mantém o AdotaPet rodando: subir e derrubar os workspaces, manter os dados do mock, acompanhar o CI e atender problemas. O monorepo reúne o frontend, a API real e o pacote de contrato compartilhado.
 
 ## 1. Rotina de execução
 
-| Tarefa                        | Comando                                   | Observação                                     |
-| ----------------------------- | ----------------------------------------- | ---------------------------------------------- |
-| Subir frontend + API simulada | `npm run dev:mock`                        | Uso diário                                     |
-| Subir só o frontend           | `npm run dev`                             | Precisa de uma API acessível em `VITE_API_URL` |
-| Subir só a API simulada       | `npm run mock`                            | Porta `MOCK_PORT` (3001)                       |
-| Subir só o backend            | `npm run backend`                         | Porta `PORT` (3002), rota `GET /health`        |
-| Subir frontend + backend      | `npm run dev:all`                         | Vite (5173) + Express (3002)                   |
-| Versionar mudança no banco    | `npm run db:migrate -w @adotapet/backend` | Prisma Migrate (scripts `db:*` em `backend/`)  |
-| Aplicar o seed do banco       | `npm run db:seed -w @adotapet/backend`    | Roda `backend/prisma/seed.ts`                  |
-| Restaurar os dados            | `npm run mock:reset`                      | Copia `db.seed.json` sobre `db.json`           |
-| Gerar o build                 | `npm run build`                           | Saída em `dist/`                               |
-| Gerar o build do backend      | `npm run build:backend`                   | Saída em `backend/dist/`                       |
-| Servir o build localmente     | `npm run preview`                         | Porta 4173, com a API simulada rodando         |
+| Tarefa                        | Comando                               | Observação                                                        |
+| ----------------------------- | ------------------------------------- | ----------------------------------------------------------------- |
+| Subir frontend + API simulada | `npm run dev:mock`                    | Uso diário                                                        |
+| Subir só o frontend           | `npm run dev`                         | Precisa de uma API acessível em `VITE_API_URL`                    |
+| Subir só a API simulada       | `npm run mock`                        | Porta `MOCK_PORT` (3001)                                          |
+| Subir só o backend            | `npm run backend`                     | Porta `PORT` (3002), rota `GET /health`                           |
+| Subir frontend + backend      | `npm run dev:all`                     | Vite (5173) + Express (3002)                                      |
+| Versionar mudança no banco    | `npm run db:migrate -w @adotapet/api` | Prisma Migrate (scripts `db:*` em `apps/api/`)                    |
+| Aplicar o seed do banco       | `npm run db:seed -w @adotapet/api`    | Roda `apps/api/prisma/seed.ts`                                    |
+| Restaurar os dados            | `npm run mock:reset`                  | Copia `db.seed.json` sobre `db.json`                              |
+| Gerar o build                 | `npm run build`                       | Saída em `apps/web/dist`, `apps/api/dist`, `packages/shared/dist` |
+| Gerar o build do backend      | `npm run build:backend`               | Saída em `apps/api/dist/`                                         |
+| Servir o build localmente     | `npm run preview`                     | Porta 4173, com a API simulada rodando                            |
 
 Para encerrar, use `Ctrl+C` no terminal. Não há processo em segundo plano.
 
 ## 2. Dados da API simulada
 
-- **Seed versionado:** `mock-server/db.seed.json`. É a "fotografia" original: 1 usuário de demonstração, 12 pets, 1 perfil completo, 1 favorito (Luna) e 4 solicitações de exemplo, uma de cada status.
-- **Banco em uso:** `mock-server/db.json`, criado na primeira execução e **ignorado pelo git**. Guarda tudo o que a pessoa faz (favoritos, perfil, solicitações).
+- **Seed versionado:** `apps/web/mock-server/db.seed.json`. É a "fotografia" original: 1 usuário de demonstração, 12 pets, 1 perfil completo, 1 favorito (Luna) e 4 solicitações de exemplo, uma de cada status.
+- **Banco em uso:** `apps/web/mock-server/db.json`, criado na primeira execução e **ignorado pelo git**. Guarda tudo o que a pessoa faz (favoritos, perfil, solicitações).
 - **Voltar ao estado original:** `npm run mock:reset`. Faça isso antes de uma demonstração, depois de testes manuais e sempre que atualizar o projeto.
 
 ### Solicitações do seed
@@ -39,28 +39,38 @@ A próxima solicitação criada recebe `SOL-1043`. Aprovar e recusar são açõe
 
 ## 3. Configuração
 
-| Variável        | Padrão  | Efeito                                                                                            |
-| --------------- | ------- | ------------------------------------------------------------------------------------------------- |
-| `VITE_API_URL`  | `/api`  | URL base que o frontend usa (definida em tempo de build)                                          |
-| `MOCK_PORT`     | `3001`  | Porta do json-server                                                                              |
-| `MOCK_DELAY_MS` | `300`   | Latência simulada. Use `0` para testes e `1500` para ver os estados de carregamento               |
-| `PORT`          | `3002`  | Porta do backend Express (`backend/`)                                                             |
-| `DATABASE_URL`  | (vazio) | String de conexão do PostgreSQL usada pelo Prisma (`backend/.env`, copie do `.env.example`)       |
-| `CORS_ORIGIN`   | (vazio) | Origens liberadas pelo CORS do backend, separadas por vírgula. Vazio = reflete a origem do pedido |
+| Variável                                  | Padrão                  | Efeito                                                                              |
+| ----------------------------------------- | ----------------------- | ----------------------------------------------------------------------------------- |
+| `VITE_API_URL`                            | `/api`                  | URL base que o frontend usa (definida em tempo de build)                            |
+| `MOCK_PORT`                               | `3001`                  | Porta do json-server                                                                |
+| `MOCK_DELAY_MS`                           | `300`                   | Latência simulada. Use `0` para testes e `1500` para ver os estados de carregamento |
+| `PORT`                                    | `3002`                  | Porta do backend Express (`apps/api/`)                                              |
+| `DATABASE_URL`                            | (vazio)                 | String de conexão do Postgres na nuvem; obrigatória, sem ela a API não sobe         |
+| `TEST_DATABASE_URL`                       | derivada                | Banco separado para os testes (sufixo `_test`); nunca o banco principal             |
+| `CORS_ORIGIN`                             | `http://localhost:5173` | Origens liberadas pelo CORS, separadas por vírgula; origem desconhecida é negada    |
+| `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | `100` / `60000`         | Limite global de requisições                                                        |
+| `BODY_LIMIT` / `LOG_LEVEL`                | `100kb` / `info`        | Limite do corpo JSON e nível dos logs                                               |
 
-Exemplo: `MOCK_DELAY_MS=1500 MOCK_PORT=3002 npm run mock`.
+Exemplo: `MOCK_DELAY_MS=1500 MOCK_PORT=3101 npm run mock`.
 
 ## 4. Verificação de saúde
 
 1. `GET http://localhost:3001/pets?limit=1` deve responder 200 com `total`.
 2. `GET http://localhost:3001/me/adopter-profile` deve trazer `"isComplete": true` com o seed novo.
 3. Na interface, o menu deve mostrar o contador de favoritos (1) e de solicitações ativas (2: a `Aprovada` e a `Em análise`) logo depois do reset.
-4. Com o backend em `npm run backend`, `GET http://localhost:3002/health` deve responder 200 com `{"status":"ok"}`.
+4. Com o backend em `npm run backend`, `GET http://localhost:3002/health` deve responder 200 com `{"status":"ok","database":"ok"}`. Se o banco estiver fora, responderá 503 com `{"status":"error","database":"unavailable"}`.
+5. `http://localhost:3002/docs` mostra a OpenAPI viva; o JSON está em `/docs/openapi.json`.
+6. Respostas de erro seguem `{ "statusCode", "error", "message", "details?" }`; erros internos são 500 genéricos, sem stack no corpo.
 
 ## 5. Rotina de qualidade (antes de abrir ou atualizar um PR)
 
 ```bash
 npm ci
+npm run check:workspaces
+npm run check:shared-imports
+npm run check:deps
+npm run check:contract
+npm run db:generate
 npm run lint
 npm run format:check
 npm run typecheck
@@ -82,16 +92,19 @@ Todos os passos precisam sair sem erro. O CI executa exatamente esta sequência 
 
 ## 7. Resolução de problemas
 
-| Sintoma                                            | Diagnóstico                                               | Ação                                                                       |
-| -------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Listas em "Carregando…" ou erro "Tentar novamente" | API fora do ar ou porta errada                            | Confira `npm run mock`, a porta e o proxy do Vite                          |
-| 422 ao enviar solicitação                          | Perfil incompleto                                         | Complete em `/perfil` (ou `npm run mock:reset`)                            |
-| 409 ao solicitar                                   | Já há solicitação ativa para o pet                        | Cancele a anterior em `/solicitacoes`                                      |
-| 409 ao cancelar                                    | Status mudou ou é `Aprovada`/`Recusada`/`Cancelada`       | Atualize a lista; só `Enviada` e `Em análise` cancelam                     |
-| 400 em `/pets`                                     | Parâmetro desconhecido na URL                             | Use só `search`, `species`, `size`, `sex`, `city`, `sort`, `page`, `limit` |
-| CI vermelho só na mescla                           | O CI roda sobre o resultado da mescla com a `dev`         | Traga a `dev` para a branch, rode a bateria e envie                        |
-| Teste que "passa sozinho e falha em conjunto"      | TanStack Query notifica em `setTimeout(0)`                | Espere esse tick dentro de `act` (ver Qualidade e CI)                      |
-| Estilos quebrados depois de atualizar              | Dependências antigas (Tailwind 4 usa `@tailwindcss/vite`) | `npm ci` e reinicie o Vite                                                 |
+| Sintoma                                            | Diagnóstico                                               | Ação                                                                        |
+| -------------------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Listas em "Carregando…" ou erro "Tentar novamente" | API fora do ar ou porta errada                            | Confira `npm run mock`, a porta e o proxy do Vite                           |
+| 422 ao enviar solicitação                          | Perfil incompleto                                         | Complete em `/perfil` (ou `npm run mock:reset`)                             |
+| 409 ao solicitar                                   | Já há solicitação ativa para o pet                        | Cancele a anterior em `/solicitacoes`                                       |
+| 409 ao cancelar                                    | Status mudou ou é `Aprovada`/`Recusada`/`Cancelada`       | Atualize a lista; só `Enviada` e `Em análise` cancelam                      |
+| 400 em `/pets`                                     | Parâmetro desconhecido na URL                             | Use só `search`, `species`, `size`, `sex`, `city`, `sort`, `page`, `limit`  |
+| API não sobe e a mensagem cita `DATABASE_URL`      | Configuração inválida (INF-01)                            | Copie `.env.example` e preencha a URL do Postgres na nuvem                  |
+| `/health` responde 503                             | Banco fora do ar ou URL inválida                          | Confira a conexão; o resto da API continua de pé para diagnóstico           |
+| `INF-11`/`INF-12` ignorados                        | Sem URL do banco de teste                                 | Defina `TEST_DATABASE_URL` (ou `DATABASE_URL`); nunca use o banco principal |
+| CI vermelho só na mescla                           | O CI roda sobre o resultado da mescla com a `dev`         | Traga a `dev` para a branch, rode a bateria e envie                         |
+| Teste que "passa sozinho e falha em conjunto"      | TanStack Query notifica em `setTimeout(0)`                | Espere esse tick dentro de `act` (ver Qualidade e CI)                       |
+| Estilos quebrados depois de atualizar              | Dependências antigas (Tailwind 4 usa `@tailwindcss/vite`) | `npm ci` e reinicie o Vite                                                  |
 
 ## 8. Limitações operacionais
 

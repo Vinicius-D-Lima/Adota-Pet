@@ -9,15 +9,18 @@ dist/
 .env.*
 !.env.example
 
-# Segredos locais do backend (DATABASE_URL, CORS) — nunca versionar
-backend/.env
-!backend/.env.example
+# Segredos locais da API (DATABASE_URL, CORS) — nunca versionar
+apps/api/.env
+!apps/api/.env.example
 
 # Banco em uso do mock (copiado do seed na primeira execução)
-mock-server/db.json
+apps/web/mock-server/db.json
 
 # Cliente Prisma gerado (regenere com `npm run db:generate`)
-backend/src/generated/
+apps/api/src/generated/
+
+# Marcador local do banco de teste preparado pelo Vitest
+apps/api/test/.test-db-ready
 
 # OpenCode — configurações locais, não versionar
 .opencode/

@@ -6,7 +6,7 @@ Plataforma de **adoção responsável** de animais. A ideia central é que a pes
 
 ## Escopo entregue
 
-Esta entrega é **somente o frontend**, em React + TypeScript, conversando com uma **API REST simulada** (json-server). O fluxo principal está completo:
+O monorepo reúne o frontend em React + TypeScript (`apps/web`), a API real em Express/Prisma (`apps/api`) e os schemas compartilhados em `packages/shared`. Para desenvolvimento sem banco, o frontend conversa com uma **API REST simulada** (json-server) em `apps/web/mock-server`. O fluxo principal está completo:
 
 1. Página inicial e apresentação do produto
 2. Busca e filtros de pets (espécie, porte, sexo, ordenação, texto livre)

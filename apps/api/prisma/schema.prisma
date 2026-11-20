@@ -1,0 +1,192 @@
+// Contrato de dados do banco (decisão #21: Prisma com migrations versionadas).
+// Modelos derivados de mock-server/db.seed.json — o mock é a referência do contrato.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id               String   @id
+  name             String   @default("")
+  email            String   @default("")
+  phone            String?
+  cpf              String?
+  birthDate        String?
+  zipCode          String?
+  address          String?
+  city             String?
+  state            String?
+  document         String?
+  organizationName String?
+  guardianType     String?
+  role             String   @default("ADOTANTE")
+  roles            String[] @default([])
+  lat              Float?
+  lng              Float?
+
+  adopterProfile   AdopterProfile?
+  guardianProfile  GuardianProfile?
+  favorites        Favorite[]
+  requests         AdoptionRequest[]
+  notifications    Notification[]
+  savedFilters     SavedFilter[]
+  preferences      NotificationPreference[]
+}
+
+model AdopterProfile {
+  id                 Int      @id @default(autoincrement())
+  userId             String   @unique
+  name               String?
+  cpf                String?
+  birthDate          String?
+  email              String?
+  phone              String?
+  zipCode            String?
+  address            String?
+  housing            String?
+  hasOutdoorArea     Boolean?
+  dailyTime          String?
+  activityLevel      String?
+  hasChildren        Boolean?
+  hasOtherPets       Boolean?
+  experience         String?
+  acceptsSpecialCare Boolean?
+  preferredSpecies   String?
+  preferredSize      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model GuardianProfile {
+  id           Int      @id @default(autoincrement())
+  userId       String   @unique
+  guardianType String?
+  displayName  String?
+  legalName    String?
+  document     String?
+  email        String?
+  phone        String?
+  zipCode      String?
+  address      String?
+  city         String?
+  description  String?
+  acceptsTerms Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Pet {
+  id                   String   @id
+  name                 String
+  species              String
+  breed                String
+  age                  Int
+  ageLabel             String
+  size                 String
+  sex                  String
+  city                 String
+  image                String
+  gallery              String[] @default([])
+  summary              String
+  description          String
+  traits               String[]
+  energy               String
+  space                String
+  children             Boolean
+  otherPets            Boolean
+  specialCare          Boolean
+  vaccinated           Boolean
+  neutered             Boolean
+  organization         String
+  organizationInitials String
+  lat                  Float?
+  lng                  Float?
+  createdAt            DateTime
+
+  favorites            Favorite[]
+  requests             AdoptionRequest[]
+}
+
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  petId     String
+  createdAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pet  Pet  @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, petId])
+}
+
+model AdoptionRequest {
+  id              String   @id
+  userId          String
+  petId           String
+  status          String
+  date            DateTime
+  message         String
+  answers         Json?
+  interview       Json?
+  rejectionReason String?
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pet      Pet           @relation(fields: [petId], references: [id], onDelete: Restrict)
+  messages ChatMessage[]
+}
+
+model ChatMessage {
+  id        String    @id
+  requestId String
+  authorId  String
+  body      String
+  createdAt DateTime
+  readAt    DateTime?
+
+  request AdoptionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+}
+
+model Notification {
+  id        String    @id
+  userId    String
+  type      String
+  title     String
+  body      String
+  link      String
+  readAt    DateTime?
+  createdAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model NotificationPreference {
+  userId String
+  type   String
+  inApp  Boolean
+  email  Boolean
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, type])
+}
+
+model SavedFilter {
+  id        String   @id
+  userId    String
+  name      String
+  criteria  Json
+  active    Boolean
+  createdAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}

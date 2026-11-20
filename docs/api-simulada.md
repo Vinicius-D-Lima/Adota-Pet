@@ -1,36 +1,68 @@
-# API simulada (json-server)
+# API simulada (mock-server, json-server)
 
-O frontend conversa com uma API REST simulada, em `mock-server/`. Ela existe para que o frontend possa ser **entregue e demonstrado sem backend**, com um contrato que um backend real poderá implementar depois (as issues de backend #47 a #51 descrevem esse contrato).
+O repositório inclui uma API REST simulada em `apps/web/mock-server/` para desenvolvimento e testes **sem banco de dados**. Ela implementa o mesmo contrato consumido pelo frontend e serve como referência para o backend real (`apps/api/`, Express + Prisma/PostgreSQL).
 
-- Baseada em [json-server](https://github.com/typicode/json-server) **0.17.4** (Express), com rotas, validação e regras de negócio próprias em `mock-server/server.js`.
-- As rotas respondem tanto em `/pets` quanto em `/api/pets`. O Vite faz proxy de `/api` para `http://localhost:3001`, então o navegador nunca vê CORS.
-- Não existe login real. As rotas `/me/*` usam o usuário indicado por `X-Demo-User-Id` (entre as contas de demonstração do seed) ou `demo` quando o cabeçalho não é enviado.
+- Baseada em [json-server](https://github.com/typicode/json-server) **0.17.4** (Express), com rotas, validação e regras de negócio próprias em `apps/web/mock-server/server.js`.
+- As rotas respondem tanto em `/pets` quanto em `/api/pets`.
+- Não existe login real. As rotas `/me/*` usam o usuário indicado por `X-Demo-User-Id` (entre as contas de demonstração do seed) ou `demo` quando o cabeçalho não é enviado. O papel de demonstração pode ser informado por `X-Demo-Role` (ex.: `ADMIN`/`VOLUNTEER`) nas rotas que o utilizam.
 
-## Dados
+## Como usar
 
-| Arquivo                    | Papel                                                                                                           |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `mock-server/db.seed.json` | Seed **versionado**: contas de demonstração, 12 pets, perfis, favoritos, solicitações e notificações de exemplo |
-| `mock-server/db.json`      | Banco em uso. Criado a partir do seed na primeira execução e **ignorado pelo git**                              |
-
-Os dados (favoritos, perfil, solicitações e buscas salvas) **persistem entre recarregamentos e reinícios**, porque ficam no `db.json`.
+### Subir o servidor
 
 ```bash
-npm run mock:reset   # copia o seed sobre o db.json e volta aos dados originais
+npm run mock          # inicia em http://localhost:3001
+npm run mock:reset    # restaura apps/web/mock-server/db.json a partir do seed
 ```
 
-> **Já tinha um `db.json` de uma versão anterior?** Rode `npm run mock:reset`. Sem isso o servidor sobe, mas o perfil aparece com `isComplete: false` (os campos novos `cpf`, `birthDate`, `email`, `phone`, `zipCode` e `address` ficam em `missingFields`), e `POST /requests` responde 422 até o perfil ser preenchido.
-
-Pets do seed: Luna, Bento, Mimi, Fred, Nina, Tobias, Thor, Amora, Simba, Pipoca, Rex e Maya (8 cachorros e 4 gatos, de portes Pequeno, Médio e Grande).
-
-Solicitações do seed: `SOL-1039` (Fred, `Aprovada`), `SOL-1040` (Nina, `Recusada`), `SOL-1041` (Tobias, `Cancelada`) e `SOL-1042` (Mimi, `Em análise`). A conta `demo` também tem notificações de exemplo para testar o sino, o histórico e o contador de não lidas.
-
-## Configuração
+Variáveis de ambiente:
 
 | Variável        | Padrão | Efeito                                  |
 | --------------- | ------ | --------------------------------------- |
 | `MOCK_PORT`     | `3001` | Porta do servidor                       |
 | `MOCK_DELAY_MS` | `300`  | Latência simulada em cada resposta (ms) |
+
+### Usar com o frontend (desenvolvimento manual)
+
+O frontend chama a API por `VITE_API_URL` (padrão `/api`). Por padrão, `apps/web/vite.config.ts` faz proxy de `/api` para o backend real (`http://localhost:3002`). Para testar contra o mock, use:
+
+```bash
+npm run dev:mock
+```
+
+O script pergunta o perfil de demonstração (`VITE_DEMO_USER_ID`/`VITE_DEMO_ROLE`), sobe Vite + mock e define `VITE_API_PROXY_TARGET=http://localhost:3001`. Não é preciso editar `vite.config.ts` nem criar `.env`.
+
+Outras opções:
+
+- `VITE_API_PROXY_TARGET=http://localhost:3001 npm run dev` com `npm run mock` em outro terminal.
+- `VITE_API_URL=http://localhost:3001/api` em `apps/web/.env`, com `npm run mock` e `npm run dev` (o mock expõe rotas com e sem prefixo `/api`). Reinicie o Vite após alterar o `.env`.
+
+### Usar para testes automatizados
+
+- `npm test`: executa os testes de todos os workspaces, incluindo os do mock-server em `apps/web/mock-server/*.test.js` (Vitest, ambiente `node`, supertest).
+  - `apps/web/mock-server/server.test.js`: regras de negócio e códigos de erro (banco em memória).
+  - `apps/web/mock-server/contract.test.js`: valida respostas do mock contra os schemas Zod de `@adotapet/shared`.
+- `npm run test -w @adotapet/web -- mock-server`: executa apenas os testes do mock-server.
+- `npm run test:backend`: executa os testes da API real (workspace `@adotapet/api`).
+
+Os testes do frontend (jsdom) geralmente mockam `apps/web/src/lib/api` e não dependem do processo do mock-server em execução. Ao alterar o contrato, mantenha alinhados o mock, `packages/shared` e as rotas da API.
+
+## Dados e persistência
+
+| Arquivo                             | Papel                                                                                                           |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `apps/web/mock-server/db.seed.json` | Seed **versionado**: contas de demonstração, pets, perfis, favoritos, solicitações, notificações e outros dados |
+| `apps/web/mock-server/db.json`      | Banco em uso. Criado a partir do seed na primeira execução e **ignorado pelo git**                              |
+
+Os dados (favoritos, perfil, solicitações, buscas salvas, notificações, mensagens etc.) **persistem entre recarregamentos e reinícios**, porque ficam no `db.json`.
+
+```bash
+npm run mock:reset   # copia o seed sobre o db.json e volta aos dados originais
+```
+
+> **Já tinha um `db.json` de uma versão anterior?** Rode `npm run mock:reset`. Sem isso o servidor sobe, mas o perfil pode aparecer com `isComplete: false` (campos ausentes em `missingFields`) e `POST /requests` pode responder 422 até o perfil ser preenchido.
+
+O seed inclui pets e solicitações em diferentes estados para exercitar os fluxos do produto (ex.: solicitações aprovadas, recusadas, canceladas e em análise, além de notificações de exemplo na conta `demo`). Consulte `apps/web/mock-server/db.seed.json` para o conteúdo exato.
 
 ## Rotas
 
@@ -214,12 +246,21 @@ Regras adicionais:
 
 `details` é opcional e, quando existe, é uma lista de `{ field, message }`.
 
-## Testes
+## Testes automatizados do mock-server
 
-- `mock-server/server.test.js` (Vitest + supertest, banco em memória): cobre pets, perfil, solicitações, transições e favoritos, incluindo cada código de erro.
-- `mock-server/contract.test.js`: valida as respostas **reais** do servidor (`GET /me/requests`, `GET /requests/:id`, `POST /requests` e cancelamento) contra os schemas Zod do frontend. Foi criado depois de um bug em que a lista de solicitações ficava em "Carregando…" no navegador por uma diferença de contrato que os testes unitários não pegavam.
+- `apps/web/mock-server/server.test.js` (Vitest + supertest, banco em memória, ambiente `node`): cobre regras de negócio e códigos de erro das rotas simuladas.
+- `apps/web/mock-server/contract.test.js` (Vitest + supertest, ambiente `node`): valida respostas do servidor contra os schemas Zod de `@adotapet/shared`, ajudando a detectar divergências de contrato.
 
-Os dois rodam no ambiente `node` (`// @vitest-environment node`), enquanto os testes do frontend rodam em `jsdom`.
+Comandos:
+
+```bash
+npm test                                          # suíte de todos os workspaces
+npm run test -w @adotapet/web -- mock-server      # apenas testes do mock-server
+npm run test -w @adotapet/web -- server.test.js
+npm run test -w @adotapet/web -- contract.test.js
+```
+
+Os testes do frontend rodam em `jsdom` e normalmente usam mocks da camada HTTP; os da API rodam separadamente com `npm run test:backend`. Ao alterar o contrato, mantenha alinhados `apps/web/mock-server/`, `packages/shared/` e `apps/api/src/`.
 
 ## Limitações conhecidas
 

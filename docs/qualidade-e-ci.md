@@ -2,16 +2,20 @@
 
 ## Scripts
 
-| Script                 | O que faz                                                        |
-| ---------------------- | ---------------------------------------------------------------- |
-| `npm run lint`         | ESLint (typescript-eslint, react-hooks, react-refresh, jsx-a11y) |
-| `npm run lint:fix`     | ESLint corrigindo o que for possível                             |
-| `npm run format`       | Prettier reescrevendo os arquivos                                |
-| `npm run format:check` | Prettier só verificando (é o que o CI usa)                       |
-| `npm run typecheck`    | `tsc -b --noEmit`                                                |
-| `npm test`             | Vitest em execução única                                         |
-| `npm run test:watch`   | Vitest em modo watch                                             |
-| `npm run build`        | `tsc -b && vite build`                                           |
+| Script                         | O que faz                                                   |
+| ------------------------------ | ----------------------------------------------------------- |
+| `npm run lint`                 | ESLint em todos os workspaces                               |
+| `npm run lint:fix`             | ESLint corrigindo o que for possível em todos os workspaces |
+| `npm run format`               | Prettier reescrevendo os arquivos                           |
+| `npm run format:check`         | Prettier só verificando (é o que o CI usa)                  |
+| `npm run typecheck`            | Typecheck de `apps/web`, `apps/api` e `packages/shared`     |
+| `npm test`                     | Vitest dos três workspaces, em execução única               |
+| `npm run test:watch`           | Vitest em modo watch do web                                 |
+| `npm run build`                | Build de shared → web → api a partir da raiz                |
+| `npm run check:workspaces`     | MONO-01: workspaces declarados e instalados                 |
+| `npm run check:shared-imports` | MONO-03: shared importado por web e api                     |
+| `npm run check:deps`           | MONO-06: versão única de `zod` e `@casl/ability`            |
+| `npm run check:contract`       | MONO-04: guarda de contrato no typecheck do shared          |
 
 ## Verificações locais antes de abrir um PR
 
@@ -19,6 +23,11 @@ Rode na mesma ordem do CI:
 
 ```bash
 npm ci
+npm run check:workspaces
+npm run check:shared-imports
+npm run check:deps
+npm run check:contract
+npm run db:generate
 npm run lint
 npm run format:check
 npm run typecheck
@@ -28,7 +37,9 @@ npm run build
 
 ## Integração contínua
 
-O workflow `.github/workflows/ci.yml` roda em **todo pull request** e em **push na `main`**, no Node 22: `npm ci` → `lint` → `format:check` → `typecheck` → `test` → `build`.
+O workflow `.github/workflows/ci.yml` roda em **todo pull request** e em **push na `main`**, no Node 22. Ele instala os três workspaces e executa, para **cada workspace**, lint, formatação, tipos, testes e build. Os nomes dos passos carregam os IDs `MONO-01` a `MONO-06`; veja o [catálogo do monorepo](testes/monorepo.md).
+
+Há também o job **Backend — #47 padrões transversais**, com lint, typecheck, testes e build da API. Ele usa o secret `TEST_DATABASE_URL` (uma URL do Postgres na nuvem com permissão para criar um database separado). Sem o secret, `INF-11` e `INF-12` são ignorados com aviso e os outros testes da API continuam valendo; configure o secret para que a integração com o banco também rode no CI. O projeto não usa Docker.
 
 - **Ele só valida. Não há deploy** (nem preview) em lugar nenhum.
 - Em pull requests, o GitHub executa o workflow sobre o **resultado da mescla com a branch de destino**. Por isso um PR pode passar sozinho e quebrar depois de outro entrar, e por isso vale atualizar o PR com a `dev` e esperar o CI antes de mesclar.
@@ -42,17 +53,17 @@ O workflow `.github/workflows/ci.yml` roda em **todo pull request** e em **push 
 
 ## Tailwind
 
-O Tailwind é processado pelo Vite (`@tailwindcss/vite`), então não há `tailwind.config` nem etapa extra no CI: o `npm run build` falha se `src/index.css` quebrar. Uma classe que não existe simplesmente não aplica, sem erro. Por isso o visual das telas alteradas deve ser conferido no navegador.
+O Tailwind é processado pelo Vite (`@tailwindcss/vite`), então não há `tailwind.config` nem etapa extra no CI: o `npm run build` falha se `apps/web/src/index.css` quebrar. Uma classe que não existe simplesmente não aplica, sem erro. Por isso o visual das telas alteradas deve ser conferido no navegador.
 
 ## TypeScript
 
-Modo `strict`, com `noUnusedLocals`, `noUnusedParameters` e `noFallthroughCasesInSwitch`. O `tsconfig.node.json` usa `noEmit`, e os `*.tsbuildinfo` ficam fora do git.
+Modo `strict`, com `noUnusedLocals`, `noUnusedParameters` e `noFallthroughCasesInSwitch` em todos os workspaces. Cada pacote tem seu `tsconfig.json`; o web usa `tsconfig.app.json`/`tsconfig.node.json` com `noEmit`, e os `*.tsbuildinfo` ficam fora do git. O build do `@adotapet/shared` roda antes do typecheck de web e api para que os `.d.ts` estejam disponíveis.
 
 ## Testes
 
 - **Ferramentas:** Vitest 5, Testing Library (`@testing-library/react`, `jest-dom`, `user-event`), jsdom e supertest.
-- **Situação em 05/10/2026:** **169 testes em 24 arquivos**, todos passando na branch `refact/dependencies-docs`.
-- **Onde ficam:** ao lado do código (`Componente.test.tsx`), mais `src/test/` para utilitários e `mock-server/*.test.js` para a API simulada.
+- **Execução:** `npm test` delega para `vitest run` de cada workspace; a suíte atual passeia por web (jsdom + mock-server), api (node + supertest) e shared (schemas).
+- **Onde ficam:** ao lado do código (`Componente.test.tsx`), mais `apps/web/src/test/` para utilitários, `apps/web/mock-server/*.test.js` para a API simulada, `apps/api/src/*.test.ts` para a API real e `packages/shared/src/*.test.ts` para os schemas.
 
 ### Estratégia
 
@@ -64,9 +75,12 @@ Modo `strict`, com `noUnusedLocals`, `noUnusedParameters` e `noFallthroughCasesI
 | Componentes             | Biblioteca de UI (classes do Tailwind, `cx` e repasse de `ref` ao react-hook-form), `ErrorBoundary`, `ConfirmDialog`, `Layout`, `PetCard` |
 | Cliente HTTP            | Montagem de URL, listas em `query`, erros e `204`                                                                                         |
 | API simulada            | Regras de negócio e todos os códigos de erro                                                                                              |
-| **Contrato**            | Respostas reais do mock contra os schemas Zod do frontend                                                                                 |
+| **Contrato**            | Respostas reais do mock contra os schemas Zod de `@adotapet/shared`                                                                       |
+| **API real (infra)**    | `INF-01` a `INF-12`: config, erros, CORS, helmet, rate limit, body, logs, health, OpenAPI, injeção e integração com banco de teste        |
 
-### Utilitários de teste (`src/test`)
+Os testes da API gravam em um database separado do Postgres na nuvem, criado pelo `globalSetup` do Vitest e limpo entre os testes; veja [infra-api.md](testes/infra-api.md).
+
+### Utilitários de teste (`apps/web/src/test`)
 
 - `renderWithProviders(ui, { route })`: renderiza dentro de `QueryClientProvider` (sem repetição) e `MemoryRouter`, e devolve o `queryClient`.
 - `fixtures/pets.ts`, `fixtures/profile.ts`, `fixtures/requests.ts` e `petFixture.ts`: dados de exemplo (`makeRequest`, `validProfile`, `petFixtures`).

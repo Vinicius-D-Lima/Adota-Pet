@@ -2,13 +2,13 @@
 
 Catálogo dos testes que o backend do AdotaPet deve ter, com **238 testes** em 26 módulos (107 funcionais, 112 de segurança e 19 de integração ou infraestrutura). Cada teste tem um ID estável e uma explicação do que prova e de como é feito.
 
-> **Estado:** o backend ainda não existe. Este catálogo é a **especificação** dos testes, escrita antes do código, e cada issue de backend traz a lista dos seus testes em uma seção "Testes obrigatórios". Conforme os testes forem implementados, a coluna "Como é testado" deve ser mantida em dia.
+> **Estado:** este catálogo nasceu como especificação, antes da implementação do backend. Já estão implementados os 6 testes `MONO` ([monorepo.md](monorepo.md)) e os 12 testes `INF` ([infra-api.md](infra-api.md)); os demais IDs abaixo ainda descrevem o contrato futuro. Cada issue de backend traz a lista dos seus testes em uma seção "Testes obrigatórios". À medida que os testes são implementados, a coluna "Como é testado" deve ser mantida em dia.
 
 ## Convenção
 
 - **ID:** prefixo do módulo e número com dois dígitos, por exemplo `AUTH-07`. O ID nunca é reaproveitado: se um teste for removido, o número fica vago.
 - **No código:** o nome do teste começa com o ID entre colchetes, por exemplo `it('[AUTH-07] rejeita JWT com alg none', ...)`. Assim `grep "\[AUTH-07\]"` acha o teste e o documento.
-- **Ferramentas:** Vitest e supertest para a API, com o Postgres de teste do Docker. Nada de mocks do banco: os testes de segurança de autorização só valem se a consulta real rodar.
+- **Ferramentas:** Vitest e supertest para a API, com um **database de teste dedicado no mesmo Postgres da nuvem** (sufixo `_test`, criado pelo setup; sem Docker). Nada de mocks do banco nos testes de integração: a consulta real precisa rodar.
 - **Tipos:** _Funcional_ (regra de negócio), _Segurança_ (tenta quebrar a regra de acesso, de dado ou de entrada) e _Integração_ (infraestrutura e pipeline).
 - **Segurança sempre com a tentativa de ataque:** o teste faz o que um atacante faria (usa o id de outro usuário, adultera o token, envia o payload de injeção) e confere que a API nega.
 - **Como adicionar um teste:** acrescente a linha ao arquivo do módulo com o próximo número livre, escreva o teste com o ID no nome e atualize a seção "Testes obrigatórios" da issue.
@@ -18,7 +18,7 @@ Catálogo dos testes que o backend do AdotaPet deve ter, com **238 testes** em 2
 | Módulo                                                                 | Issue                                                         | Prefixo | Funcionais | Segurança | Integração |   Total |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------- | ------- | ---------: | --------: | ---------: | ------: |
 | [Monorepo (npm workspaces)](monorepo.md)                               | [#3](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/3)   | `MONO`  |          1 |         0 |          5 |       6 |
-| [Banco PostgreSQL em Docker](banco.md)                                 | [#9](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/9)   | `DB`    |          0 |         2 |          5 |       7 |
+| [Banco PostgreSQL na nuvem](banco.md)                                  | [#9](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/9)   | `DB`    |          0 |         2 |          5 |       7 |
 | [Padrões transversais da API](infra-api.md)                            | [#47](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/47) | `INF`   |          4 |         7 |          1 |      12 |
 | [Usuários e autenticação](auth.md)                                     | [#48](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/48) | `AUTH`  |          5 |        11 |          0 |      16 |
 | [Perfil do adotante](perfil.md)                                        | [#18](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/18) | `PERF`  |          5 |         3 |          0 |       8 |

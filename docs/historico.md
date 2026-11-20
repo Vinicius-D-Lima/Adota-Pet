@@ -49,7 +49,7 @@ Linha do tempo do que foi feito, em ordem de mescla na `dev` (datas em UTC, de 2
 | #80 | Selos de saúde, tempo disponível e preferências do perfil                | #54   | 05/10       |
 | #81 | Acessibilidade: teclado, foco, leitores de tela, movimento e contraste   | #57   | 05/10       |
 | #82 | **Revert** do #81                                                        | -     | 05/10       |
-| #79 | Extrai componentes reutilizáveis para `src/components/ui`                | #6    | 05/10       |
+| #79 | Extrai componentes reutilizáveis para `apps/web/src/components/ui`       | #6    | 05/10       |
 
 > **Autoria:** "Vinicius" e "Igor" são as duas pessoas que contribuíram. Vários PRs foram preparados com apoio do Claude Code.
 

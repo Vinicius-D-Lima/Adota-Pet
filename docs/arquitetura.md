@@ -2,79 +2,93 @@
 
 ## Stack
 
-| Camada               | Tecnologia                                                                         |
-| -------------------- | ---------------------------------------------------------------------------------- |
-| Interface            | React 18, TypeScript (modo `strict`)                                               |
-| Build e dev server   | Vite 6 (com proxy `/api` → API simulada)                                           |
-| Rotas                | react-router-dom 7                                                                 |
-| Estado do servidor   | TanStack Query v5 (`useQuery`, `useInfiniteQuery`, `useMutation`, devtools em dev) |
-| Estilos              | Tailwind CSS 4 (plugin `@tailwindcss/vite`, tokens no `@theme`), `tailwind-merge`  |
-| Formulários          | react-hook-form 7 + `@hookform/resolvers` (`zodResolver`)                          |
-| Validação em runtime | Zod 4                                                                              |
-| Ícones               | lucide-react                                                                       |
-| API simulada         | json-server 0.17.4 (Express por baixo)                                             |
-| Backend              | Express 5 + TypeScript (workspace `backend/`, scaffold inicial, CORS habilitado)   |
-| Banco de dados       | PostgreSQL + Prisma 7 (migrations versionadas, cliente em `backend/src/generated`) |
-| Testes               | Vitest 5, Testing Library, jsdom, supertest (API simulada e backend)               |
-| Qualidade            | ESLint 9 (flat config), Prettier, GitHub Actions                                   |
+| Camada                 | Tecnologia                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| Interface              | React 18, TypeScript (modo `strict`)                                                 |
+| Build e dev server     | Vite 6 (`apps/web`, com proxy `/api` → API em 3002 ou mock em 3001)                  |
+| Rotas                  | react-router-dom 7                                                                   |
+| Estado do servidor     | TanStack Query v5 (`useQuery`, `useInfiniteQuery`, `useMutation`, devtools em dev)   |
+| Estilos                | Tailwind CSS 4 (plugin `@tailwindcss/vite`, tokens no `@theme`), `tailwind-merge`    |
+| Formulários            | react-hook-form 7 + `@hookform/resolvers` (`zodResolver`)                            |
+| Validação em runtime   | Zod 4                                                                                |
+| Ícones                 | lucide-react                                                                         |
+| API simulada           | json-server 0.17.4 (Express por baixo)                                               |
+| Backend                | Express 5 + TypeScript (`@adotapet/api` em `apps/api/`, CORS restrito, helmet, pino) |
+| Contrato compartilhado | schemas Zod em `@adotapet/shared` (`packages/shared/`)                               |
+| Banco de dados         | PostgreSQL na nuvem (Neon) + Prisma 7 (migrations, database `_test` para testes)     |
+| Testes                 | Vitest 5, Testing Library, jsdom, supertest (API simulada e backend)                 |
+| Qualidade              | ESLint 9 (flat config), Prettier, GitHub Actions                                     |
 
-Não há biblioteca de estado global: o estado compartilhado vive no cache do TanStack Query. Os estilos são classes utilitárias do **Tailwind CSS 4**, com os tokens do projeto (cores, fontes e sombra) declarados em `src/index.css`. Os formulários (questionário e perfil) usam **react-hook-form** com o mesmo schema Zod do contrato.
+A API segue camadas por módulo: `routes/` (HTTP) → serviços/funções de domínio → `db.ts` (acesso a dados). A infraestrutura é transversal: `config.ts` valida o ambiente antes de abrir a porta, `validate.ts` aplica os schemas compartilhados nas entradas, `http.ts` padroniza saídas de erro, `logger.ts` registra cada requisição com `requestId` e `openapi.ts` gera a documentação das rotas reais. Não há Docker: banco de desenvolvimento e de teste ficam no Neon.
+
+Não há biblioteca de estado global: o estado compartilhado vive no cache do TanStack Query. Os estilos são classes utilitárias do **Tailwind CSS 4**, com os tokens do projeto (cores, fontes e sombra) declarados em `apps/web/src/index.css`. Os formulários (questionário e perfil) usam **react-hook-form** com o mesmo schema Zod do contrato.
 
 ## Estrutura de pastas
 
 ```
 .
-├── .github/workflows/ci.yml      # CI: lint, formatação, tipos, testes e build
-├── docs/                         # esta documentação
-├── backend/                      # workspace do backend Express (monorepo npm workspaces)
-│   ├── prisma/
-│   │   ├── schema.prisma         # contrato de dados (models) — Prisma + PostgreSQL
-│   │   ├── migrations/           # migrations versionadas (geradas por db:migrate)
-│   │   └── seed.ts               # dados iniciais (db:seed)
-│   ├── prisma.config.ts          # configuração do Prisma CLI (DATABASE_URL, seed)
-│   ├── src/app.ts                # criação do app (JSON + CORS)
-│   ├── src/db.ts                 # cliente Prisma (instância única, adapter pg)
-│   ├── src/routes/health.ts      # GET /health
-│   ├── src/server.ts             # listen (PORT, padrão 3002)
-│   └── src/app.test.ts           # supertest: saúde e CORS
-├── mock-server/                  # API simulada (json-server)
-│   ├── server.js                 # rotas, validação e regras de negócio
-│   ├── reset.js                  # restaura db.json a partir do seed
-│   ├── db.seed.json              # dados iniciais versionados
-│   ├── db.json                   # banco em uso (ignorado pelo git)
-│   ├── server.test.js            # regras do servidor
-│   └── contract.test.js          # respostas reais x schemas do frontend
-├── public/favicon.svg
-└── src/
-    ├── main.tsx                  # entrada: providers, roteador e Error Boundary raiz
-    ├── App.tsx                   # rotas, lazy loading e Error Boundary por rota
-    ├── types.ts                  # tipos públicos (derivados dos schemas Zod)
-    ├── index.css                 # Tailwind: @import, tokens (@theme) e base
-    ├── components/               # componentes da aplicação
-    │   └── ui/                   # biblioteca de componentes reutilizáveis
-    ├── pages/                    # uma página por rota
-    ├── hooks/                    # acesso à API via TanStack Query
-    ├── schemas/                  # schemas Zod: contrato de dados do frontend
-    ├── lib/                      # cliente HTTP, ApiError e QueryClient
-    ├── utils/                    # funções puras (compatibilidade, status, datas...)
-    └── test/                     # utilitários e fixtures de teste
+├── .github/workflows/ci.yml       # CI com os IDs MONO-01 a MONO-06
+├── docs/                          # esta documentação
+├── scripts/                       # checagens MONO-01, MONO-03, MONO-04, MONO-06
+├── apps/
+│   ├── web/                       # @adotapet/web — React + Vite
+│   │   ├── mock-server/           # API simulada (json-server), seed e testes
+│   │   ├── scripts/               # dev-mock.js
+│   │   ├── src/
+│   │   │   ├── main.tsx           # providers, roteador e Error Boundary raiz
+│   │   │   ├── App.tsx            # rotas, lazy loading e Error Boundary por rota
+│   │   │   ├── types.ts           # reexporta os tipos de @adotapet/shared
+│   │   │   ├── index.css          # Tailwind: @import, tokens (@theme) e base
+│   │   │   ├── components/        # componentes da aplicação
+│   │   │   │   └── ui/            # biblioteca de componentes reutilizáveis
+│   │   │   ├── pages/             # uma página por rota
+│   │   │   ├── hooks/             # acesso à API via TanStack Query
+│   │   │   ├── lib/               # cliente HTTP, ApiError e QueryClient
+│   │   │   ├── utils/             # funções puras (compatibilidade, status, datas...)
+│   │   │   └── test/              # utilitários e fixtures de teste
+│   │   ├── index.html
+│   │   └── vite.config.ts         # proxy /api → 3002 (api) ou 3001 (mock)
+│   └── api/                       # @adotapet/api — Express + Prisma
+│       ├── prisma/
+│       │   ├── schema.prisma      # contrato de dados (models)
+│       │   ├── migrations/        # migrations versionadas
+│       │   └── seed.ts            # dados iniciais (db:seed)
+│       ├── prisma.config.ts       # configuração do Prisma CLI
+│       ├── test/                  # setup do database _test e limpeza entre testes
+│       └── src/
+│           ├── app.ts             # helmet, CORS, JSON, logs, rate limit, erros, rotas
+│           ├── config.ts          # variáveis validadas por Zod (fail-fast)
+│           ├── logger.ts          # pino com requestId e redação de dados sensíveis
+│           ├── validate.ts        # body/query/params via @adotapet/shared
+│           ├── http.ts            # erro padrão { statusCode, error, message, details? }
+│           ├── openapi.ts         # /docs e /docs/openapi.json
+│           ├── routes/            # routers sob /api e /health
+│           ├── context.ts         # usuário de demonstração via cabeçalhos
+│           ├── db.ts              # cliente Prisma (adapter pg)
+│           ├── server.ts          # valida config, listen (PORT, padrão 3002)
+│           └── infra.test.ts      # testes INF-01 a INF-12 (supertest)
+└── packages/
+    └── shared/                    # @adotapet/shared — contrato único
+        └── src/                   # schemas Zod e index.ts
 ```
 
 ## Fluxo de dados
 
 ```
-Página ──usa──▶ hook (TanStack Query) ──chama──▶ api (fetch) ──▶ /api (proxy) ──▶ json-server
-   ▲                    │                                                              │
-   │                    └── valida a resposta com um schema Zod ◀────────────────────────┘
+Página ──usa──▶ hook (TanStack Query) ──chama──▶ api (fetch) ──▶ /api (proxy do Vite)
+   ▲                    │                                             │
+   │                    │                                             ├──▶ @adotapet/api (3002, padrão)
+   │                    │                                             └──▶ mock-server (3001, dev:mock)
+   │                    └── valida a resposta com @adotapet/shared ◀────┘
    └── lê data / isPending / isError do cache
 ```
 
 1. A **página** nunca chama `fetch`. Ela usa um **hook** (`usePets`, `useFavorites`, `useAdoptionRequests`, `useAdopterProfile`).
-2. O hook chama o cliente `api` (`src/lib/api.ts`) e **valida a resposta com um schema Zod**. Se o servidor devolver algo fora do contrato, o erro aparece na hora, não como um `undefined` perdido na tela.
+2. O hook chama o cliente `api` (`apps/web/src/lib/api.ts`) e **valida a resposta com um schema de `@adotapet/shared`**. Se o servidor devolver algo fora do contrato, o erro aparece na hora, não como um `undefined` perdido na tela.
 3. O resultado fica no **cache do TanStack Query**, compartilhado por toda a aplicação. O contador do menu, o coração do cartão e a página de favoritos leem o mesmo dado.
 4. Mutações (`useMutation`) invalidam ou atualizam o cache, e as telas se atualizam sozinhas.
 
-### Cliente HTTP (`src/lib/api.ts`)
+### Cliente HTTP (`apps/web/src/lib/api.ts`)
 
 - Métodos `get`, `post`, `put`, `patch` e `delete`, tipados.
 - Base da URL em `VITE_API_URL` (padrão `/api`).
@@ -82,7 +96,7 @@ Página ──usa──▶ hook (TanStack Query) ──chama──▶ api (fetch
 - Corpo JSON ou `FormData` (multipart, para uploads futuros); resposta `204` devolve `undefined`.
 - Suporta `AbortSignal`, e o cancelamento não vira erro de API.
 
-### Erros (`src/lib/ApiError.ts`)
+### Erros (`apps/web/src/lib/ApiError.ts`)
 
 Toda falha vira um `ApiError` com `statusCode`, `message` e `details`:
 
@@ -93,7 +107,7 @@ Toda falha vira um `ApiError` com `statusCode`, `message` e `details`:
 
 Formato de erro do servidor: `{ statusCode, error, message, details }`.
 
-### Cache e repetição (`src/lib/queryClient.ts`)
+### Cache e repetição (`apps/web/src/lib/queryClient.ts`)
 
 - `staleTime` de 60 s e `refetchOnWindowFocus` desligado.
 - Repetição automática: erros **4xx não são repetidos**; erros de rede e 5xx são repetidos até 2 vezes.
@@ -107,9 +121,9 @@ Formato de erro do servidor: `{ statusCode, error, message, details }`.
 | `useAdoptionRequests` | `['adoption-requests', 'list']`, `[..., 'detail', id]` |
 | `useAdopterProfile`   | `['adopter-profile']`                                  |
 
-## Schemas e tipos (`src/schemas`)
+## Schemas e tipos (`packages/shared`)
 
-Os schemas Zod são a **fonte única** do contrato de dados. Os tipos TypeScript (`Pet`, `Profile`, `QuestionnaireAnswers`, `AdoptionRequest`...) são derivados deles e reexportados por `src/types.ts`.
+Os schemas Zod são a **fonte única** do contrato de dados. Eles vivem em `@adotapet/shared`, são exportados por `packages/shared/src/index.ts` e são importados por `apps/web` e `apps/api`. Os tipos TypeScript (`Pet`, `Profile`, `QuestionnaireAnswers`, `AdoptionRequest`...) são derivados deles e reexportados ao frontend por `apps/web/src/types.ts`.
 
 | Schema                | Papel                                                                                    |
 | --------------------- | ---------------------------------------------------------------------------------------- |
@@ -120,7 +134,7 @@ Os schemas Zod são a **fonte única** do contrato de dados. Os tipos TypeScript
 
 `ProfileDraft` é o perfil como o formulário o enxerga: campos de texto e booleanos podem ser `''` enquanto a pessoa não respondeu.
 
-O arquivo `mock-server/contract.test.js` valida as **respostas reais** do servidor contra estes schemas, para que mock e frontend não se afastem em silêncio.
+O arquivo `apps/web/mock-server/contract.test.js` valida as **respostas reais** do mock contra estes schemas compartilhados, para que mock, frontend e API não se afastem em silêncio. A API também deriva `PROFILE_FIELDS` de `profileSchema` em `apps/api/src/validation.ts` (MONO-03).
 
 ## Roteamento e carregamento
 
@@ -140,7 +154,7 @@ O arquivo `mock-server/contract.test.js` valida as **respostas reais** do servid
 
 `useToggleFavorite` atualiza o cache antes da resposta, enfileira as chamadas (`scope`) para que cheguem na ordem dos cliques, desfaz **só o pet** que falhou, mostra um aviso e só ressincroniza com o servidor quando a última mutação da fila termina.
 
-## Funções puras (`src/utils`)
+## Funções puras (`apps/web/src/utils`)
 
 | Arquivo                  | Função                                                                                                                      |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |

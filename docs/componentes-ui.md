@@ -1,8 +1,8 @@
 # Componentes
 
-Há dois grupos: a **biblioteca de UI** (`src/components/ui`), genérica e sem regra de negócio, e os **componentes da aplicação** (`src/components`), que conhecem o domínio de adoção.
+Há dois grupos: a **biblioteca de UI** (`apps/web/src/components/ui`), genérica e sem regra de negócio, e os **componentes da aplicação** (`apps/web/src/components`), que conhecem o domínio de adoção.
 
-## Biblioteca de UI (`src/components/ui`)
+## Biblioteca de UI (`apps/web/src/components/ui`)
 
 Importe sempre do índice:
 
@@ -52,9 +52,9 @@ Os estilos são classes do **Tailwind CSS** escritas no próprio componente (nã
 - Classes específicas de uma tela vão no `className` do componente; o `cx` resolve o conflito com as classes-base.
 - O ESLint reconhece `Input`, `Select` e `Textarea` como controles de formulário (`jsx-a11y/label-has-associated-control`), então o `Field` envolvendo um deles conta como rótulo associado.
 - **Botões próprios (fora da biblioteca):** o coração de favoritar, o botão do menu e os botões de alternância do filtro de porte têm estilo específico e continuam como `<button>` comuns.
-- Os testes da biblioteca estão em `src/components/ui/ui.test.tsx`.
+- Os testes da biblioteca estão em `apps/web/src/components/ui/ui.test.tsx`.
 
-## Componentes da aplicação (`src/components`)
+## Componentes da aplicação (`apps/web/src/components`)
 
 | Componente            | O que faz                                                                                                                                                                      |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
