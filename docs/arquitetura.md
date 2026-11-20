@@ -13,7 +13,9 @@
 | Validação em runtime | Zod 4                                                                              |
 | Ícones               | lucide-react                                                                       |
 | API simulada         | json-server 0.17.4 (Express por baixo)                                             |
-| Testes               | Vitest 5, Testing Library, jsdom, supertest (API simulada)                         |
+| Backend              | Express 5 + TypeScript (workspace `backend/`, scaffold inicial, CORS habilitado)   |
+| Banco de dados       | PostgreSQL + Prisma 7 (migrations versionadas, cliente em `backend/src/generated`) |
+| Testes               | Vitest 5, Testing Library, jsdom, supertest (API simulada e backend)               |
 | Qualidade            | ESLint 9 (flat config), Prettier, GitHub Actions                                   |
 
 Não há biblioteca de estado global: o estado compartilhado vive no cache do TanStack Query. Os estilos são classes utilitárias do **Tailwind CSS 4**, com os tokens do projeto (cores, fontes e sombra) declarados em `src/index.css`. Os formulários (questionário e perfil) usam **react-hook-form** com o mesmo schema Zod do contrato.
@@ -24,6 +26,17 @@ Não há biblioteca de estado global: o estado compartilhado vive no cache do Ta
 .
 ├── .github/workflows/ci.yml      # CI: lint, formatação, tipos, testes e build
 ├── docs/                         # esta documentação
+├── backend/                      # workspace do backend Express (monorepo npm workspaces)
+│   ├── prisma/
+│   │   ├── schema.prisma         # contrato de dados (models) — Prisma + PostgreSQL
+│   │   ├── migrations/           # migrations versionadas (geradas por db:migrate)
+│   │   └── seed.ts               # dados iniciais (db:seed)
+│   ├── prisma.config.ts          # configuração do Prisma CLI (DATABASE_URL, seed)
+│   ├── src/app.ts                # criação do app (JSON + CORS)
+│   ├── src/db.ts                 # cliente Prisma (instância única, adapter pg)
+│   ├── src/routes/health.ts      # GET /health
+│   ├── src/server.ts             # listen (PORT, padrão 3002)
+│   └── src/app.test.ts           # supertest: saúde e CORS
 ├── mock-server/                  # API simulada (json-server)
 │   ├── server.js                 # rotas, validação e regras de negócio
 │   ├── reset.js                  # restaura db.json a partir do seed

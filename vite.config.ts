@@ -19,5 +19,8 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
+    // Só os testes do frontend e do mock: os do backend (workspace) rodam com o
+    // Vitest próprio do backend, em ambiente node.
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'mock-server/**/*.test.js', 'vite.config.test.js'],
   },
 })

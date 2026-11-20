@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "workspaces": [
+    "backend"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -11,6 +14,12 @@
     "mock": "node mock-server/server.js",
     "mock:reset": "node mock-server/reset.js",
     "dev:mock": "node scripts/dev-mock.js",
+    "backend": "npm run dev -w @adotapet/backend",
+    "dev:all": "concurrently -n web,api -c cyan,magenta \"npm run dev\" \"npm run backend\"",
+    "typecheck:backend": "npm run typecheck -w @adotapet/backend",
+    "test:backend": "npm run test -w @adotapet/backend",
+    "build:backend": "npm run build -w @adotapet/backend",
+    "db:generate": "npm run db:generate -w @adotapet/backend",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",

@@ -1,0 +1,10 @@
+// Contrato de dados do banco (decisão #21: Prisma com migrations versionadas).
+// Adicione os models aqui e rode `npm run db:migrate` (em backend/) para versionar.
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}

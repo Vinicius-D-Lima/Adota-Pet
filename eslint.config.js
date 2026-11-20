@@ -7,14 +7,14 @@ import tseslint from 'typescript-eslint'
 import prettier from 'eslint-config-prettier'
 
 export default tseslint.config(
-  { ignores: ['dist', 'node_modules'] },
+  { ignores: ['**/dist', 'node_modules', 'backend/src/generated'] },
   {
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommended,
       jsxA11y.flatConfigs.recommended,
     ],
-    files: ['**/*.{ts,tsx}'],
+    files: ['src/**/*.{ts,tsx}', 'vite.config.ts'],
     languageOptions: { globals: globals.browser },
     plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
     rules: {
@@ -25,6 +25,12 @@ export default tseslint.config(
       ],
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
+  },
+  {
+    // Backend (workspace): Node, sem regras de React.
+    files: ['backend/**/*.ts'],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: { globals: globals.node },
   },
   prettier,
 )

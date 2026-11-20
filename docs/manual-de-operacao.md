@@ -4,14 +4,19 @@ Para quem mantém o AdotaPet rodando: subir e derrubar, manter os dados do mock,
 
 ## 1. Rotina de execução
 
-| Tarefa                        | Comando              | Observação                                     |
-| ----------------------------- | -------------------- | ---------------------------------------------- |
-| Subir frontend + API simulada | `npm run dev:mock`   | Uso diário                                     |
-| Subir só o frontend           | `npm run dev`        | Precisa de uma API acessível em `VITE_API_URL` |
-| Subir só a API simulada       | `npm run mock`       | Porta `MOCK_PORT` (3001)                       |
-| Restaurar os dados            | `npm run mock:reset` | Copia `db.seed.json` sobre `db.json`           |
-| Gerar o build                 | `npm run build`      | Saída em `dist/`                               |
-| Servir o build localmente     | `npm run preview`    | Porta 4173, com a API simulada rodando         |
+| Tarefa                        | Comando                                   | Observação                                     |
+| ----------------------------- | ----------------------------------------- | ---------------------------------------------- |
+| Subir frontend + API simulada | `npm run dev:mock`                        | Uso diário                                     |
+| Subir só o frontend           | `npm run dev`                             | Precisa de uma API acessível em `VITE_API_URL` |
+| Subir só a API simulada       | `npm run mock`                            | Porta `MOCK_PORT` (3001)                       |
+| Subir só o backend            | `npm run backend`                         | Porta `PORT` (3002), rota `GET /health`        |
+| Subir frontend + backend      | `npm run dev:all`                         | Vite (5173) + Express (3002)                   |
+| Versionar mudança no banco    | `npm run db:migrate -w @adotapet/backend` | Prisma Migrate (scripts `db:*` em `backend/`)  |
+| Aplicar o seed do banco       | `npm run db:seed -w @adotapet/backend`    | Roda `backend/prisma/seed.ts`                  |
+| Restaurar os dados            | `npm run mock:reset`                      | Copia `db.seed.json` sobre `db.json`           |
+| Gerar o build                 | `npm run build`                           | Saída em `dist/`                               |
+| Gerar o build do backend      | `npm run build:backend`                   | Saída em `backend/dist/`                       |
+| Servir o build localmente     | `npm run preview`                         | Porta 4173, com a API simulada rodando         |
 
 Para encerrar, use `Ctrl+C` no terminal. Não há processo em segundo plano.
 
@@ -34,11 +39,14 @@ A próxima solicitação criada recebe `SOL-1043`. Aprovar e recusar são açõe
 
 ## 3. Configuração
 
-| Variável        | Padrão | Efeito                                                                              |
-| --------------- | ------ | ----------------------------------------------------------------------------------- |
-| `VITE_API_URL`  | `/api` | URL base que o frontend usa (definida em tempo de build)                            |
-| `MOCK_PORT`     | `3001` | Porta do json-server                                                                |
-| `MOCK_DELAY_MS` | `300`  | Latência simulada. Use `0` para testes e `1500` para ver os estados de carregamento |
+| Variável        | Padrão  | Efeito                                                                                            |
+| --------------- | ------- | ------------------------------------------------------------------------------------------------- |
+| `VITE_API_URL`  | `/api`  | URL base que o frontend usa (definida em tempo de build)                                          |
+| `MOCK_PORT`     | `3001`  | Porta do json-server                                                                              |
+| `MOCK_DELAY_MS` | `300`   | Latência simulada. Use `0` para testes e `1500` para ver os estados de carregamento               |
+| `PORT`          | `3002`  | Porta do backend Express (`backend/`)                                                             |
+| `DATABASE_URL`  | (vazio) | String de conexão do PostgreSQL usada pelo Prisma (`backend/.env`, copie do `.env.example`)       |
+| `CORS_ORIGIN`   | (vazio) | Origens liberadas pelo CORS do backend, separadas por vírgula. Vazio = reflete a origem do pedido |
 
 Exemplo: `MOCK_DELAY_MS=1500 MOCK_PORT=3002 npm run mock`.
 
@@ -47,6 +55,7 @@ Exemplo: `MOCK_DELAY_MS=1500 MOCK_PORT=3002 npm run mock`.
 1. `GET http://localhost:3001/pets?limit=1` deve responder 200 com `total`.
 2. `GET http://localhost:3001/me/adopter-profile` deve trazer `"isComplete": true` com o seed novo.
 3. Na interface, o menu deve mostrar o contador de favoritos (1) e de solicitações ativas (2: a `Aprovada` e a `Em análise`) logo depois do reset.
+4. Com o backend em `npm run backend`, `GET http://localhost:3002/health` deve responder 200 com `{"status":"ok"}`.
 
 ## 5. Rotina de qualidade (antes de abrir ou atualizar um PR)
 

@@ -46,6 +46,20 @@ O `dev:mock` pergunta o perfil de demonstração: adotante, instituição admini
 - `npm run mock` sobe só o mock; `npm run dev` sobe só o Vite.
 - `MOCK_DELAY_MS` (padrão `300`) controla a latência simulada; `MOCK_PORT` (padrão `3001`) muda a porta.
 
+### Backend (workspace)
+
+O repositório é um monorepo com **npm workspaces**: o frontend fica na raiz e o backend Express (TypeScript, com CORS) vive em `backend/`. Um comando sobe os dois:
+
+```bash
+npm run dev:all
+```
+
+- `npm run backend` sobe só o backend: http://localhost:3002 (rota `GET /health`).
+- `npm run typecheck:backend`, `npm run test:backend` e `npm run build:backend` rodam as checagens do backend.
+- Variáveis: `PORT` (padrão `3002`), `DATABASE_URL` (PostgreSQL, usada pelo Prisma) e `CORS_ORIGIN` (origens liberadas, separadas por vírgula; sem valor, a origem do pedido é refletida). Veja `backend/.env.example`.
+- **Banco de dados:** PostgreSQL com Prisma (decisões [#20](docs/decisoes.md) e [#21](docs/decisoes.md)). Copie `backend/.env.example` para `backend/.env`, aponte `DATABASE_URL` para o seu banco e use os scripts `db:*` (em `backend/`): `db:migrate` versiona mudanças, `db:seed` aplica dados iniciais, `db:studio` abre o visualizador e `db:generate` regenera o cliente (`backend/src/generated/`, ignorado pelo git).
+- O proxy do Vite continua apontando `/api` para o mock (3001); o backend ainda não serve as rotas da API.
+
 ### Dados do mock
 
 - `mock-server/db.seed.json` é o seed versionado. Na primeira execução ele é copiado para `mock-server/db.json` (ignorado pelo git), que guarda favoritos, perfil e solicitações entre recarregamentos e reinícios.
@@ -80,6 +94,12 @@ npm test
 ```
 
 Roda toda a suíte: o frontend (Vitest + Testing Library + jsdom) e a API simulada (Vitest + supertest), incluindo o teste de contrato. Veja [docs/qualidade-e-ci.md](docs/qualidade-e-ci.md).
+
+Para os testes do backend (Vitest + supertest, ambiente node):
+
+```bash
+npm run test:backend
+```
 
 Para gerar o build de produção (checagem de tipos + build do Vite):
 
@@ -129,9 +149,10 @@ Botões de ícone/alternância (favoritar e menu) seguem com estilo próprio. Mo
 | `npm run format:check` | Prettier apenas verificando (usado no CI)                        |
 | `npm test`             | Vitest (Testing Library + jsdom), execução única                 |
 | `npm run test:watch`   | Vitest em modo watch                                             |
+| `npm run test:backend` | Vitest do backend (supertest, ambiente node)                     |
 
 O workflow `.github/workflows/ci.yml` roda em todo PR e em push na `main`:
-`npm ci` → `lint` → `format:check` → `typecheck` → `test` → `build`.
+`npm ci` → `lint` → `format:check` → `typecheck` → `test` → `build` → `typecheck:backend` → `test:backend` → `build:backend`.
 
 ## Organização
 
@@ -149,6 +170,7 @@ src/
 ├── types.ts      tipos derivados dos schemas
 └── App.tsx       rotas, carregamento sob demanda e Error Boundary
 mock-server/      API simulada (json-server), seed e testes
+backend/          workspace do backend Express (TypeScript + CORS)
 docs/             documentação
 ```
 
