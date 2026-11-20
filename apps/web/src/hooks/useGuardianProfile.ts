@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { completeDemoProfile, getDemoPersonalData } from '../lib/demoAccount'
+import { isRealAuth } from '../lib/session'
 import type { GuardianProfile, GuardianProfileDraft } from '@adotapet/shared'
 import { calculateProfileCompletion } from '../utils/profileCompletion'
 
@@ -50,12 +51,14 @@ export function toGuardianProfile(response: GuardianProfileResponse): SavedGuard
   }
 }
 
-export function useGuardianProfile() {
+export function useGuardianProfile(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: guardianProfileKey,
     queryFn: async () => {
       const response = await api.get<GuardianProfileResponse>(PROFILE_PATH)
-      const personalData = getDemoPersonalData()
+      // Dados do mock nunca podem preencher o perfil de um usuário autenticado.
+      const personalData = isRealAuth() ? null : getDemoPersonalData()
       const personalDefaults = personalData
         ? {
             displayName:
@@ -103,7 +106,7 @@ export function useSaveGuardianProfile() {
       toGuardianProfile(await api.put<GuardianProfileResponse>(PROFILE_PATH, profile)),
     onSuccess: (profile) => {
       queryClient.setQueryData(guardianProfileKey, profile)
-      if (profile.isComplete) completeDemoProfile('/perfil?tipo=responsavel')
+      if (profile.isComplete && !isRealAuth()) completeDemoProfile('/perfil?tipo=responsavel')
     },
   })
 }

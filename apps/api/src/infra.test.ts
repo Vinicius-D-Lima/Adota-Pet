@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { hasTestDatabase } from '../test/database.js'
 import { resetTestDatabase } from '../test/reset.js'
 import { createApp } from './app.js'
+import { signAccessToken } from './auth.js'
 import { loadConfig } from './config.js'
 import { prisma } from './db.js'
 import { createLogger } from './logger.js'
@@ -17,6 +18,8 @@ describe('infraestrutura da API (#47)', () => {
   it('[INF-01] variável obrigatória ausente derruba a inicialização', () => {
     expect(() => loadConfig({ ...process.env, DATABASE_URL: undefined })).toThrow(/DATABASE_URL/)
     expect(() => loadConfig({ ...process.env, DATABASE_URL: '' })).toThrow(/DATABASE_URL/)
+    // #48: a chave de assinatura também é obrigatória e aparece na mensagem.
+    expect(() => loadConfig({ ...process.env, JWT_SECRET: undefined })).toThrow(/JWT_SECRET/)
   })
 
   it('[INF-02] erro de validação usa o formato padrão', async () => {
@@ -123,10 +126,16 @@ describe('infraestrutura da API (#47)', () => {
     } as DestinationStream
     const testLogger = createLogger({ level: 'debug', destination })
 
+    // A rota agora exige JWT: usa um token válido e um usuário em memória para
+    // chegar à validação Zod sem depender do banco.
+    const fakeUser = { id: 'inf-08', platformRole: 'USUARIO' } as const
+    vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(fakeUser as never)
+    const { token } = await signAccessToken(fakeUser)
+
     const response = await request(createApp({ logger: testLogger }))
       .put('/api/me/account')
       .set('Cookie', 'session=abc123')
-      .set('Authorization', 'Bearer token-super-secreto')
+      .set('Authorization', `Bearer ${token}`)
       .send({
         accountType: 'adopter',
         password: 'senhaSuperSecreta123',

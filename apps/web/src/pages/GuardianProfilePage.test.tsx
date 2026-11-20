@@ -6,7 +6,8 @@ import { renderWithProviders } from '../test/renderWithProviders'
 import { ProfilePage } from './ProfilePage'
 
 vi.mock('../lib/api', () => ({ api: { get: vi.fn(), put: vi.fn() } }))
-vi.mock('../lib/demoAccount', () => ({
+vi.mock('../lib/demoAccount', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/demoAccount')>()),
   getDemoProfilePath: () => '/perfil?tipo=responsavel',
   getDemoPersonalData: () => null,
   completeDemoProfile: vi.fn(),

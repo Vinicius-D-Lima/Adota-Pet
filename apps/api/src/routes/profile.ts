@@ -35,10 +35,67 @@ type AccountKey =
   | 'city'
   | 'state'
   | 'organizationName'
+  | 'responsibleName'
   | 'guardianType'
 
 const isBooleanField = (key: string) =>
   ['hasOutdoorArea', 'hasChildren', 'hasOtherPets', 'acceptsTerms'].includes(key)
+
+const defined = (patch: Record<string, unknown>) =>
+  Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined))
+
+/**
+ * Dados coletados no cadastro também precisam ir para as tabelas de perfil:
+ * `/me/adopter-profile` e `/me/guardian-profile` leem dessas tabelas, não de User.
+ * Sem isso o formulário de perfil aparece vazio logo após criar a conta.
+ */
+function profileFromAccount(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  normalized: Partial<Record<AccountKey, string>>,
+) {
+  return {
+    adopter: () => {
+      const patch = defined({
+        name: normalized.name,
+        cpf: normalized.cpf,
+        birthDate: normalized.birthDate,
+        email: normalized.email,
+        phone: normalized.phone,
+        zipCode: normalized.zipCode,
+        address: normalized.address,
+      })
+      const create: Prisma.AdopterProfileUncheckedCreateInput = { userId }
+      const update: Prisma.AdopterProfileUncheckedUpdateInput = {}
+      Object.assign(create, patch)
+      Object.assign(update, patch)
+      return tx.adopterProfile.upsert({ where: { userId }, create, update })
+    },
+    guardian: () => {
+      const city =
+        normalized.city && normalized.state
+          ? `${normalized.city}, ${normalized.state}`
+          : normalized.city
+      const patch = defined({
+        guardianType: normalized.guardianType,
+        displayName: normalized.organizationName || normalized.name || normalized.responsibleName,
+        legalName: normalized.responsibleName || normalized.name,
+        document: normalized.document,
+        email: normalized.email,
+        phone: normalized.phone,
+        zipCode: normalized.zipCode,
+        address: normalized.address,
+        city,
+        acceptsTerms: true,
+      })
+      const create: Prisma.GuardianProfileUncheckedCreateInput = { userId }
+      const update: Prisma.GuardianProfileUncheckedUpdateInput = {}
+      Object.assign(create, patch)
+      Object.assign(update, patch)
+      return tx.guardianProfile.upsert({ where: { userId }, create, update })
+    },
+  }
+}
 
 profileRouter.get('/me', async (req, res) => {
   const { user } = await currentUser(req)
@@ -140,13 +197,20 @@ profileRouter.put('/me/account', validate({ body: createAccountSchema }), async 
   }
   if (details.length) return sendError(res, 400, 'Validação falhou', details)
 
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: {
-      ...normalized,
-      role: guardian ? 'RESPONSAVEL' : 'ADOTANTE',
-      roles: [guardian ? 'GUARDIAN' : 'ADOPTER'],
-    },
+  const user = await prisma.$transaction(async (tx) => {
+    // `responsibleName` existe só no formulário: no banco ele vira `name`.
+    const { responsibleName: _responsibleName, ...userFields } = normalized
+    const updated = await tx.user.update({
+      where: { id: userId },
+      data: {
+        ...userFields,
+        role: guardian ? 'RESPONSAVEL' : 'ADOTANTE',
+        roles: [guardian ? 'GUARDIAN' : 'ADOPTER'],
+      },
+    })
+    const sync = profileFromAccount(tx, userId, normalized)
+    await (guardian ? sync.guardian() : sync.adopter())
+    return updated
   })
   res.json(publicUser(user))
 })

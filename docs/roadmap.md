@@ -9,7 +9,7 @@ O que ainda falta, o que sabemos que é limitado e como seguir para a fase do ba
 | Acessibilidade (#57)                     | **Revertida.** Falta decidir se volta e refazer o PR sobre a `dev` |
 | Recomendações "Para você" (#33)          | Aberta; precisa de adaptação para a entrega só com frontend        |
 | Área da organização (#60 e relacionadas) | Depende de backend e autenticação                                  |
-| Fase do backend                          | Não iniciada                                                       |
+| Fase do backend                          | Em andamento: base (#47) e autenticação (#48, #4, #5) integradas   |
 | Publicação                               | Sem deploy; o mock precisa de hospedagem à parte                   |
 
 ## Acessibilidade (#57)
@@ -35,7 +35,7 @@ A lista completa está em [Escopo prometido x entregue](escopo-prometido-vs-entr
 
 ## Limitações conhecidas
 
-- **Usuário único e sem autenticação:** tudo fala do usuário `demo`.
+- **Usuário único no mock:** com o backend real (#4/#5), login/cadastro usam JWT e o access token fica só em memória; com `npm run dev:mock`, o frontend continua usando a conta demo via `X-Demo-User-Id`/`X-Demo-Role`.
 - **Estados da solicitação:** a instituição já pode iniciar a análise, aprovar e recusar (PR #86), mas sem etapas de entrevista e visita, sem motivo obrigatório da recusa e sem diferença entre administrador e voluntário.
 - **Distância:** calculada a partir de coordenadas fixas, sem geolocalização do navegador.
 - **Imagens:** os pets usam URLs externas; não há upload.
@@ -61,7 +61,7 @@ A ordem respeita as dependências declaradas em cada issue. Issues da mesma linh
 | 2     | #93   | #9 e #97                                     | Banco PostgreSQL na nuvem (Neon); pipeline de segurança no CI                       |
 | 3     | #45   | #47 ✅                                       | Base da API: config, erros, CORS, segurança, logs, health, OpenAPI e testes `INF`   |
 | 4     | #45   | #94 e #95                                    | Armazenamento S3 e fila de jobs (pg-boss)                                           |
-| 5     | #45   | #48, #4 e #5                                 | Autenticação no backend, no frontend e proteção de rotas                            |
+| 5     | #45   | #48 ✅, #4 ✅ e #5 ✅                        | Autenticação no backend, no frontend e proteção de rotas — integrada                |
 | 6     | #15   | #27, #28 e #41                               | Organizações, permissões (CASL) e área da organização                               |
 | 7     | #11   | #18                                          | Perfil do adotante na API                                                           |
 | 8     | #45   | #49, #51, #50 e #60                          | Pets, favoritos e solicitações na API; cadastro de pets na área da organização      |
@@ -80,7 +80,7 @@ O frontend só conhece a URL base e o contrato.
 1. Aponte `VITE_API_URL` para o backend (ou ajuste o proxy do Vite).
 2. Mantenha as rotas e os formatos descritos em [API simulada](api-simulada.md): `{ data, total }` nas listas, solicitação com o pet embutido, datas em ISO, e erros no formato `{ statusCode, error, message, details }` com os códigos 400, 404, 409 e 422 com o mesmo significado.
 3. Rode `apps/web/mock-server/contract.test.js` como referência: ele mostra exatamente o que o frontend valida.
-4. Troque o usuário fixo pela sessão autenticada (#48, #4 e #5), e as rotas `/me/*` passam a depender do token.
+4. O backend já expõe `/auth/*` e exige JWT nas rotas `/me/*` e `/requests/*` (#48, #4 e #5). O frontend usa Bearer + refresh em cookie automaticamente no modo real; `npm run dev:mock` mantém os headers demo.
 5. A tela de compatibilidade passa a consumir o resultado do serviço de matching (#19), se ele for entregue.
 
 ## Próximos passos recomendados

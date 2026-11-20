@@ -15,7 +15,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../lib/api', () => ({
   api: { get: mocks.get, put: mocks.put, delete: mocks.remove },
 }))
-vi.mock('../lib/demoAccount', () => ({
+vi.mock('../lib/demoAccount', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../lib/demoAccount')>()),
   hasDemoAccount: () => mocks.access.hasAccount,
 }))
 

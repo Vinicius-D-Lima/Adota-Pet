@@ -43,6 +43,39 @@ describe('ProfilePage', () => {
     expect(screen.getByRole('textbox', { name: /cpf/i })).toHaveValue(validProfile.cpf)
   })
 
+  it('lê TODOS os campos do perfil devolvidos pela API', async () => {
+    await setup()
+
+    const textFields: Array<[RegExp, string]> = [
+      [/nome completo/i, validProfile.name],
+      [/cpf/i, validProfile.cpf],
+      [/data de nascimento/i, validProfile.birthDate],
+      [/e-mail/i, validProfile.email],
+      [/telefone\/celular/i, validProfile.phone],
+      [/cep/i, validProfile.zipCode],
+      [/endereço/i, validProfile.address],
+    ]
+    for (const [label, value] of textFields) {
+      expect(screen.getByLabelText(label), String(label)).toHaveValue(value)
+    }
+
+    const selectFields: Array<[RegExp, string]> = [
+      [/tipo de moradia/i, validProfile.housing],
+      [/área externa segura/i, String(validProfile.hasOutdoorArea)],
+      [/há crianças na residência/i, String(validProfile.hasChildren)],
+      [/já há outros pets/i, String(validProfile.hasOtherPets)],
+      [/tempo disponível por dia/i, validProfile.dailyTime],
+      [/nível de atividade/i, validProfile.activityLevel],
+      [/experiência com animais/i, validProfile.experience],
+      [/disponibilidade para cuidados especiais/i, String(validProfile.acceptsSpecialCare)],
+      [/espécie/i, validProfile.preferredSpecies],
+      [/porte/i, validProfile.preferredSize],
+    ]
+    for (const [label, value] of selectFields) {
+      expect(screen.getByLabelText(label), String(label)).toHaveValue(value)
+    }
+  })
+
   it('ignora a tentativa de trocar o tipo do perfil pela URL', async () => {
     getMock.mockResolvedValue(savedResponse)
     renderWithProviders(<ProfilePage />, { route: '/perfil?tipo=responsavel' })

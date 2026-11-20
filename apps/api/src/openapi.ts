@@ -1,12 +1,14 @@
 import type { Express } from 'express'
 import swaggerUi from 'swagger-ui-express'
 import {
+  authLoginSchema,
   createAccountSchema,
   petIdParamsSchema,
   petsQuerySchema,
   petsResponseSchema,
   petSchema,
   profileSchema,
+  registerSchema,
 } from '@adotapet/shared'
 import { z, type ZodType } from 'zod'
 
@@ -16,6 +18,32 @@ const healthResponseSchema = z.object({
   database: z.enum(['ok', 'unavailable']),
 })
 
+/** Schemas de autenticação (#48): a documentação acompanha as rotas reais. */
+const authUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  platformRole: z.enum(['USUARIO', 'MODERADOR']),
+  role: z.string(),
+  createdAt: z.string(),
+})
+
+const authResponseSchema = z.object({
+  user: authUserSchema,
+  accessToken: z.string(),
+  expiresIn: z.number().int(),
+})
+
+const authDocs: Record<string, RouteSchemas> = Object.fromEntries(
+  ['/auth', '/api/auth'].flatMap((base) => [
+    [`POST ${base}/register`, { body: registerSchema, response: authResponseSchema }],
+    [`POST ${base}/login`, { body: authLoginSchema, response: authResponseSchema }],
+    [`POST ${base}/refresh`, { response: authResponseSchema }],
+    [`POST ${base}/logout`, {}],
+    [`GET ${base}/me`, { response: authUserSchema }],
+  ]),
+)
+
 interface RouteSchemas {
   query?: ZodType
   params?: ZodType
@@ -24,6 +52,8 @@ interface RouteSchemas {
 }
 
 const DOCUMENTED: Record<string, RouteSchemas> = {
+  ...authDocs,
+  'GET /me': { response: authUserSchema },
   'GET /health': { response: healthResponseSchema },
   'GET /api/pets': { query: petsQuerySchema, response: petsResponseSchema },
   'GET /api/pets/{id}': { params: petIdParamsSchema, response: petSchema },
@@ -134,10 +164,15 @@ export function buildOpenApiDocument(app: Express) {
         },
         ...(method === 'GET' ? { 503: errorResponse } : {}),
         400: errorResponse,
+        ...(path.includes('/auth/') ? { 401: errorResponse, 409: errorResponse } : {}),
         413: errorResponse,
         429: errorResponse,
         500: errorResponse,
       },
+    }
+
+    if (path === '/me' || path.endsWith('/auth/me')) {
+      operation.security = [{ bearerAuth: [] }]
     }
 
     const parameters = [
@@ -167,6 +202,13 @@ export function buildOpenApiDocument(app: Express) {
     },
     paths,
     components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
       schemas: {
         Error: {
           type: 'object',

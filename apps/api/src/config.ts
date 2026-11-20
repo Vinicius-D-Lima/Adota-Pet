@@ -34,6 +34,23 @@ const envSchema = z.object({
   DEMO_USER_ID: z.string().min(1).default('demo'),
   /** URL opcional de um database separado para os testes (sem Docker). */
   TEST_DATABASE_URL: z.string().optional(),
+
+  // Autenticação (#48). JWT_SECRET é obrigatório pelo mesmo motivo de DATABASE_URL:
+  // sem chave não há como assinar tokens com segurança.
+  JWT_SECRET: z
+    .string({ error: 'JWT_SECRET é obrigatório (configure apps/api/.env)' })
+    .min(32, 'JWT_SECRET deve ter pelo menos 32 caracteres'),
+  JWT_ACCESS_TTL: z.string().min(1).default('15m'),
+  JWT_REFRESH_TTL_DAYS: z.coerce.number().int().positive().default(7),
+  LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(5),
+  LOGIN_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  /** `false` só para desenvolvimento local em http; em produção mantenha `true`. */
+  COOKIE_SECURE: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+  COOKIE_SAME_SITE: z.enum(['strict', 'lax', 'none']).default('lax'),
+  REFRESH_COOKIE_NAME: z.string().min(1).default('refresh_token'),
 })
 
 export type ApiConfig = z.infer<typeof envSchema>

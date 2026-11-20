@@ -50,6 +50,10 @@ A próxima solicitação criada recebe `SOL-1043`. Aprovar e recusar são açõe
 | `CORS_ORIGIN`                             | `http://localhost:5173` | Origens liberadas pelo CORS, separadas por vírgula; origem desconhecida é negada    |
 | `RATE_LIMIT_MAX` / `RATE_LIMIT_WINDOW_MS` | `100` / `60000`         | Limite global de requisições                                                        |
 | `BODY_LIMIT` / `LOG_LEVEL`                | `100kb` / `info`        | Limite do corpo JSON e nível dos logs                                               |
+| `JWT_SECRET`                              | (vazio)                 | Chave HMAC dos JWTs, mínimo 32 caracteres; obrigatória                              |
+| `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL_DAYS` | `15m` / `7`             | Validade do access token e do refresh token                                         |
+| `LOGIN_RATE_LIMIT_MAX`                    | `5`                     | Tentativas de login por IP + e-mail antes do 429                                    |
+| `COOKIE_SECURE` / `COOKIE_SAME_SITE`      | `true` / `lax`          | Flags do cookie de refresh                                                          |
 
 Exemplo: `MOCK_DELAY_MS=1500 MOCK_PORT=3101 npm run mock`.
 
@@ -101,7 +105,9 @@ Todos os passos precisam sair sem erro. O CI executa exatamente esta sequência 
 | 400 em `/pets`                                     | Parâmetro desconhecido na URL                             | Use só `search`, `species`, `size`, `sex`, `city`, `sort`, `page`, `limit`  |
 | API não sobe e a mensagem cita `DATABASE_URL`      | Configuração inválida (INF-01)                            | Copie `.env.example` e preencha a URL do Postgres na nuvem                  |
 | `/health` responde 503                             | Banco fora do ar ou URL inválida                          | Confira a conexão; o resto da API continua de pé para diagnóstico           |
-| `INF-11`/`INF-12` ignorados                        | Sem URL do banco de teste                                 | Defina `TEST_DATABASE_URL` (ou `DATABASE_URL`); nunca use o banco principal |
+| `INF-11`/`INF-12` e `AUTH-01..16` ignorados        | Sem URL do banco de teste                                 | Defina `TEST_DATABASE_URL` (ou `DATABASE_URL`); nunca use o banco principal |
+| API não sobe e a mensagem cita `JWT_SECRET`        | Configuração inválida (INF-01)                            | Copie `.env.example` e gere uma chave aleatória de 32+ caracteres           |
+| `POST /auth/login` devolve 429 na 1ª tentativa     | Rate limit por IP + e-mail compartilhado                  | Use outro e-mail/IP ou aumente `LOGIN_RATE_LIMIT_MAX`                       |
 | CI vermelho só na mescla                           | O CI roda sobre o resultado da mescla com a `dev`         | Traga a `dev` para a branch, rode a bateria e envie                         |
 | Teste que "passa sozinho e falha em conjunto"      | TanStack Query notifica em `setTimeout(0)`                | Espere esse tick dentro de `act` (ver Qualidade e CI)                       |
 | Estilos quebrados depois de atualizar              | Dependências antigas (Tailwind 4 usa `@tailwindcss/vite`) | `npm ci` e reinicie o Vite                                                  |

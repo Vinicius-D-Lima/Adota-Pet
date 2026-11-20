@@ -39,7 +39,7 @@ npm run build
 
 O workflow `.github/workflows/ci.yml` roda em **todo pull request** e em **push na `main`**, no Node 22. Ele instala os três workspaces e executa, para **cada workspace**, lint, formatação, tipos, testes e build. Os nomes dos passos carregam os IDs `MONO-01` a `MONO-06`; veja o [catálogo do monorepo](testes/monorepo.md).
 
-Há também o job **Backend — #47 padrões transversais**, com lint, typecheck, testes e build da API. Ele usa o secret `TEST_DATABASE_URL` (uma URL do Postgres na nuvem com permissão para criar um database separado). Sem o secret, `INF-11` e `INF-12` são ignorados com aviso e os outros testes da API continuam valendo; configure o secret para que a integração com o banco também rode no CI. O projeto não usa Docker.
+Há também o job **Backend — #47 padrões e #48 autenticação**, com lint, typecheck, testes e build da API. Ele usa os secrets `DATABASE_URL` (admin) e `TEST_DATABASE_URL` (database terminando em `_test`). Sem eles, `INF-11`, `INF-12` e os 16 testes `AUTH-*` são ignorados com aviso e os outros 13 testes da API continuam valendo; configure os secrets para que a integração com o banco e a autenticação também rodem no CI. O projeto não usa Docker.
 
 - **Ele só valida. Não há deploy** (nem preview) em lugar nenhum.
 - Em pull requests, o GitHub executa o workflow sobre o **resultado da mescla com a branch de destino**. Por isso um PR pode passar sozinho e quebrar depois de outro entrar, e por isso vale atualizar o PR com a `dev` e esperar o CI antes de mesclar.

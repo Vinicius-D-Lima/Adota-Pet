@@ -136,6 +136,15 @@ Os schemas Zod são a **fonte única** do contrato de dados. Eles vivem em `@ado
 
 O arquivo `apps/web/mock-server/contract.test.js` valida as **respostas reais** do mock contra estes schemas compartilhados, para que mock, frontend e API não se afastem em silêncio. A API também deriva `PROFILE_FIELDS` de `profileSchema` em `apps/api/src/validation.ts` (MONO-03).
 
+## Autenticação na API (`apps/api/src/auth.ts`)
+
+O módulo de autenticação (#48) implementa a decisão 22 com `jose` (JWT HS256, algoritmo fixo na verificação) e `@node-rs/argon2` (hash `$argon2id$`). `POST /auth/register`, `/auth/login`, `/auth/refresh` e `/auth/logout` são espelhados em `/api/auth/*`; `GET /me` devolve o usuário autenticado.
+
+- `requireAuth` valida o Bearer, consulta o usuário e preenche `req.auth` (claims) e `req.user` (linha do banco). `currentUser` prefere essa identidade; `X-Demo-User-Id` continua apenas como transição para os módulos legados até a #4.
+- O access token (~15 min) traz `sub`, `type: 'access'` e `platformRole`. O refresh é um token opaco de 48 bytes: o cookie guarda o original e o banco (`RefreshToken`) guarda só o SHA-256, com `revokedAt` para revogação e detecção de reuso.
+- `platformRole` (`USUARIO`/`MODERADOR`) é novo e distinto de `role`/`roles`, que pertencem ao contrato do mock-server e ainda alimentam a área da instituição.
+- Os schemas `registerSchema` e `authLoginSchema` vivem em `@adotapet/shared` e são usados na validação de entrada e na OpenAPI.
+
 ## Roteamento e carregamento
 
 - `main.tsx`: `ErrorBoundary` → `QueryClientProvider` → `BrowserRouter` → `App` (e as devtools do TanStack Query só em desenvolvimento).

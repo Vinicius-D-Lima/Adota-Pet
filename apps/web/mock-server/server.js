@@ -611,6 +611,43 @@ export function createApp({
         roles: [guardian ? 'GUARDIAN' : 'ADOPTER'],
       })
       .write()
+    // O cadastro também popula o perfil: /me/* lê destas coleções, não de users.
+    if (guardian) {
+      const city =
+        normalized.city && normalized.state
+          ? `${normalized.city}, ${normalized.state}`
+          : normalized.city
+      store
+        .set('guardianProfile', {
+          guardianType: normalized.guardianType,
+          displayName: normalized.organizationName || normalized.name || normalized.responsibleName,
+          legalName: normalized.responsibleName || normalized.name,
+          document: normalized.document,
+          email: normalized.email,
+          phone: normalized.phone,
+          zipCode: normalized.zipCode,
+          address: normalized.address,
+          city,
+          description: store.get('guardianProfile').value()?.description ?? '',
+          acceptsTerms: true,
+          userId,
+        })
+        .write()
+    } else {
+      store
+        .get('profile')
+        .assign({
+          name: normalized.name,
+          cpf: normalized.cpf,
+          birthDate: normalized.birthDate,
+          email: normalized.email,
+          phone: normalized.phone,
+          zipCode: normalized.zipCode,
+          address: normalized.address,
+          userId,
+        })
+        .write()
+    }
     const { lat: _lat, lng: _lng, ...publicUser } = user
     res.json(publicUser)
   })

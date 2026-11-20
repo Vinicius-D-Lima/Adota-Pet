@@ -29,8 +29,8 @@ import {
   useAdopterProfile,
   useSaveAdopterProfile,
 } from '../hooks/useAdopterProfile'
+import { useDemoAccount } from '../hooks/useDemoAccount'
 import { ApiError } from '../lib/ApiError'
-import { getDemoProfilePath } from '../lib/demoAccount'
 import { profileSchema } from '@adotapet/shared'
 import type { Profile, ProfileDraft } from '../types'
 import { adopterRequiredFields, calculateProfileCompletion } from '../utils/profileCompletion'
@@ -136,7 +136,8 @@ export function ProfilePage() {
     if (returnTo) navigate(returnTo, { replace: true })
     else window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-  const isGuardianAccount = getDemoProfilePath() === '/perfil?tipo=responsavel'
+  // O tipo da conta vem da sessão autenticada (JWT no modo real), não do mock.
+  const isGuardianAccount = useDemoAccount().profilePath === '/perfil?tipo=responsavel'
 
   return isGuardianAccount ? (
     <GuardianProfilePage onSaved={onSaved} />

@@ -17,6 +17,10 @@ export function OrganizacaoGuard({ children }: { children: ReactNode }) {
   const location = useLocation()
   const permissions = usePermissions({ enabled: account.isAuthenticated })
 
+  if (account.status === 'loading') {
+    return <Feedback>Verificando sua sessão...</Feedback>
+  }
+
   if (!account.isAuthenticated) {
     return <Navigate to="/entrar" replace state={{ from: location.pathname }} />
   }

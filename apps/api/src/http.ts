@@ -6,6 +6,7 @@ import { logger as defaultLogger } from './logger.js'
 /** Nomes de status usados no corpo do erro (contrato #47). */
 const STATUS_NAMES: Record<number, string> = {
   400: 'Bad Request',
+  401: 'Unauthorized',
   403: 'Forbidden',
   404: 'Not Found',
   409: 'Conflict',

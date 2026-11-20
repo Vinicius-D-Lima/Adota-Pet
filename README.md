@@ -86,7 +86,9 @@ npm run dev:all
 
 Atalhos: `npm run dev` (só web), `npm run backend` (só api).
 
-> A identidade de demonstração ainda é baseada nos cabeçalhos `X-Demo-User-Id` e `X-Demo-Role`; não há autenticação JWT nesta etapa.
+> A autenticação JWT está integrada ao frontend: `/entrar` e `/cadastro` chamam `/auth/login` e `/auth/register`, o access token fica somente em memória e o refresh é um cookie `httpOnly`. Configure `JWT_SECRET` no `apps/api/.env` antes de subir a API. Rotas privadas (perfil, solicitações, questionário e área da organização) exigem `Authorization: Bearer`; home e listagem/detalhe de pets são públicas.
+
+Contas de demonstração no banco principal (senha `Senha@123`): `demo@adotapet.local`, `contato@institutopatinhas.org`, `demo-empty@adotapet.local` e `moderador@adotapet.local`.
 
 ### 2) Frontend + mock-server (sem banco)
 

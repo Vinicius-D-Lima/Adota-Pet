@@ -1,14 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { type Resolver, useForm, useWatch } from 'react-hook-form'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowRight, Building2, LogIn, User } from 'lucide-react'
 import { useState } from 'react'
-import { type Resolver, useForm, useWatch } from 'react-hook-form'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { type LoginFormData, loginSchema } from '@adotapet/shared'
 import { Alert, Button, Card, Container, cx, Field, Input, PageSurface } from '../components/ui'
 import { adopterProfileKey } from '../hooks/useAdopterProfile'
 import { guardianProfileKey } from '../hooks/useGuardianProfile'
 import { useDemoAccount } from '../hooks/useDemoAccount'
-import { type LoginFormData, loginSchema } from '@adotapet/shared'
+import { ApiError } from '../lib/ApiError'
+import { getSessionSnapshot, isRealAuth } from '../lib/session'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -21,6 +23,7 @@ export function LoginPage() {
     register,
     handleSubmit,
     setValue,
+    setError,
     control,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
@@ -34,12 +37,24 @@ export function LoginPage() {
 
   const accountType = useWatch({ control, name: 'accountType' })
 
+  const destinationFor = (accountType: LoginFormData['accountType']) => {
+    const state = location.state as { from?: string } | null
+    if (state?.from) return state.from
+    // No modo real o tipo da conta vem do token (/me), não do botão da tela.
+    if (isRealAuth()) {
+      const roles = getSessionSnapshot().user?.roles ?? []
+      return roles.includes('GUARDIAN') ? '/organizacao' : '/'
+    }
+    return accountType === 'guardian' ? '/organizacao' : '/'
+  }
+
   const submit = handleSubmit(async (data) => {
     setLoginError('')
     try {
-      account.login({
+      await account.login({
         accountType: data.accountType,
         email: data.email,
+        password: data.password,
       })
 
       await Promise.all([
@@ -47,10 +62,21 @@ export function LoginPage() {
         queryClient.invalidateQueries({ queryKey: guardianProfileKey }),
       ])
 
-      const state = location.state as { from?: string } | null
-      const destination = state?.from || (data.accountType === 'guardian' ? '/organizacao' : '/')
-      navigate(destination, { replace: true })
-    } catch {
+      navigate(destinationFor(data.accountType), { replace: true })
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const fieldErrors = error.toFieldErrors()
+        let fieldErrorShown = false
+        for (const [field, message] of Object.entries(fieldErrors)) {
+          if (!(field in data)) continue
+          setError(field as keyof LoginFormData, { message })
+          fieldErrorShown = true
+        }
+        if (fieldErrorShown) return
+        // 401 usa a mensagem genérica do backend (não revela se o e-mail existe).
+        setLoginError(error.message)
+        return
+      }
       setLoginError('Não foi possível entrar. Verifique seus dados e tente novamente.')
     }
   })

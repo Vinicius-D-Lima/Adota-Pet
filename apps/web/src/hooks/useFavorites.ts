@@ -29,8 +29,9 @@ const withMembership = (ids: string[], petId: string, favorite: boolean) => {
   return favorite ? [...rest, petId] : rest
 }
 
-export function useFavoriteIds() {
+export function useFavoriteIds(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: favoriteKeys.ids,
     queryFn: async ({ signal }) =>
       favoriteIdsResponseSchema.parse(await api.get<unknown>('/me/favorites/ids', { signal })).data,
