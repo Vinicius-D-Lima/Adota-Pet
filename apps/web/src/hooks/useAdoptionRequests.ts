@@ -13,8 +13,9 @@ export const adoptionRequestKeys = {
 export const fetchAdoptionRequests = async () =>
   adoptionRequestsResponseSchema.parse(await api.get('/me/requests')).data
 
-export function useAdoptionRequests() {
+export function useAdoptionRequests(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: adoptionRequestKeys.list(),
     queryFn: fetchAdoptionRequests,
   })

@@ -1,28 +1,40 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { type Resolver, useForm, useWatch } from 'react-hook-form'
 import { useQueryClient } from '@tanstack/react-query'
 import { PawPrint, UserRoundPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { type Resolver, useForm, useWatch } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
+import { z } from 'zod'
+import { createAccountSchema } from '@adotapet/shared'
 import { Alert, Button, Card, Container, Field, Input, PageSurface } from '../components/ui'
 import { adopterProfileKey } from '../hooks/useAdopterProfile'
 import { guardianProfileKey } from '../hooks/useGuardianProfile'
 import { api } from '../lib/api'
+import { ApiError } from '../lib/ApiError'
+import { register } from '../lib/auth'
 import { createDemoAccount } from '../lib/demoAccount'
-import { createAccountSchema, type CreateAccountData } from '@adotapet/shared'
+import { isRealAuth, updateUser, type AuthUser } from '../lib/session'
+
+/** A confirmação existe só no formulário: o contrato da API não a recebe. */
+const registerFormSchema = createAccountSchema.and(
+  z.object({ confirmPassword: z.string().min(1, 'Confirme sua senha.') }),
+)
+type RegisterFormData = z.infer<typeof registerFormSchema>
 
 export function CreateAccountPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [accountError, setAccountError] = useState('')
   const {
-    register,
+    register: registerField,
     handleSubmit,
     setValue,
+    setError,
+    clearErrors,
     control,
     formState: { errors, isSubmitting },
-  } = useForm<CreateAccountData>({
-    resolver: zodResolver(createAccountSchema) as Resolver<CreateAccountData>,
+  } = useForm<RegisterFormData>({
+    resolver: zodResolver(registerFormSchema) as Resolver<RegisterFormData>,
     defaultValues: {
       accountType: 'adopter',
       name: '',
@@ -31,6 +43,7 @@ export function CreateAccountPage() {
       email: '',
       phone: '',
       password: '',
+      confirmPassword: '',
       organizationName: '',
       responsibleName: '',
       document: '',
@@ -61,6 +74,11 @@ export function CreateAccountPage() {
 
   const submit = handleSubmit(async (data) => {
     setAccountError('')
+    clearErrors('confirmPassword')
+    if (data.password !== data.confirmPassword) {
+      setError('confirmPassword', { message: 'As senhas não coincidem.' })
+      return
+    }
     const { accountType } = data
     const profilePath = accountType === 'guardian' ? '/perfil?tipo=responsavel' : '/perfil'
     const personalData =
@@ -118,14 +136,38 @@ export function CreateAccountPage() {
               address: data.address,
               password: data.password,
             }
-      await api.put('/me/account', accountPayload)
-      createDemoAccount(profilePath, personalData)
+      if (isRealAuth()) {
+        // O cadastro real cria o usuário e devolve tokens; o perfil é salvo em seguida.
+        const name = accountType === 'guardian' ? data.responsibleName : data.name
+        await register({ name: name ?? '', email: data.email, password: data.password })
+      }
+
+      const saved = await api.put<AuthUser>('/me/account', accountPayload)
+      if (isRealAuth() && saved) updateUser(saved)
+      if (!isRealAuth()) createDemoAccount(profilePath, personalData)
+
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: adopterProfileKey }),
         queryClient.invalidateQueries({ queryKey: guardianProfileKey }),
       ])
       navigate('/', { replace: true })
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiError) {
+        if (error.statusCode === 409) {
+          setError('email', { message: 'Já existe uma conta com este e-mail' })
+          return
+        }
+        const fieldErrors = error.toFieldErrors()
+        let fieldErrorShown = false
+        for (const [field, message] of Object.entries(fieldErrors)) {
+          if (!(field in data)) continue
+          setError(field as keyof RegisterFormData, { message })
+          fieldErrorShown = true
+        }
+        if (fieldErrorShown) return
+        setAccountError(error.message)
+        return
+      }
       setAccountError('Não foi possível criar sua conta. Tente novamente.')
     }
   })
@@ -155,14 +197,14 @@ export function CreateAccountPage() {
               <legend className="mb-2 text-xs font-bold">Como você quer usar o AdotaPet?</legend>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="flex cursor-pointer gap-3 rounded-xl border border-line p-4">
-                  <input type="radio" value="adopter" {...register('accountType')} />
+                  <input type="radio" value="adopter" {...registerField('accountType')} />
                   <span>
                     <strong className="block text-sm">Quero adotar</strong>
                     <small className="text-muted">Encontre e favorite pets para conhecer.</small>
                   </span>
                 </label>
                 <label className="flex cursor-pointer gap-3 rounded-xl border border-line p-4">
-                  <input type="radio" value="guardian" {...register('accountType')} />
+                  <input type="radio" value="guardian" {...registerField('accountType')} />
                   <span>
                     <strong className="block text-sm">Quero divulgar pets</strong>
                     <small className="text-muted">
@@ -197,7 +239,7 @@ export function CreateAccountPage() {
                       autoComplete="name"
                       placeholder="Ex.: Maria da Silva"
                       invalid={Boolean(errors.name)}
-                      {...register('name')}
+                      {...registerField('name')}
                     />
                   </Field>
                   <Field label="Data de nascimento" error={errors.birthDate?.message} tight>
@@ -205,7 +247,7 @@ export function CreateAccountPage() {
                       type="date"
                       autoComplete="bday"
                       invalid={Boolean(errors.birthDate)}
-                      {...register('birthDate')}
+                      {...registerField('birthDate')}
                     />
                   </Field>
                   <Field label="CPF" error={errors.cpf?.message} tight>
@@ -214,7 +256,7 @@ export function CreateAccountPage() {
                       maxLength={11}
                       placeholder="Ex.: 52998224725"
                       invalid={Boolean(errors.cpf)}
-                      {...register('cpf', digits('cpf', 11))}
+                      {...registerField('cpf', digits('cpf', 11))}
                     />
                   </Field>
                 </>
@@ -224,14 +266,18 @@ export function CreateAccountPage() {
                     <legend className="text-xs font-bold">Tipo de responsável</legend>
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="flex cursor-pointer gap-3 rounded-xl border border-line p-4">
-                        <input type="radio" value="INDIVIDUAL" {...register('guardianType')} />
+                        <input type="radio" value="INDIVIDUAL" {...registerField('guardianType')} />
                         <span>
                           <strong className="block text-sm">Pessoa física</strong>
                           <small className="text-muted">Protetor independente com CPF.</small>
                         </span>
                       </label>
                       <label className="flex cursor-pointer gap-3 rounded-xl border border-line p-4">
-                        <input type="radio" value="ORGANIZATION" {...register('guardianType')} />
+                        <input
+                          type="radio"
+                          value="ORGANIZATION"
+                          {...registerField('guardianType')}
+                        />
                         <span>
                           <strong className="block text-sm">Instituição ou ONG</strong>
                           <small className="text-muted">Pessoa jurídica com CNPJ.</small>
@@ -253,7 +299,7 @@ export function CreateAccountPage() {
                           <Input
                             placeholder="Ex.: Instituto Patinhas"
                             invalid={Boolean(errors.organizationName)}
-                            {...register('organizationName')}
+                            {...registerField('organizationName')}
                           />
                         </Field>
                       )}
@@ -268,7 +314,7 @@ export function CreateAccountPage() {
                           autoComplete="name"
                           placeholder="Ex.: Ana Maria de Souza"
                           invalid={Boolean(errors.responsibleName)}
-                          {...register('responsibleName')}
+                          {...registerField('responsibleName')}
                         />
                       </Field>
                       <Field
@@ -285,7 +331,7 @@ export function CreateAccountPage() {
                               : 'Ex.: 11222333000181'
                           }
                           invalid={Boolean(errors.document)}
-                          {...register(
+                          {...registerField(
                             'document',
                             digits('document', guardianType === 'INDIVIDUAL' ? 11 : 14),
                           )}
@@ -295,7 +341,7 @@ export function CreateAccountPage() {
                         <Input
                           placeholder="Ex.: São Paulo"
                           invalid={Boolean(errors.city)}
-                          {...register('city')}
+                          {...registerField('city')}
                         />
                       </Field>
                       <Field label="Estado" error={errors.state?.message} tight>
@@ -303,7 +349,7 @@ export function CreateAccountPage() {
                           maxLength={2}
                           placeholder="Ex.: SP"
                           invalid={Boolean(errors.state)}
-                          {...register('state')}
+                          {...registerField('state')}
                         />
                       </Field>
                     </>
@@ -316,7 +362,7 @@ export function CreateAccountPage() {
                   autoComplete="email"
                   placeholder="Ex.: maria@exemplo.com"
                   invalid={Boolean(errors.email)}
-                  {...register('email')}
+                  {...registerField('email')}
                 />
               </Field>
               <Field label="Celular" error={errors.phone?.message} tight>
@@ -327,7 +373,7 @@ export function CreateAccountPage() {
                   autoComplete="tel"
                   placeholder="Ex.: 11999999999"
                   invalid={Boolean(errors.phone)}
-                  {...register('phone', digits('phone', 11))}
+                  {...registerField('phone', digits('phone', 11))}
                 />
               </Field>
               <Field label="CEP" error={errors.zipCode?.message} tight>
@@ -337,7 +383,7 @@ export function CreateAccountPage() {
                   autoComplete="postal-code"
                   placeholder="Ex.: 01310100"
                   invalid={Boolean(errors.zipCode)}
-                  {...register('zipCode', digits('zipCode', 8))}
+                  {...registerField('zipCode', digits('zipCode', 8))}
                 />
               </Field>
               <Field label="Endereço completo" error={errors.address?.message} tight full>
@@ -345,7 +391,7 @@ export function CreateAccountPage() {
                   autoComplete="street-address"
                   placeholder="Ex.: Avenida Paulista, 1000"
                   invalid={Boolean(errors.address)}
-                  {...register('address')}
+                  {...registerField('address')}
                 />
               </Field>
               <Field
@@ -360,7 +406,22 @@ export function CreateAccountPage() {
                   autoComplete="new-password"
                   placeholder="Crie uma senha"
                   invalid={Boolean(errors.password)}
-                  {...register('password')}
+                  {...registerField('password')}
+                />
+              </Field>
+              <Field
+                label="Confirmar senha"
+                error={errors.confirmPassword?.message}
+                hint="Repita a senha para confirmar."
+                tight
+                full
+              >
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Repita sua senha"
+                  invalid={Boolean(errors.confirmPassword)}
+                  {...registerField('confirmPassword')}
                 />
               </Field>
             </div>

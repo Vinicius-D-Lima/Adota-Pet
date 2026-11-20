@@ -9,10 +9,21 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Papel na plataforma (#48). Diferente de `role`/`roles`, que são do contrato do mock.
+enum PlatformRole {
+  USUARIO
+  MODERADOR
+}
+
 model User {
-  id               String   @id
-  name             String   @default("")
-  email            String   @default("")
+  id               String        @id
+  name             String        @default("")
+  /// Sempre normalizado em minúsculas; a unicidade também é garantida no banco.
+  email            String        @default("") @unique
+  /// Hash argon2id. Nulo só para usuários legados do mock que ainda não fizeram login.
+  passwordHash     String?
+  platformRole     PlatformRole  @default(USUARIO)
+  createdAt        DateTime      @default(now())
   phone            String?
   cpf              String?
   birthDate        String?
@@ -35,6 +46,21 @@ model User {
   notifications    Notification[]
   savedFilters     SavedFilter[]
   preferences      NotificationPreference[]
+  refreshTokens    RefreshToken[]
+}
+
+/// Refresh token fica no banco só como hash (#48): permite revogar e detectar reuso.
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model AdopterProfile {

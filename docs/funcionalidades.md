@@ -1,6 +1,12 @@
 # Funcionalidades
 
-Descrição de cada tela e das regras de negócio. Todas leem e gravam dados pela [API simulada](api-simulada.md).
+Descrição de cada tela e das regras de negócio. Todas leem e gravam dados pela [API simulada](api-simulada.md) (`npm run dev:mock`) ou pela API real com autenticação JWT.
+
+## Autenticação e rotas privadas
+
+- **Modo real** (padrão com o backend na porta 3002): `/entrar` e `/cadastro` chamam `/auth/login` e `/auth/register`. O access token fica apenas em memória, nunca em `localStorage`/`sessionStorage`; o refresh rotaciona em cookie `httpOnly + Secure + SameSite` e as requisições usam `credentials: 'include'`. Em 401, o frontend renova uma única vez e repete a chamada.
+- **Modo demo** (`npm run dev:mock`): o mock-server não tem `/auth/*`, então a sessão continua sendo a conta de demonstração, enviada nos headers `X-Demo-User-Id`/`X-Demo-Role`.
+- **Públicas:** início, listagem/detalhe de pets e compatibilidade. **Privadas:** perfil, favoritos, solicitações, questionário e área da organização. Ao restaurar a sessão no boot, os guards mostram "Verificando sua sessão..." em vez de "piscar" deslogado; após login, o usuário volta para a rota de origem.
 
 ## Mapa de rotas
 

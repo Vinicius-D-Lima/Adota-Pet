@@ -275,9 +275,12 @@ describe('perfil', () => {
 
     const me = await request(app).get('/me').set(emptyAccount)
     expect(me.body).toMatchObject({ name: 'Maria da Silva', cpf: '52998224725' })
-    expect((await request(app).get('/me/adopter-profile').set(emptyAccount)).body.isComplete).toBe(
-      false,
-    )
+    const adopterProfile = (await request(app).get('/me/adopter-profile').set(emptyAccount)).body
+    expect(adopterProfile).toMatchObject({
+      name: 'Maria da Silva',
+      email: 'maria@exemplo.com',
+      cpf: '52998224725',
+    })
   })
 
   it('rejeita a criação de conta com dados pessoais inválidos', async () => {
@@ -343,6 +346,15 @@ describe('perfil', () => {
       roles: ['GUARDIAN'],
     })
     expect(response.body).not.toHaveProperty('password')
+
+    const profile = (await request(app).get('/me/guardian-profile').set(emptyAccount)).body
+    expect(profile).toMatchObject({
+      guardianType: 'ORGANIZATION',
+      displayName: 'Instituto Patinhas',
+      legalName: 'Maria da Silva',
+      city: 'São Paulo, SP',
+      acceptsTerms: true,
+    })
   })
 
   it('grava uma conta de protetor independente com CPF e sem instituição', async () => {

@@ -9,6 +9,8 @@ interface ErrorBoundaryProps {
 
 interface ErrorBoundaryState {
   hasError: boolean
+  /** Motivo exato do erro, exibido só em DEV para facilitar o diagnóstico. */
+  message?: string
 }
 
 const keysChanged = (a: readonly unknown[] = [], b: readonly unknown[] = []) =>
@@ -17,8 +19,8 @@ const keysChanged = (a: readonly unknown[] = [], b: readonly unknown[] = []) =>
 export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false }
 
-  static getDerivedStateFromError(): ErrorBoundaryState {
-    return { hasError: true }
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, message: error.message }
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -41,6 +43,12 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       >
         <div>
           <h1 className="text-[32px]">Algo deu errado</h1>
+          {import.meta.env.DEV && this.state.message && (
+            <details className="mx-auto mt-4 max-w-xl text-left text-xs">
+              <summary className="cursor-pointer">Detalhes técnicos</summary>
+              <pre className="whitespace-pre-wrap break-words">{this.state.message}</pre>
+            </details>
+          )}
           <p>Não foi possível exibir esta página. Tente novamente ou volte ao início.</p>
           <div className="mt-[18px] flex flex-wrap justify-center gap-3">
             <Button onClick={() => this.setState({ hasError: false })}>Tentar novamente</Button>

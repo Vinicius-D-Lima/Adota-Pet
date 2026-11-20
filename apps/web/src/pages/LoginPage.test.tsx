@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../lib/ApiError'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { LoginPage } from './LoginPage'
 
@@ -12,6 +13,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../hooks/useDemoAccount', () => ({
   useDemoAccount: () => ({
     isAuthenticated: false,
+    status: 'anonymous',
     profilePath: '/perfil',
     login: mocks.login,
     logout: vi.fn(),
@@ -20,6 +22,7 @@ vi.mock('../hooks/useDemoAccount', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.login.mockResolvedValue(undefined)
 })
 
 function CurrentPath() {
@@ -51,7 +54,7 @@ describe('LoginPage', () => {
     expect(mocks.login).not.toHaveBeenCalled()
   })
 
-  it('permite login como adotante e redireciona', async () => {
+  it('envia e-mail e senha e redireciona', async () => {
     const user = userEvent.setup()
     renderWithProviders(
       <>
@@ -62,13 +65,14 @@ describe('LoginPage', () => {
     )
 
     await user.type(screen.getByLabelText(/e-mail/i), 'lucas@exemplo.com')
-    await user.type(screen.getByLabelText(/senha/i), '123456')
+    await user.type(screen.getByLabelText(/senha/i), 'Senha@123')
     await user.click(screen.getByRole('button', { name: /entrar/i }))
 
     await waitFor(() => {
       expect(mocks.login).toHaveBeenCalledWith({
         accountType: 'adopter',
         email: 'lucas@exemplo.com',
+        password: 'Senha@123',
       })
     })
   })
@@ -92,7 +96,34 @@ describe('LoginPage', () => {
       expect(mocks.login).toHaveBeenCalledWith({
         accountType: 'guardian',
         email: 'ong@patinhas.org',
+        password: 'senha123',
       })
     })
+  })
+
+  it('mostra a mensagem genérica do backend em credenciais inválidas', async () => {
+    mocks.login.mockRejectedValueOnce(new ApiError(401, 'Credenciais inválidas'))
+    const user = userEvent.setup()
+    renderWithProviders(<LoginPage />, { route: '/entrar' })
+
+    await user.type(screen.getByLabelText(/e-mail/i), 'lucas@exemplo.com')
+    await user.type(screen.getByLabelText(/senha/i), 'Senha@123')
+    await user.click(screen.getByRole('button', { name: /entrar/i }))
+
+    expect(await screen.findByText('Credenciais inválidas')).toBeInTheDocument()
+  })
+
+  it('mostra erros de campo vindos do backend', async () => {
+    mocks.login.mockRejectedValueOnce(
+      new ApiError(400, 'Validação falhou', [{ field: 'password', message: 'Senha muito curta' }]),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<LoginPage />, { route: '/entrar' })
+
+    await user.type(screen.getByLabelText(/e-mail/i), 'lucas@exemplo.com')
+    await user.type(screen.getByLabelText(/senha/i), 'Senha@123')
+    await user.click(screen.getByRole('button', { name: /entrar/i }))
+
+    expect(await screen.findByText('Senha muito curta')).toBeInTheDocument()
   })
 })

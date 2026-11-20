@@ -19,6 +19,22 @@ Sem `DATABASE_URL`, o processo encerra antes de abrir a porta e a mensagem cita 
 - `/docs` — Swagger UI, com o JSON em `/docs/openapi.json` (INF-10);
 - `/api/...` — rotas de domínio, com erros no formato `{ statusCode, error, message, details? }`.
 
+## Autenticação (#48)
+
+Endpoints (também disponíveis sem o prefixo `/api`, por exemplo `/auth/login`):
+
+| Método | Rota                 | Descrição                                                           |
+| ------ | -------------------- | ------------------------------------------------------------------- |
+| `POST` | `/api/auth/register` | Cria a conta com senha argon2id; e-mail é normalizado em minúsculas |
+| `POST` | `/api/auth/login`    | Devolve access token JWT (~15 min) e cookie de refresh (~7 dias)    |
+| `POST` | `/api/auth/refresh`  | Rotaciona o refresh token; reuso revoga toda a cadeia               |
+| `POST` | `/api/auth/logout`   | Revoga o refresh e limpa o cookie                                   |
+| `GET`  | `/api/auth/me`       | Dados do usuário autenticado (`GET /me` é alias)                    |
+
+O access token vai em `Authorization: Bearer <token>`. O refresh fica em cookie `httpOnly + Secure + SameSite=Lax`, guardado no banco apenas como hash SHA-256. `requireAuth` (`src/auth.ts`) preenche `req.auth` e `req.user` para os próximos módulos; os routers legados ainda aceitam `X-Demo-User-Id` enquanto o frontend #4 não é migrado.
+
+`npm run db:seed` cria três contas com a senha `Senha@123`: `demo@adotapet.local` (adotante), `contato@institutopatinhas.org` (ONG) e `moderador@adotapet.local` (`platformRole=MODERADOR`).
+
 ## Configuração
 
 Todas as variáveis são validadas por Zod na inicialização (`src/config.ts`). `.env.example` está versionado; `.env` não.
@@ -34,7 +50,13 @@ Todas as variáveis são validadas por Zod na inicialização (`src/config.ts`).
 | `RATE_LIMIT_WINDOW_MS` | `60000`                 | Janela do rate limit em milissegundos                                   |
 | `BODY_LIMIT`           | `100kb`                 | Limite do corpo JSON                                                    |
 | `LOG_LEVEL`            | `info`                  | Nível dos logs pino estruturados                                        |
-| `DEMO_USER_ID`         | `demo`                  | Identidade de demonstração (ainda não há JWT)                           |
+| `DEMO_USER_ID`         | `demo`                  | Identidade legada de demonstração (não autentica rotas JWT)             |
+| `JWT_SECRET`           | —                       | **Obrigatório**. Chave HMAC de ao menos 32 caracteres para assinar JWTs |
+| `JWT_ACCESS_TTL`       | `15m`                   | Validade do access token                                                |
+| `JWT_REFRESH_TTL_DAYS` | `7`                     | Validade do refresh token em dias                                       |
+| `LOGIN_RATE_LIMIT_MAX` | `5`                     | Tentativas de login por IP + e-mail antes do 429                        |
+| `COOKIE_SECURE`        | `true`                  | Flag `Secure` do cookie; desative só em desenvolvimento http            |
+| `COOKIE_SAME_SITE`     | `lax`                   | Política `SameSite` do cookie                                           |
 
 ## Estrutura (#47)
 
@@ -46,7 +68,8 @@ Todas as variáveis são validadas por Zod na inicialização (`src/config.ts`).
 | `src/http.ts`     | Formato padrão de erro, `HttpError` e middleware global (500 genérico, sem stack) |
 | `src/logger.ts`   | Pino com `requestId` e redação de `password`, `token`, `cookie`, `CPF` etc.       |
 | `src/openapi.ts`  | OpenAPI 3.1 derivada dos schemas Zod e das rotas reais do Express                 |
-| `src/routes/`     | Routers por domínio; `health.ts` consulta o banco                                 |
+| `src/auth.ts`     | Argon2id, JWT HS256, hash do refresh, `requireAuth` e rotação de tokens           |
+| `src/routes/`     | Routers por domínio; `auth.ts` expõe registro/login/refresh/logout/me             |
 | `src/server.ts`   | Inicialização, validação da config e encerramento graceful                        |
 
 ## Testes
@@ -57,7 +80,7 @@ npm run test -w @adotapet/api        # da raiz
 npm test                              # todos os workspaces
 ```
 
-Os 12 testes `INF-01` a `INF-12` vivem em `src/infra.test.ts`. Antes da suíte, `test/global-setup.ts` cria (se precisar) um database separado no mesmo Postgres da nuvem, aplica as migrations e grava o marcador local; `test/reset.ts` limpa as tabelas entre os testes. Sem URL de banco configurada, apenas `INF-11`/`INF-12` são ignorados. Detalhes em [`docs/testes/infra-api.md`](../../docs/testes/infra-api.md).
+Os 12 testes `INF-01` a `INF-12` vivem em `src/infra.test.ts` e os 16 testes `AUTH-01` a `AUTH-16`, em `src/auth.test.ts`. Antes da suíte, `test/global-setup.ts` cria (se precisar) um database separado no mesmo Neon, aplica as migrations e grava o marcador local; `test/reset.ts` limpa as tabelas entre os testes (inclusive `RefreshToken`). Sem URL de banco configurada, `INF-11`/`INF-12` e os 16 testes `AUTH-*` são ignorados com aviso; os outros 13 rodam. Detalhes em [`docs/testes/infra-api.md`](../../docs/testes/infra-api.md) e [`docs/testes/auth.md`](../../docs/testes/auth.md).
 
 ## Outros scripts
 

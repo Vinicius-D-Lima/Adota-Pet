@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express'
 import { prisma } from './db.js'
 import type { AdoptionRequest, ChatMessage, Pet, User } from './generated/prisma/client.js'
-import { haversineKm, sendError } from './http.js'
+import { haversineKm, isBlank, sendError } from './http.js'
 import {
   PROFILE_FIELDS,
   missingGuardianFields,
@@ -23,8 +23,13 @@ export interface ProfileView {
   [key: string]: unknown
 }
 
-/** Usuário atual: cabeçalho `X-Demo-User-Id` quando existe, senão o demo padrão. */
+/**
+ * Usuário atual: identidade do JWT quando o middleware `requireAuth` rodou;
+ * nos módulos legados ainda em migração, o cabeçalho demo continua valendo.
+ */
 export async function currentUser(req: Request): Promise<{ id: string; user: User | null }> {
+  if (req.user) return { id: req.user.id, user: req.user }
+
   const requested = req.get('X-Demo-User-Id')
   if (requested) {
     const found = await prisma.user.findUnique({ where: { id: requested } })
@@ -42,6 +47,8 @@ export function publicUser(user: User) {
   const copy: Partial<User> = { ...user }
   delete copy.lat
   delete copy.lng
+  // Nunca sair da API, nem em /me, nem em login/cadastro (AUTH-04).
+  delete copy.passwordHash
   for (const key of Object.keys(copy) as (keyof User)[]) {
     if (copy[key] === null) delete copy[key]
   }
@@ -54,18 +61,54 @@ export const withGallery = <T extends { gallery: string[] }>(pet: T) => ({
   gallery: pet.gallery.length ? pet.gallery : undefined,
 })
 
+/**
+ * O cadastro grava os dados básicos em `User`, mas as telas de perfil leem
+ * `AdopterProfile`/`GuardianProfile`. Contas criadas antes da sincronização
+ * entre as tabelas ficaram com o perfil vazio; usar `User` como fallback garante
+ * que o nome/e-mail/etc. apareçam de qualquer forma.
+ */
+const ACCOUNT_FIELDS = ['name', 'email', 'cpf', 'birthDate', 'phone', 'zipCode', 'address'] as const
+
+function fillBlank(source: Record<string, unknown>, values: Record<string, unknown>) {
+  for (const [key, value] of Object.entries(values)) {
+    if (isBlank(source[key]) && typeof value === 'string' && value.trim()) source[key] = value
+  }
+  return source
+}
+
 export async function getProfile(userId: string): Promise<ProfileView> {
-  const row = await prisma.adopterProfile.findUnique({ where: { userId } })
+  const [row, user] = await Promise.all([
+    prisma.adopterProfile.findUnique({ where: { userId } }),
+    prisma.user.findUnique({ where: { id: userId } }),
+  ])
   const source: Record<string, unknown> = { ...row }
   delete source.id
+  const fallback: Record<string, unknown> = {}
+  for (const field of ACCOUNT_FIELDS) fallback[field] = user?.[field]
+  fillBlank(source, fallback)
   const missingFields = missingProfileFields(source)
   return { ...source, userId, isComplete: missingFields.length === 0, missingFields }
 }
 
 export async function getGuardianProfile(userId: string): Promise<ProfileView> {
-  const row = await prisma.guardianProfile.findUnique({ where: { userId } })
+  const [row, user] = await Promise.all([
+    prisma.guardianProfile.findUnique({ where: { userId } }),
+    prisma.user.findUnique({ where: { id: userId } }),
+  ])
   const source: Record<string, unknown> = { ...row }
   delete source.id
+  const city = [user?.city, user?.state].filter(Boolean).join(', ')
+  fillBlank(source, {
+    guardianType: user?.guardianType,
+    displayName: user?.organizationName || user?.name,
+    legalName: user?.name,
+    document: user?.document,
+    email: user?.email,
+    phone: user?.phone,
+    zipCode: user?.zipCode,
+    address: user?.address,
+    city: city || undefined,
+  })
   const missingFields = missingGuardianFields(source)
   return { ...source, userId, isComplete: missingFields.length === 0, missingFields }
 }
@@ -105,8 +148,16 @@ export const organizationPets = async (userId: string) => {
   })
 }
 
-/** Papel de demonstração: `X-Demo-Role` / `?role=` (padrão ADMIN). */
+/**
+ * Papel na organização. No modo JWT o cabeçalho `X-Demo-Role` é ignorado:
+ * clientes não podem decidir own permission. Até existir membership real (#26/#28),
+ * guardiões e moderadores da plataforma podem aprovar; os demais não.
+ */
 export function demoRole(req: Request): 'ADMIN' | 'VOLUNTEER' {
+  if (req.auth) {
+    const guardian = req.user?.roles?.includes('GUARDIAN') ?? false
+    return req.auth.platformRole === 'MODERADOR' || guardian ? 'ADMIN' : 'VOLUNTEER'
+  }
   const value = String(req.headers['x-demo-role'] || req.query.role || '').toUpperCase()
   return value === 'VOLUNTEER' ? 'VOLUNTEER' : 'ADMIN'
 }

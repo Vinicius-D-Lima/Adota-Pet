@@ -43,13 +43,13 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
   const queryClient = useQueryClient()
   const account = useDemoAccount()
   const isGuardian = account.profilePath === '/perfil?tipo=responsavel'
-  const requestsQuery = useAdoptionRequests()
+  const requestsQuery = useAdoptionRequests(account.status !== 'loading')
   const requestCount =
     requestsQuery.data?.filter((item) => isActiveRequest(item.status)).length ?? 0
   const [open, setOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
-  const favoriteCount = useFavoriteIds().data?.length ?? 0
+  const favoriteCount = useFavoriteIds(account.status !== 'loading').data?.length ?? 0
   const receivedRequestCount =
     useReceivedRequests(account.isAuthenticated && isGuardian).data?.filter((item) =>
       ['Enviada', 'Em análise'].includes(item.status),
@@ -94,11 +94,12 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
     }
   }, [])
 
-  const logout = () => {
-    account.logout()
-    queryClient.clear()
+  const logout = async () => {
     setAccountMenuOpen(false)
     setOpen(false)
+    // No modo real isto chama POST /auth/logout e limpa a sessão em memória.
+    await account.logout()
+    queryClient.clear()
     navigate('/', { replace: true })
   }
 

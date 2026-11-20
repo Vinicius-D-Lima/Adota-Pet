@@ -161,6 +161,12 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 - **Decisão:** `apps/api` centraliza configuração validada por Zod (fail-fast), erro padrão com `details`, validação de `body`/`query`/`params` pelos schemas de `@adotapet/shared`, helmet, CORS por origem configurada, rate limit, limite de corpo, logs pino com `requestId` e redação de dados sensíveis, health com consulta ao banco e OpenAPI derivada das rotas e dos schemas. O banco de desenvolvimento e o de teste ficam no Neon: o setup do Vitest cria um database com sufixo `_test`, aplica migrations e trunca as tabelas entre testes.
 - **Consequência:** todo módulo seguinte herda a mesma base sem reimplementar infraestrutura. Nenhum teste aponta para o banco principal; se não houver URL de teste, só os dois testes de integração são ignorados. Os 12 IDs `INF-01` a `INF-12` estão em [`docs/testes/infra-api.md`](testes/infra-api.md).
 
+## 31. Implementação da autenticação no backend (#48)
+
+- **Contexto:** a decisão 22 definiu o modelo (JWT curto + refresh rotacionado em cookie), mas não as bibliotecas nem como conviver com os módulos legados que ainda leem `X-Demo-User-Id`.
+- **Decisão:** `jose` para JWT HS256 (algoritmo fixo na verificação, o que rejeita `alg: none` e troca de algoritmo), `@node-rs/argon2` para senhas (hash `$argon2id$`, sem etapa de compilação nativa no CI) e SHA-256 do token opaco para o refresh no banco. `platformRole` (`USUARIO`/`MODERADOR`) é um enum novo, separado de `role`/`roles`, que pertencem ao contrato do mock. O middleware `requireAuth` preenche `req.auth`/`req.user`; `currentUser` prefere essa identidade quando presente, mantendo o cabeçalho demo apenas como transição até o frontend #4.
+- **Consequência:** cadastro descarta campos privilegiados por padrão do Zod (sem `.strict()` no corpo de registro), login roda argon2 mesmo para e-mail inexistente e reuso de refresh revoga a cadeia inteira. As rotas ficam em `/auth/*` e `/api/auth/*`, com `GET /me` como alias. O e-mail virou único no banco; o seed dá um e-mail válido ao `demo-empty`, que vinha com `""` do mock. Sem URL de banco, os 16 testes `AUTH-*` são ignorados como `INF-11`/`INF-12` (ver [`docs/testes/auth.md`](testes/auth.md)).
+
 ## Decisão pendente: acessibilidade
 
 O trabalho de acessibilidade (#57) foi mesclado e depois **revertido** (PR #82). Ele não está na `dev`. Veja [Histórico](historico.md#o-revert-da-acessibilidade-81-e-82) e [Roadmap](roadmap.md#acessibilidade-57).

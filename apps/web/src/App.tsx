@@ -3,6 +3,7 @@ import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Layout } from './components/Layout'
 import { OrganizacaoGuard } from './components/OrganizacaoGuard'
+import { Feedback } from './components/ui'
 import { useAdopterProfile } from './hooks/useAdopterProfile'
 import { useGuardianProfile } from './hooks/useGuardianProfile'
 import { useDemoAccount } from './hooks/useDemoAccount'
@@ -50,12 +51,26 @@ const OrganizationRequestDetailPage = named(
 )
 const NotFoundPage = named(() => import('./pages/NotFoundPage'), 'NotFoundPage')
 
-function ProtectedRoute({ children }: { children: ReactNode }) {
+/** Não redireciona enquanto o refresh inicial está em voo (#4/#5: sem "piscar"). */
+function SessionPending() {
+  return <Feedback>Verificando sua sessão...</Feedback>
+}
+
+export function ProtectedRoute({ children }: { children: ReactNode }) {
   const account = useDemoAccount()
   const location = useLocation()
+  if (account.status === 'loading') return <SessionPending />
   if (!account.isAuthenticated) {
     return <Navigate to="/entrar" replace state={{ from: location.pathname }} />
   }
+  return children
+}
+
+/** Usuário autenticado não precisa ver login/cadastro (#5). */
+function GuestRoute({ children }: { children: ReactNode }) {
+  const account = useDemoAccount()
+  if (account.status === 'loading') return <SessionPending />
+  if (account.isAuthenticated) return <Navigate to="/" replace />
   return children
 }
 
@@ -68,6 +83,7 @@ function AccountTypeRoute({
 }) {
   const account = useDemoAccount()
   const location = useLocation()
+  if (account.status === 'loading') return <SessionPending />
   if (!account.isAuthenticated)
     return <Navigate to="/entrar" replace state={{ from: location.pathname }} />
   const isGuardian = account.profilePath === '/perfil?tipo=responsavel'
@@ -86,8 +102,8 @@ function OrganizationArea() {
 
 export default function App() {
   const account = useDemoAccount()
-  const profileQuery = useAdopterProfile()
-  const guardianProfileQuery = useGuardianProfile()
+  const profileQuery = useAdopterProfile(account.status !== 'loading')
+  const guardianProfileQuery = useGuardianProfile(account.status !== 'loading')
   const { pathname } = useLocation()
   const isGuardianAccount = account.profilePath === '/perfil?tipo=responsavel'
   const profileName = isGuardianAccount
@@ -190,9 +206,30 @@ export default function App() {
                 element={<OrganizationRequestDetailPage />}
               />
             </Route>
-            <Route path="/cadastro" element={<CreateAccountPage />} />
-            <Route path="/criar-conta" element={<CreateAccountPage />} />
-            <Route path="/entrar" element={<LoginPage />} />
+            <Route
+              path="/cadastro"
+              element={
+                <GuestRoute>
+                  <CreateAccountPage />
+                </GuestRoute>
+              }
+            />
+            <Route
+              path="/criar-conta"
+              element={
+                <GuestRoute>
+                  <CreateAccountPage />
+                </GuestRoute>
+              }
+            />
+            <Route
+              path="/entrar"
+              element={
+                <GuestRoute>
+                  <LoginPage />
+                </GuestRoute>
+              }
+            />
             <Route
               path="/denuncias/nova"
               element={

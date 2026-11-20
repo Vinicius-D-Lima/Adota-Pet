@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { completeDemoProfile, getDemoPersonalData } from '../lib/demoAccount'
+import { isRealAuth } from '../lib/session'
 import type { Profile, ProfileDraft } from '../types'
 import { calculateProfileCompletion } from '../utils/profileCompletion'
 
@@ -60,12 +61,15 @@ export function toAdopterProfile(response: AdopterProfileResponse): AdopterProfi
   }
 }
 
-export function useAdopterProfile() {
+export function useAdopterProfile(enabled = true) {
   return useQuery({
+    enabled,
     queryKey: adopterProfileKey,
     queryFn: async () => {
       const response = await api.get<AdopterProfileResponse>(PROFILE_PATH)
-      const personalData = getDemoPersonalData()
+      // No modo real a identidade vem do JWT: nunca mesclar dados do mock,
+      // senão qualquer login exibiria o perfil da conta de demonstração.
+      const personalData = isRealAuth() ? null : getDemoPersonalData()
       const defaults = Object.fromEntries(
         Object.entries(personalData ?? {}).filter(
           ([, value]) => typeof value === 'string' && value,
@@ -95,7 +99,7 @@ export function useSaveAdopterProfile() {
       toAdopterProfile(await api.put<AdopterProfileResponse>(PROFILE_PATH, profile)),
     onSuccess: (savedProfile) => {
       queryClient.setQueryData(adopterProfileKey, savedProfile)
-      if (savedProfile.isComplete) completeDemoProfile('/perfil')
+      if (savedProfile.isComplete && !isRealAuth()) completeDemoProfile('/perfil')
     },
   })
 }

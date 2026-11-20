@@ -40,22 +40,27 @@ cp apps/web/.env.example apps/web/.env
 cp apps/api/.env.example apps/api/.env   # somente para a API real
 ```
 
-| Variável                | Padrão                  | Onde         | Descrição                                                    |
-| ----------------------- | ----------------------- | ------------ | ------------------------------------------------------------ |
-| `VITE_API_URL`          | `/api`                  | Frontend     | URL base da API. Troque para usar outra API                  |
-| `VITE_API_PROXY_TARGET` | `localhost:3002`        | Frontend     | Destino do proxy; `dev:mock` ajusta para `localhost:3001`    |
-| `MOCK_PORT`             | `3001`                  | API simulada | Porta do json-server                                         |
-| `MOCK_DELAY_MS`         | `300`                   | API simulada | Latência simulada, em milissegundos                          |
-| `DATABASE_URL`          | —                       | API real     | String de conexão do Postgres na nuvem (obrigatória)         |
-| `TEST_DATABASE_URL`     | sufixo `_test`          | API real     | Banco de teste separado; nunca aponta os testes ao principal |
-| `PORT`                  | `3002`                  | API real     | Porta do Express                                             |
-| `CORS_ORIGIN`           | `http://localhost:5173` | API real     | Origens liberadas pelo CORS, separadas por vírgula           |
-| `RATE_LIMIT_MAX`        | `100`                   | API real     | Requisições permitidas por janela                            |
-| `RATE_LIMIT_WINDOW_MS`  | `60000`                 | API real     | Janela do rate limit, em ms                                  |
-| `BODY_LIMIT`            | `100kb`                 | API real     | Limite do corpo JSON                                         |
-| `LOG_LEVEL`             | `info`                  | API real     | Nível dos logs estruturados                                  |
+| Variável                | Padrão                  | Onde         | Descrição                                                        |
+| ----------------------- | ----------------------- | ------------ | ---------------------------------------------------------------- |
+| `VITE_API_URL`          | `/api`                  | Frontend     | URL base da API. Troque para usar outra API                      |
+| `VITE_API_PROXY_TARGET` | `localhost:3002`        | Frontend     | Destino do proxy; `dev:mock` ajusta para `localhost:3001`        |
+| `MOCK_PORT`             | `3001`                  | API simulada | Porta do json-server                                             |
+| `MOCK_DELAY_MS`         | `300`                   | API simulada | Latência simulada, em milissegundos                              |
+| `DATABASE_URL`          | —                       | API real     | String de conexão do Postgres na nuvem (obrigatória)             |
+| `TEST_DATABASE_URL`     | sufixo `_test`          | API real     | Banco de teste separado; nunca aponta os testes ao principal     |
+| `PORT`                  | `3002`                  | API real     | Porta do Express                                                 |
+| `CORS_ORIGIN`           | `http://localhost:5173` | API real     | Origens liberadas pelo CORS, separadas por vírgula               |
+| `RATE_LIMIT_MAX`        | `100`                   | API real     | Requisições permitidas por janela                                |
+| `RATE_LIMIT_WINDOW_MS`  | `60000`                 | API real     | Janela do rate limit, em ms                                      |
+| `BODY_LIMIT`            | `100kb`                 | API real     | Limite do corpo JSON                                             |
+| `LOG_LEVEL`             | `info`                  | API real     | Nível dos logs estruturados                                      |
+| `JWT_SECRET`            | —                       | API real     | Chave de assinatura dos JWTs, mínimo 32 caracteres (obrigatória) |
+| `JWT_ACCESS_TTL`        | `15m`                   | API real     | Validade do access token                                         |
+| `JWT_REFRESH_TTL_DAYS`  | `7`                     | API real     | Validade do refresh token em dias                                |
+| `LOGIN_RATE_LIMIT_MAX`  | `5`                     | API real     | Tentativas de login por IP + e-mail antes do 429                 |
+| `COOKIE_SECURE`         | `true`                  | API real     | Flag `Secure` do cookie de refresh                               |
 
-O banco é gerenciado na nuvem (Neon), sem Docker. A API valida as variáveis na inicialização: se `DATABASE_URL` estiver ausente, ela encerra com uma mensagem que cita a variável. A URL de testes é derivada da principal por padrão (`.../adotapet` → `.../adotapet_test`) e o setup do Vitest cria e migra esse database separado.
+O banco é gerenciado na nuvem (Neon), sem Docker. A API valida as variáveis na inicialização: se `DATABASE_URL` ou `JWT_SECRET` estiverem ausentes, ela encerra com uma mensagem que cita a variável. A URL de testes é derivada da principal por padrão (`.../adotapet` → `.../adotapet_test`) e o setup do Vitest cria e migra esse database separado.
 
 ## 5. Subir o projeto
 

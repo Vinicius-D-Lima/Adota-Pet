@@ -7,6 +7,7 @@ import { loadConfig, type ApiConfig } from './config.js'
 import { errorHandler, sendError } from './http.js'
 import { logger as defaultLogger, requestDetailsLogger, requestLogger } from './logger.js'
 import { mountDocs } from './openapi.js'
+import { createAuthRouter, meRouter } from './routes/auth.js'
 import { createHealthRouter } from './routes/health.js'
 import { apiRouter } from './routes/index.js'
 
@@ -35,7 +36,7 @@ export function createApp(options: AppOptions = {}): Express {
     cors({
       origin: config.CORS_ORIGIN,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'X-Demo-User-Id', 'X-Demo-Role', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'X-Demo-User-Id', 'X-Demo-Role', 'Authorization', 'Cookie'],
     }),
   )
   app.use(express.json({ limit: config.BODY_LIMIT }))
@@ -54,7 +55,12 @@ export function createApp(options: AppOptions = {}): Express {
     }),
   )
 
+  // Autenticação (#48): aliases `/auth/*` (issue) e `/api/auth/*` (contrato da API).
+  const authRouter = createAuthRouter(config)
   app.use(createHealthRouter(options.checkDatabase))
+  app.use('/auth', authRouter)
+  app.use('/api/auth', authRouter)
+  app.use('/me', meRouter)
   app.use('/api', apiRouter)
   mountDocs(app)
 

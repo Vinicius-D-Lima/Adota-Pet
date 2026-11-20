@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { requireAuth } from '../auth.js'
 import { sendError } from '../http.js'
 import { favoritesRouter } from './favorites.js'
 import { notificationsRouter } from './notifications.js'
@@ -10,6 +11,19 @@ import { savedFiltersRouter } from './savedFilters.js'
 
 /** API do Adota-Pet: mesmo contrato do mock-server, persistida no PostgreSQL. */
 export const apiRouter = Router()
+
+// Os routers são montados na raiz de /api, então um `router.use(requireAuth)`
+// dentro deles também protegeria /api/pets (público). Em vez disso, exigimos JWT
+// apenas nos prefixos privados conhecidos (#4/#5). Paths desconhecidos seguem
+// para o 404 abaixo, e /api/auth/* já é montado antes de /api em app.ts.
+const PRIVATE_PREFIXES = ['/me', '/requests'] as const
+apiRouter.use((req, res, next) => {
+  const isPrivate = PRIVATE_PREFIXES.some(
+    (prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`),
+  )
+  if (isPrivate) return requireAuth(req, res, next)
+  return next()
+})
 
 apiRouter.use(profileRouter)
 apiRouter.use(organizationRouter)

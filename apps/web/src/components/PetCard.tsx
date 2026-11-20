@@ -1,7 +1,7 @@
 import { Heart, MapPin } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useDemoAccount } from '../hooks/useDemoAccount'
 import { useFavorite } from '../hooks/useFavorites'
-import { hasDemoAccount } from '../lib/demoAccount'
 import type { Pet } from '../types'
 import { HealthBadges } from './HealthBadges'
 import { Card, TextLink, cx } from './ui'
@@ -36,7 +36,8 @@ export function PetCard({ pet, compatibilityScore, compatibilityLevel }: PetCard
   const navigate = useNavigate()
   const from = `${location.pathname}${location.search}`
   const petPath = `/pets/${pet.id}`
-  const hasAccount = hasDemoAccount()
+  // No modo real, `isAuthenticated` vem do JWT — não do storage do mock.
+  const hasAccount = useDemoAccount().isAuthenticated
   const accessPath = '/criar-conta'
   const canInteract = hasAccount
 

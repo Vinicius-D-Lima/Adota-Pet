@@ -3,7 +3,11 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { hash } from '@node-rs/argon2'
 import { prisma } from '../src/db.js'
+
+/** Senha única das contas de demonstração (documentada no README da API). */
+const DEMO_PASSWORD = 'Senha@123'
 
 interface SeedData {
   users: Array<{
@@ -69,8 +73,11 @@ const seedPath = path.resolve(here, '../../web/mock-server/db.seed.json')
 const seed = JSON.parse(readFileSync(seedPath, 'utf8')) as SeedData
 
 async function main() {
+  const demoPasswordHash = await hash(DEMO_PASSWORD)
+
   // Reset em ordem de dependência (FKs) dentro de uma transação: seed idempotente.
   await prisma.$transaction([
+    prisma.refreshToken.deleteMany(),
     prisma.savedFilter.deleteMany(),
     prisma.notificationPreference.deleteMany(),
     prisma.notification.deleteMany(),
@@ -87,12 +94,27 @@ async function main() {
     data: seed.users.map(({ id, name, email, role, roles, lat, lng }) => ({
       id,
       name,
-      email,
+      // `demo-empty` veio do mock com e-mail vazio; o e-mail agora é único no banco.
+      email: email || `${id}@adotapet.local`,
       role,
       roles,
       lat: lat ?? null,
       lng: lng ?? null,
+      passwordHash: demoPasswordHash,
     })),
+  })
+
+  // Terceira conta pedida pela issue #48: moderador para o fluxo de denúncias (#26).
+  await prisma.user.create({
+    data: {
+      id: 'demo-moderator',
+      name: 'Moderador AdotaPet',
+      email: 'moderador@adotapet.local',
+      role: 'MODERADOR',
+      roles: ['MODERADOR'],
+      passwordHash: demoPasswordHash,
+      platformRole: 'MODERADOR',
+    },
   })
 
   await prisma.pet.createMany({
@@ -188,6 +210,10 @@ async function main() {
   ])
   console.log(
     `Seed concluído: ${counts[0]} usuários, ${counts[1]} pets, ${counts[2]} solicitações, ${counts[3]} notificações.`,
+  )
+  console.log(
+    `Contas de demonstração (senha ${DEMO_PASSWORD}): demo@adotapet.local (adotante), ` +
+      'contato@institutopatinhas.org (ONG) e moderador@adotapet.local (moderador).',
   )
 }
 

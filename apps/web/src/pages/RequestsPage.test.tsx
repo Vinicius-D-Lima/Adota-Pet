@@ -267,6 +267,20 @@ describe('RequestsPage', () => {
     expect(await screen.findByText(/nenhuma solicitação ainda/i)).toBeInTheDocument()
   })
 
+  it('erro no carregamento mantém a página e oferece nova tentativa', async () => {
+    getMock.mockRejectedValueOnce(ApiError.network()).mockResolvedValue(list())
+    renderWithProviders(<RequestsPage />)
+
+    expect(
+      await screen.findByText(/não foi possível carregar suas solicitações/i),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /minhas solicitações/i })).toBeInTheDocument()
+    expect(screen.queryByText(/algo deu errado/i)).not.toBeInTheDocument()
+
+    await userEvent.setup().click(screen.getByRole('button', { name: /tentar novamente/i }))
+    expect(await screen.findByText(/nenhuma solicitação ainda/i)).toBeInTheDocument()
+  })
+
   it('exibe o badge de mensagens não lidas e abre o chat ao expandir a solicitação', async () => {
     getMock.mockImplementation((path) => {
       if (path === '/me/requests') {

@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ApiError } from '../lib/ApiError'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { CreateAccountPage } from './CreateAccountPage'
 
@@ -42,6 +43,7 @@ describe('CreateAccountPage', () => {
     await user.type(screen.getByLabelText('CEP'), '01310100')
     await user.type(screen.getByLabelText('Endereço completo'), 'Avenida Paulista, 1000')
     await user.type(screen.getByPlaceholderText('Crie uma senha'), 'senha123')
+    await user.type(screen.getByPlaceholderText('Repita sua senha'), 'senha123')
     await user.click(screen.getByRole('button', { name: /Criar minha conta/ }))
 
     const personalData = {
@@ -82,6 +84,7 @@ describe('CreateAccountPage', () => {
     await user.type(screen.getByLabelText('CEP'), '01310100')
     await user.type(screen.getByLabelText('Endereço completo'), 'Rua das Flores, 100')
     await user.type(screen.getByPlaceholderText('Crie uma senha'), 'senha123')
+    await user.type(screen.getByPlaceholderText('Repita sua senha'), 'senha123')
     await user.click(screen.getByRole('button', { name: /Criar minha conta/ }))
 
     const personalData = {
@@ -116,5 +119,45 @@ describe('CreateAccountPage', () => {
     expect(await screen.findByText('Informe seu nome completo.')).toBeInTheDocument()
     expect(mocks.put).not.toHaveBeenCalled()
     expect(mocks.createDemoAccount).not.toHaveBeenCalled()
+  })
+
+  it('exige confirmação de senha e acusa senhas diferentes', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<CreateAccountPage />)
+
+    expect(screen.getByPlaceholderText('Repita sua senha')).toBeInTheDocument()
+
+    await user.type(screen.getByLabelText('Nome completo'), 'Maria da Silva')
+    await user.type(screen.getByLabelText('Data de nascimento'), '1990-05-10')
+    await user.type(screen.getByLabelText('CPF'), '52998224725')
+    await user.type(screen.getByLabelText('E-mail'), 'maria@exemplo.com')
+    await user.type(screen.getByLabelText('Celular'), '11999999999')
+    await user.type(screen.getByLabelText('CEP'), '01310100')
+    await user.type(screen.getByLabelText('Endereço completo'), 'Rua das Flores, 100')
+    await user.type(screen.getByPlaceholderText('Crie uma senha'), 'senha123')
+    await user.type(screen.getByPlaceholderText('Repita sua senha'), 'outrasenha')
+    await user.click(screen.getByRole('button', { name: /Criar minha conta/ }))
+
+    expect(await screen.findByText('As senhas não coincidem.')).toBeInTheDocument()
+    expect(mocks.put).not.toHaveBeenCalled()
+  })
+
+  it('mostra erro de e-mail já cadastrado no campo correto', async () => {
+    mocks.put.mockRejectedValueOnce(new ApiError(409, 'Já existe uma conta com este e-mail'))
+    const user = userEvent.setup()
+    renderWithProviders(<CreateAccountPage />)
+
+    await user.type(screen.getByLabelText('Nome completo'), 'Maria da Silva')
+    await user.type(screen.getByLabelText('Data de nascimento'), '1990-05-10')
+    await user.type(screen.getByLabelText('CPF'), '52998224725')
+    await user.type(screen.getByLabelText('E-mail'), 'maria@exemplo.com')
+    await user.type(screen.getByLabelText('Celular'), '11999999999')
+    await user.type(screen.getByLabelText('CEP'), '01310100')
+    await user.type(screen.getByLabelText('Endereço completo'), 'Rua das Flores, 100')
+    await user.type(screen.getByPlaceholderText('Crie uma senha'), 'senha123')
+    await user.type(screen.getByPlaceholderText('Repita sua senha'), 'senha123')
+    await user.click(screen.getByRole('button', { name: /Criar minha conta/ }))
+
+    expect(await screen.findByText('Já existe uma conta com este e-mail')).toBeInTheDocument()
   })
 })

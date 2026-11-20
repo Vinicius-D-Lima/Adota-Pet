@@ -42,13 +42,13 @@ jobs:
         run: npm run build:shared && npm run build:api
 
   backend:
-    name: Backend - #47 padrões transversais
+    name: Backend - #47 padrões e #48 autenticação
     runs-on: ubuntu-latest
     env:
       # Secrets do Postgres na nuvem: a URL administrativa cria/migra o database
       # apontado por TEST_DATABASE_URL (deve terminar em _test e ser diferente da
       # principal). Se TEST_DATABASE_URL estiver vazio, o setup deriva o sufixo.
-      # Sem nenhuma URL, INF-11/INF-12 são ignorados; os outros testes seguem.
+      # Sem nenhuma URL, INF-11/INF-12 e AUTH-01..16 são ignorados; os outros seguem.
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       TEST_DATABASE_URL: ${{ secrets.TEST_DATABASE_URL }}
       CORS_ORIGIN: http://localhost:5173
@@ -67,7 +67,7 @@ jobs:
         run: npm run lint -w @adotapet/api
       - name: INF-05 - tipos da API
         run: npm run typecheck -w @adotapet/api
-      - name: INF-01 a INF-12 - testes de integração da API
+      - name: INF-01 a INF-12 e AUTH-01 a AUTH-16 - testes da API
         run: npm test -w @adotapet/api
       - name: INF-10 - build da API
         run: npm run build -w @adotapet/api

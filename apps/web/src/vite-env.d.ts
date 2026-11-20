@@ -10,3 +10,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv
 }
+
+/** Definido pelo Vite: `real` com o backend na 3002, `demo` no mock/testes. */
+declare const __AUTH_MODE__: 'real' | 'demo'

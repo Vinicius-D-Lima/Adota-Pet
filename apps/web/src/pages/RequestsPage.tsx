@@ -71,16 +71,37 @@ export function RequestsPage() {
     setToCancel(null)
   }
 
+  // `data` pode estar undefined após limpar o cache ou trocar de conta. Nunca
+  // deixe isso chegar ao `.filter()` abaixo e cair no ErrorBoundary global.
+  const requests = requestsQuery.data ?? []
+
   if (requestsQuery.isPending) {
     return <Feedback>Carregando solicitações...</Feedback>
   }
 
-  // Só é erro de tela cheia se nunca houve dados: um refetch que falha não pode derrubar o modal aberto.
-  if (requestsQuery.isLoadingError) {
-    return <Feedback error>Não foi possível carregar suas solicitações. Tente novamente.</Feedback>
+  // Só tratamos como erro de carregamento quando nunca houve dados: um refetch
+  // que falha não pode derrubar o modal aberto nem a lista já exibida.
+  if (requestsQuery.isError && !requestsQuery.data) {
+    return (
+      <PageSurface>
+        <Container as="section" className="pb-[90px] pt-[35px] md:pt-[54px]">
+          <PageIntro
+            eyebrow="Acompanhamento"
+            title="Minhas solicitações"
+            description="Veja o andamento das suas adoções e as próximas etapas de cada processo."
+          />
+          <EmptyState
+            role="alert"
+            icon={<ClipboardList size={36} />}
+            title="Não foi possível carregar suas solicitações"
+            description="Verifique sua conexão e tente novamente."
+          >
+            <Button onClick={() => void requestsQuery.refetch()}>Tentar novamente</Button>
+          </EmptyState>
+        </Container>
+      </PageSurface>
+    )
   }
-
-  const requests = requestsQuery.data
   const stageFromUrl = searchParams.get('estagio')
   const activeStageKey: RequestStage = isRequestStage(stageFromUrl) ? stageFromUrl : 'all'
   const activeStage = REQUEST_STAGES.find(({ key }) => key === activeStageKey) ?? REQUEST_STAGES[0]

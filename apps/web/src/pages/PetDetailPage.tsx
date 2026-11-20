@@ -17,10 +17,10 @@ import {
 } from '../components/ui'
 import { RatingStars } from '../components/RatingStars'
 import { useActiveRequestForPet } from '../hooks/useAdoptionRequests'
+import { useDemoAccount } from '../hooks/useDemoAccount'
 import { useFavorite } from '../hooks/useFavorites'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
-import { hasDemoAccount } from '../lib/demoAccount'
 
 const pagePadding = 'pb-[90px] pt-[35px] md:pt-[54px]'
 
@@ -46,8 +46,9 @@ export function PetDetailPage() {
   const activeRequest = useActiveRequestForPet(petId)
   const { isFavorite, toggle, isPending: isFavoritePending } = useFavorite(petId ?? '')
   const backTo = (location.state as { from?: string } | null)?.from ?? '/pets'
+  const isAuthenticated = useDemoAccount().isAuthenticated
   const handleFavorite = () => {
-    if (hasDemoAccount()) toggle()
+    if (isAuthenticated) toggle()
     else {
       navigate('/criar-conta', { state: { from: `${location.pathname}${location.search}` } })
     }

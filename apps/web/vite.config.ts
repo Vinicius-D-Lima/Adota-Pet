@@ -13,17 +13,30 @@ const proxy = { '/api': apiTarget }
 // estar liberado. O ponto inicial libera todos os subdomínios.
 const allowedHosts = ['.app.github.dev']
 
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  // O backend aceita o prefixo /api, então não é preciso reescrever o caminho.
-  server: { proxy, allowedHosts },
-  preview: { proxy, allowedHosts },
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    globals: true,
-    // Só os testes do frontend e do mock: os do backend (workspace) rodam com o
-    // Vitest próprio do backend, em ambiente node.
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'mock-server/**/*.test.js', 'vite.config.test.js'],
-  },
+export default defineConfig(({ mode }) => {
+  // VITE_AUTH_MODE força o modo. Por padrão: mock/testes usam a conta demo;
+  // o backend real (3002) usa JWT (#4/#5).
+  const requested = process.env.VITE_AUTH_MODE
+  const authMode =
+    requested === 'real' || requested === 'demo'
+      ? requested
+      : mode === 'test' || apiTarget.includes('3001')
+        ? 'demo'
+        : 'real'
+
+  return {
+    plugins: [react(), tailwindcss()],
+    define: { __AUTH_MODE__: JSON.stringify(authMode) },
+    // O backend aceita o prefixo /api, então não é preciso reescrever o caminho.
+    server: { proxy, allowedHosts },
+    preview: { proxy, allowedHosts },
+    test: {
+      environment: 'jsdom',
+      setupFiles: ['./src/test/setup.ts'],
+      globals: true,
+      // Só os testes do frontend e do mock: os do backend (workspace) rodam com o
+      // Vitest próprio do backend, em ambiente node.
+      include: ['src/**/*.{test,spec}.{ts,tsx}', 'mock-server/**/*.test.js', 'vite.config.test.js'],
+    },
+  }
 })

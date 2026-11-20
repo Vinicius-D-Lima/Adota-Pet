@@ -14,6 +14,8 @@ function ensureEnv(name: string, fallback: string): void {
 }
 
 ensureEnv('DATABASE_URL', 'postgresql://teste:teste@localhost:5432/adotapet')
+// Chave de teste determinística: nunca usar fora da suíte.
+ensureEnv('JWT_SECRET', 'chave-de-teste-autenticacao-adotapet-com-mais-de-32-caracteres')
 process.env.NODE_ENV = 'test'
 ensureEnv('CORS_ORIGIN', 'http://localhost:5173')
 // INF-08 cria o próprio logger em nível debug; o global fica silencioso na suíte.

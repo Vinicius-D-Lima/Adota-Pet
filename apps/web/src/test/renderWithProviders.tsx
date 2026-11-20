@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, type RenderOptions } from '@testing-library/react'
 import type { ReactElement, ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
+import { AuthProvider } from '../components/AuthProvider'
 
 export function createTestQueryClient() {
   return new QueryClient({
@@ -17,7 +18,9 @@ export function TestProviders({ children, route = '/' }: { children: ReactNode; 
   const queryClient = createTestQueryClient()
   return (
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+      <MemoryRouter initialEntries={[route]}>
+        <AuthProvider>{children}</AuthProvider>
+      </MemoryRouter>
     </QueryClientProvider>
   )
 }
@@ -35,7 +38,9 @@ export function renderWithProviders(
     queryClient,
     ...render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>
+        <MemoryRouter initialEntries={[route]}>
+          <AuthProvider>{ui}</AuthProvider>
+        </MemoryRouter>
       </QueryClientProvider>,
       options,
     ),

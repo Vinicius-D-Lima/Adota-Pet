@@ -8,6 +8,15 @@ Garante cadastro, login, refresh rotacionado em cookie httpOnly e proteção con
 
 Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest contra o Postgres de teste. O nome do teste no código começa com o ID entre colchetes, por exemplo `it('[AUTH-01] ...')`, para que este documento, a issue e o código se encontrem pelo mesmo identificador.
 
+Os 16 testes vivem em `apps/api/src/auth.test.ts` e usam o mesmo database dedicado da #47 (`neondb_test`, no Neon — **sem Docker**). O `globalSetup` cria/migra esse database e `test/reset.ts` limpa as tabelas, inclusive `RefreshToken`, antes de cada teste:
+
+```bash
+npm test -w @adotapet/api
+# sem DATABASE_URL/TEST_DATABASE_URL válidos: AUTH-01..16 são ignorados com aviso
+```
+
+A suíte usa `JWT_SECRET` de teste definido em `apps/api/test/setup.ts`; nenhuma credencial real aparece no código.
+
 ## Testes
 
 | ID        | Tipo                           | O que verifica                                          | Como é testado                                                                                                                          |
@@ -19,10 +28,10 @@ Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest c
 | `AUTH-05` | Segurança · Autenticação       | Login não revela se o e-mail existe                     | Senha errada e e-mail inexistente devolvem o mesmo status, a mesma mensagem e tempo de resposta semelhante. Evita enumeração de contas. |
 | `AUTH-06` | Segurança · Limite de uso      | 6ª tentativa de login em 1 minuto retorna 429           | Por IP + e-mail. Evita força bruta.                                                                                                     |
 | `AUTH-07` | Funcional                      | Login emite access token curto e cookie de refresh      | O access token expira em cerca de 15 minutos; o refresh vem em cookie.                                                                  |
-| `AUTH-08` | Segurança · Autenticação       | Cookie de refresh com flags de segurança                | Confere `HttpOnly`, `Secure` (fora do desenvolvimento) e `SameSite`; o access token nunca é gravado em cookie.                          |
+| `AUTH-08` | Segurança · Autenticação       | Cookie de refresh com flags de segurança                | Confere `HttpOnly`, `Secure` (padrão, configurável com `COOKIE_SECURE`) e `SameSite=Lax`; o access token nunca é gravado em cookie.     |
 | `AUTH-09` | Segurança · Autenticação       | JWT adulterado é rejeitado                              | Troca um caractere da assinatura e espera 401.                                                                                          |
-| `AUTH-10` | Segurança · Autenticação       | JWT com `alg: none` ou algoritmo inesperado é rejeitado | Monta um token sem assinatura e outro com HS256 quando o esperado é outro algoritmo; ambos retornam 401.                                |
-| `AUTH-11` | Segurança · Autenticação       | JWT expirado é rejeitado                                | Com relógio simulado, espera 401 depois do prazo.                                                                                       |
+| `AUTH-10` | Segurança · Autenticação       | JWT com `alg: none` ou algoritmo inesperado é rejeitado | Monta um token `alg: none` e outro assinado com HS384 quando a API espera HS256; ambos retornam 401.                                    |
+| `AUTH-11` | Segurança · Autenticação       | JWT expirado é rejeitado                                | Assina um JWT com `iat` no passado e `exp` negativo; espera 401.                                                                        |
 | `AUTH-12` | Segurança · Autenticação       | Refresh rotacionado e reuso detectado                   | Usar o refresh antigo depois da rotação é rejeitado e revoga a cadeia inteira de tokens do usuário.                                     |
 | `AUTH-13` | Segurança · Autenticação       | Logout invalida o refresh                               | Depois do logout o refresh não funciona mais.                                                                                           |
 | `AUTH-14` | Segurança · Mass assignment    | Cadastro ignora campos privilegiados                    | Enviar `platformRole: "MODERADOR"` ou `id` no corpo não altera o papel nem o id do novo usuário.                                        |
