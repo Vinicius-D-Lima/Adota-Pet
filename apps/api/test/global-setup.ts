@@ -54,7 +54,7 @@ export default async function setup() {
     console.log(`[INF-12] migrations aplicadas em ${name}`)
   } catch {
     try {
-      prismaCli(['db', 'push', '--skip-generate'])
+      prismaCli(['db', 'push'])
       console.log(`[INF-12] schema sincronizado em ${name} (db push)`)
     } catch (error) {
       console.warn(`[INF-12] Falha ao aplicar o schema em ${name}:`, error)
