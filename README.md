@@ -86,7 +86,32 @@ npm run dev:all
 
 Atalhos: `npm run dev` (só web), `npm run backend` (só api).
 
-> A autenticação JWT está integrada ao frontend: `/entrar` e `/cadastro` chamam `/auth/login` e `/auth/register`, o access token fica somente em memória e o refresh é um cookie `httpOnly`. Configure `JWT_SECRET` no `apps/api/.env` antes de subir a API. Rotas privadas (perfil, solicitações, questionário e área da organização) exigem `Authorization: Bearer`; home e listagem/detalhe de pets são públicas.
+> A autenticação JWT está integrada ao frontend: `/entrar` e `/cadastro` chamam `/auth/login` e `/auth/register`, o access token fica somente em memória e o refresh é um cookie `httpOnly`. Configure `JWT_SECRET` no `apps/api/.env` antes de subir a API.
+
+### Rotas públicas × protegidas
+
+A proteção de navegação usa guardas do `react-router-dom` — `ProtectedRoute`, `GuestRoute`, `AccountTypeRoute` e `OrganizacaoGuard` (em `apps/web/src/App.tsx`). Não existe `middleware.ts` do Next.js porque a migração para Next foi encerrada.
+
+**Públicas** (acesso sem login):
+
+- `/` — home
+- `/pets` e `/pets/:petId` — listagem e detalhe do pet
+- `/entrar`, `/cadastro` e `/criar-conta` — somente para visitantes; usuário autenticado é redirecionado para `/`
+- `*` — página 404
+
+**Protegidas** (sem sessão redirecionam para `/entrar`; após o login, voltam à rota original):
+
+- `/perfil`
+- `/solicitacoes` e `/solicitacoes/:requestId/enviada`
+- `/pets/:petId/questionario` e `/pets/:petId/compatibilidade`
+- `/favoritos` e `/minhas-buscas`
+- `/notificacoes` e `/notificacoes/preferencias`
+- `/denuncias/nova`
+- `/organizacao` e subrotas — além da sessão, exigem perfil de instituição (`GUARDIAN`)
+
+As rotas de adotante usam `AccountTypeRoute`, que também impede uma conta de instituição de acessá-las. Enquanto a restauração da sessão está em voo, aparece “Verificando sua sessão...” para evitar o “piscar” deslogado.
+
+Os guardas do frontend controlam apenas a **navegação** — não são segurança. A validação real do JWT acontece no backend, a cada requisição aos prefixos privados `/api/me/*` e `/api/requests/*` (`requireAuth` com verificação de assinatura, `iss`, `aud` e expiração), com refresh único e retry em 401. Uma chamada direta à API sem token válido recebe 401 mesmo que a interface mostre a página.
 
 Contas de demonstração no banco principal (senha `Senha@123`): `demo@adotapet.local`, `contato@institutopatinhas.org`, `demo-empty@adotapet.local` e `moderador@adotapet.local`.
 
