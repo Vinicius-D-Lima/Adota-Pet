@@ -1,3 +1,4 @@
+import { questionnaireSchema } from '@adotapet/shared'
 import { Router } from 'express'
 import {
   currentUser,
@@ -9,6 +10,8 @@ import {
   withPet,
 } from '../context.js'
 import { prisma } from '../db.js'
+import { enqueueNewRequestForOrganization } from '../events.js'
+import { Prisma } from '../generated/prisma/client.js'
 import type { FieldError } from '../http.js'
 import { isBlank, list, sendError } from '../http.js'
 import { asRecord } from '../validation.js'
@@ -18,50 +21,49 @@ export const requestsRouter = Router()
 const ACTIVE_STATUSES = ['Enviada', 'Em análise', 'Aprovada']
 const CANCELLABLE_STATUSES = ['Enviada', 'Em análise']
 const FINAL_REQUEST_STATUSES = ['Aprovada', 'Recusada', 'Cancelada']
+const AVAILABLE_PET_STATUS = 'DISPONIVEL'
 
-/** Próximo número de solicitação no padrão `SOL-0000` (começa em 1043). */
-async function nextRequestId(): Promise<string> {
-  const rows = await prisma.adoptionRequest.findMany({ select: { id: true } })
-  const lastNumber = rows.reduce(
-    (max, { id }) => Math.max(max, Number(/^SOL-(\d+)$/.exec(id)?.[1] ?? 0)),
-    1042,
-  )
-  return `SOL-${String(lastNumber + 1).padStart(4, '0')}`
+/** Próximo número de solicitação no padrão `SOL-0000`, gerado pelo banco (#50/REQ-08). */
+async function nextRequestId(tx: Prisma.TransactionClient): Promise<string> {
+  const rows = await tx.$queryRaw<Array<{ value: bigint | number }>>`
+    SELECT nextval('adoption_request_id_seq') AS value
+  `
+  return `SOL-${String(Number(rows[0]?.value ?? 0)).padStart(4, '0')}`
 }
+
+const isUniqueViolation = (error: unknown) =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
 
 requestsRouter.post('/requests', async (req, res) => {
   const { id: userId } = await currentUser(req)
   const body = asRecord(req.body)
-  const petId = body?.petId
-  const answers = body?.answers
-  const details: FieldError[] = []
+  const parsed = questionnaireSchema.safeParse(body?.answers)
+  const missingPetId = isBlank(body?.petId)
 
-  if (isBlank(petId)) details.push({ field: 'petId', message: 'petId é obrigatório' })
-  const given = answers && typeof answers === 'object' ? (answers as Record<string, unknown>) : {}
-  if (!answers || typeof answers !== 'object') {
-    details.push({ field: 'answers', message: 'answers é obrigatório' })
-  }
-  const minLength: Record<string, number> = { motivation: 20, routine: 20, adaptation: 15 }
-  for (const [key, min] of Object.entries(minLength)) {
-    const value = given[key]
-    if (isBlank(value) || String(value).trim().length < min) {
-      details.push({
-        field: `answers.${key}`,
-        message: `${key} deve ter ao menos ${min} caracteres`,
-      })
+  // REQ-01: o mesmo schema do questionário do frontend, com os erros no `details`.
+  if (missingPetId || !parsed.success) {
+    const details: FieldError[] = []
+    if (missingPetId) details.push({ field: 'petId', message: 'petId é obrigatório' })
+    if (!parsed.success) {
+      for (const issue of parsed.error.issues) {
+        const path = issue.path.join('.')
+        details.push({
+          field: path ? `answers.${path}` : 'answers',
+          message: issue.message,
+        })
+      }
     }
+    return sendError(res, 400, 'Validação falhou', details)
   }
-  if (isBlank(given.aloneTime))
-    details.push({ field: 'answers.aloneTime', message: 'aloneTime é obrigatório' })
-  for (const key of ['costs', 'commitment']) {
-    if (given[key] !== true)
-      details.push({ field: `answers.${key}`, message: `${key} precisa ser confirmado` })
-  }
-  if (details.length) return sendError(res, 400, 'Validação falhou', details)
 
-  const pet = await prisma.pet.findUnique({ where: { id: String(petId) } })
+  const pet = await prisma.pet.findUnique({ where: { id: String(body?.petId) } })
   if (!pet) return sendError(res, 404, 'Pet não encontrado')
+  // REQ-03: adotado/arquivado não recebe nova solicitação.
+  if (pet.status !== AVAILABLE_PET_STATUS) {
+    return sendError(res, 409, 'Este pet não está mais disponível para adoção')
+  }
 
+  // REQ-04: o perfil é a fonte da verdade, calculada pelo backend (#18).
   const profile = await getProfile(userId)
   if (!profile.isComplete) {
     return sendError(
@@ -80,24 +82,40 @@ requestsRouter.post('/requests', async (req, res) => {
   })
   if (duplicate) return sendError(res, 409, 'Você já possui uma solicitação ativa para este pet')
 
-  const request = await prisma.adoptionRequest.create({
-    data: {
-      id: await nextRequestId(),
-      userId,
-      petId: pet.id,
-      status: 'Enviada',
-      date: new Date(),
-      message: 'Sua solicitação foi enviada e aguarda o início da análise.',
-      answers: {
-        motivation: String(given.motivation),
-        routine: String(given.routine),
-        aloneTime: String(given.aloneTime),
-        adaptation: String(given.adaptation),
-        costs: true,
-        commitment: true,
-      },
-    },
-  })
+  const date = new Date()
+  let request
+  try {
+    request = await prisma.$transaction(async (tx) => {
+      const created = await tx.adoptionRequest.create({
+        data: {
+          id: await nextRequestId(tx),
+          userId,
+          petId: pet.id,
+          status: 'Enviada',
+          date,
+          message: 'Sua solicitação foi enviada e aguarda o início da análise.',
+          // REQ-06: somente as respostas known são gravadas; status/id/adopterId
+          // enviados no corpo são descartados pelo schema do Zod.
+          answers: parsed.data,
+        },
+      })
+      // REQ-10: evento e solicitação na mesma transação (JOB-07).
+      await enqueueNewRequestForOrganization(tx, {
+        requestId: created.id,
+        petId: pet.id,
+        adopterId: userId,
+        organization: pet.organization,
+        createdAt: date.toISOString(),
+      })
+      return created
+    })
+  } catch (error) {
+    // REQ-07: o índice único parcial é a última linha de defesa contra a corrida.
+    if (isUniqueViolation(error)) {
+      return sendError(res, 409, 'Você já possui uma solicitação ativa para este pet')
+    }
+    throw error
+  }
   res.status(201).json(await withPet(request))
 })
 
@@ -118,10 +136,12 @@ requestsRouter.get('/me/requests', async (req, res) => {
 
 requestsRouter.get('/requests/:id', async (req, res) => {
   const { id: userId } = await currentUser(req)
-  const request = await prisma.adoptionRequest.findFirst({
-    where: { id: req.params.id, userId },
-  })
+  const request = await prisma.adoptionRequest.findUnique({ where: { id: req.params.id } })
   if (!request) return sendError(res, 404, 'Solicitação não encontrada')
+  // REQ-05: dono ou membro da organização do pet; ninguém mais.
+  if (!(await isChatParticipant(request, userId))) {
+    return sendError(res, 403, 'Você não tem acesso a esta solicitação')
+  }
   res.json(await withPet(request))
 })
 

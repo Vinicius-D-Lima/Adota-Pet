@@ -132,6 +132,8 @@ model Pet {
   lat                  Float?
   lng                  Float?
   createdAt            DateTime
+  /// #49/#50: só DISPONIVEL aceita solicitação; ADOTADO e ARQUIVADO não.
+  status               String   @default("DISPONIVEL")
 
   favorites            Favorite[]
   requests             AdoptionRequest[]
@@ -163,6 +165,18 @@ model AdoptionRequest {
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   pet      Pet           @relation(fields: [petId], references: [id], onDelete: Restrict)
   messages ChatMessage[]
+}
+
+/// Outbox de eventos de domínio (#50): o evento entra na mesma transação da
+/// solicitação e o consumidor de notificações (#30/#95) lê depois.
+model EventOutbox {
+  id          String    @id @default(cuid())
+  type        String
+  payload     Json
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([type, createdAt])
 }
 
 model ChatMessage {

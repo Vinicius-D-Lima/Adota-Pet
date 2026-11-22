@@ -28,6 +28,8 @@ export const petSchema = z.object({
   organizationInitials: z.string().min(1),
   organizationRating: z.number().min(0).max(5).nullable().optional(),
   organizationRatingCount: z.number().int().nonnegative().optional(),
+  /// #49/#50: ausente nos dados legados do mock; o backend assume DISPONIVEL.
+  status: z.enum(['DISPONIVEL', 'ADOTADO', 'ARQUIVADO']).optional(),
   lat: z.number(),
   lng: z.number(),
   createdAt: z.string().min(1),
