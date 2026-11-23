@@ -1,3 +1,15 @@
+import {
+  emptyRequestStageCounters,
+  interviewApiSchema,
+  organizationRequestStageOf,
+  organizationTransitionSchema,
+  receivedRequestsQuerySchema,
+  rejectionFormSchema,
+  type InterviewApiPayload,
+  type OrganizationTransitionPayload,
+  type ReceivedRequestsQuery,
+} from '@adotapet/shared'
+import type { Request } from 'express'
 import { Router } from 'express'
 import {
   demoRole,
@@ -5,13 +17,15 @@ import {
   organizationPets,
   permissionsForRole,
   requireGuardian,
+  requirePermission,
   withGallery,
   withReceivedRequest,
 } from '../context.js'
 import { prisma } from '../db.js'
 import type { Pet, Prisma } from '../generated/prisma/client.js'
-import type { FieldError } from '../http.js'
-import { isBlank, list, sendError } from '../http.js'
+import { list, sendError, zodDetails } from '../http.js'
+import { deleteStorageObjectsForResource } from '../storage.js'
+import { validate } from '../validate.js'
 import { ORGANIZATION_PET_FIELDS, asRecord, validateOrganizationPet } from '../validation.js'
 
 export const organizationRouter = Router()
@@ -21,25 +35,17 @@ const ORGANIZATION_REQUEST_TRANSITIONS: Record<string, string> = {
   APROVADA: 'Aprovada',
   RECUSADA: 'Recusada',
 }
-const INTERVIEW_TYPES = ['Entrevista online', 'Visita presencial']
-
 const presentOrganizationPet = (pet: Pet) => ({
   ...withGallery(pet),
   distance: null,
   distanceKm: null,
 })
 
-const isFutureDate = (value: unknown) => {
-  if (typeof value !== 'string' || isBlank(value)) return false
-  const date = new Date(value)
-  return !Number.isNaN(date.getTime()) && date.getTime() > Date.now()
-}
-
 /** Solicitação dos pets da instituição ou `null` (com 404 já enviado). */
-async function receivedRequestOf(req: { params: { id: string } }, viewerId: string) {
+async function receivedRequestOf(req: Request, viewerId: string) {
   const petIds = (await organizationPets(viewerId)).map(({ id }) => id)
   const request = await prisma.adoptionRequest.findFirst({
-    where: { id: req.params.id, petId: { in: petIds } },
+    where: { id: String(req.params.id), petId: { in: petIds } },
   })
   return request
 }
@@ -140,7 +146,9 @@ organizationRouter.delete('/me/organization-pets/:id', async (req, res) => {
   if (requests > 0)
     return sendError(res, 409, 'Não é possível remover um pet que possui solicitações')
 
-  // Favoritos caem em cascata (onDelete: Cascade no schema).
+  // Favoritos caem em cascata (onDelete: Cascade no schema). A limpeza de
+  // arquivos é explícita (#94/STO-08) para não deixar órfãos no bucket.
+  await deleteStorageObjectsForResource('PET', existing.id)
   await prisma.pet.delete({ where: { id: existing.id } })
   res.status(204).end()
 })
@@ -148,6 +156,7 @@ organizationRouter.delete('/me/organization-pets/:id', async (req, res) => {
 organizationRouter.get('/me/permissions', async (req, res) => {
   const viewer = await requireGuardian(req, res)
   if (!viewer) return
+  if (!requirePermission(req, res, 'requests:view')) return
   const role = demoRole(req)
   const identity = await organizationIdentity(viewer.id)
   res.json({
@@ -158,79 +167,91 @@ organizationRouter.get('/me/permissions', async (req, res) => {
   })
 })
 
-organizationRouter.get('/me/received-requests', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
-  if (!viewer) return
-  const petIds = (await organizationPets(viewer.id)).map(({ id }) => id)
-  const requests = await prisma.adoptionRequest.findMany({
-    where: { petId: { in: petIds } },
-    orderBy: [{ date: 'desc' }, { id: 'desc' }],
-  })
-  const data = await Promise.all(requests.map((request) => withReceivedRequest(request, viewer.id)))
-  res.json(list(data))
-})
+organizationRouter.get(
+  '/me/received-requests',
+  validate({ query: receivedRequestsQuerySchema }),
+  async (req, res) => {
+    const viewer = await requireGuardian(req, res)
+    if (!viewer) return
+    if (!requirePermission(req, res, 'requests:view')) return
+
+    const { stage, petId } = req.query as unknown as ReceivedRequestsQuery
+    const pets = await organizationPets(viewer.id)
+    const petIds = pets.map(({ id }) => id)
+    const requests = await prisma.adoptionRequest.findMany({
+      where: { petId: { in: petIds } },
+      orderBy: [{ date: 'desc' }, { id: 'desc' }],
+    })
+
+    // Contadores respeitam o pet selecionado e são calculados antes da etapa,
+    // para que as abas mostrem a distribuição real da fila filtrada.
+    const scoped = petId ? requests.filter((request) => request.petId === petId) : requests
+    const counters = emptyRequestStageCounters()
+    counters.all = scoped.length
+    for (const request of scoped) counters[organizationRequestStageOf(request)] += 1
+
+    const selected =
+      stage === 'all'
+        ? scoped
+        : scoped.filter((request) => organizationRequestStageOf(request) === stage)
+    const data = await Promise.all(
+      selected.map((request) => withReceivedRequest(request, viewer.id)),
+    )
+    res.json({ ...list(data), counters, pets: pets.map(presentOrganizationPet) })
+  },
+)
 
 organizationRouter.get('/me/received-requests/:id', async (req, res) => {
   const viewer = await requireGuardian(req, res)
   if (!viewer) return
+  if (!requirePermission(req, res, 'requests:view')) return
   const request = await receivedRequestOf(req, viewer.id)
   if (!request) return sendError(res, 404, 'Solicitação não encontrada')
   res.json(await withReceivedRequest(request, viewer.id))
 })
 
-organizationRouter.post('/me/received-requests/:id/interview', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
-  if (!viewer) return
-  const request = await receivedRequestOf(req, viewer.id)
-  if (!request) return sendError(res, 404, 'Solicitação não encontrada')
-  if (request.status !== 'Em análise') {
-    return sendError(res, 409, 'Só é possível agendar uma entrevista com a solicitação em análise.')
-  }
-  const scheduled = asRecord(request.interview)
-  if (scheduled?.completed) {
-    return sendError(res, 409, 'A entrevista desta solicitação já foi realizada.')
-  }
+organizationRouter.post(
+  '/me/received-requests/:id/interview',
+  validate({ body: interviewApiSchema }),
+  async (req, res) => {
+    const viewer = await requireGuardian(req, res)
+    if (!viewer) return
+    if (!requirePermission(req, res, 'requests:review')) return
+    const request = await receivedRequestOf(req, viewer.id)
+    if (!request) return sendError(res, 404, 'Solicitação não encontrada')
+    if (request.status !== 'Em análise') {
+      return sendError(
+        res,
+        409,
+        'Só é possível agendar uma entrevista com a solicitação em análise.',
+      )
+    }
+    const scheduled = asRecord(request.interview)
+    if (scheduled?.completed) {
+      return sendError(res, 409, 'A entrevista desta solicitação já foi realizada.')
+    }
 
-  const body = asRecord(req.body)
-  const proposedSlots = Array.isArray(body?.proposedSlots) ? body.proposedSlots : []
-  const details: FieldError[] = []
-  if (proposedSlots.length === 0 || proposedSlots.length > 3) {
-    details.push({
-      field: 'proposedSlots',
-      message: 'Proponha de 1 a 3 horários para a entrevista.',
-    })
-  }
-  if (proposedSlots.some((slot) => !isFutureDate(slot))) {
-    details.push({
-      field: 'proposedSlots',
-      message: 'Todos os horários precisam ser datas futuras.',
-    })
-  }
-  if (details.length) return sendError(res, 400, 'Validação falhou', details)
-
-  const requestedType = body?.type
-  const type =
-    typeof requestedType === 'string' && INTERVIEW_TYPES.includes(requestedType)
-      ? requestedType
-      : 'Entrevista online'
-  const updated = await prisma.adoptionRequest.update({
-    where: { id: request.id },
-    data: {
-      interview: {
-        type,
-        proposedSlots,
-        status: 'AGENDADA',
-        completed: false,
-        scheduledAt: new Date().toISOString(),
+    const { type, proposedSlots } = req.body as InterviewApiPayload
+    const updated = await prisma.adoptionRequest.update({
+      where: { id: request.id },
+      data: {
+        interview: {
+          type,
+          proposedSlots,
+          status: 'AGENDADA',
+          completed: false,
+          scheduledAt: new Date().toISOString(),
+        },
       },
-    },
-  })
-  res.json(await withReceivedRequest(updated, viewer.id))
-})
+    })
+    res.json(await withReceivedRequest(updated, viewer.id))
+  },
+)
 
 organizationRouter.post('/me/received-requests/:id/interview/complete', async (req, res) => {
   const viewer = await requireGuardian(req, res)
   if (!viewer) return
+  if (!requirePermission(req, res, 'requests:review')) return
   const request = await receivedRequestOf(req, viewer.id)
   if (!request) return sendError(res, 404, 'Solicitação não encontrada')
 
@@ -255,62 +276,70 @@ organizationRouter.post('/me/received-requests/:id/interview/complete', async (r
   res.json(await withReceivedRequest(updated, viewer.id))
 })
 
-organizationRouter.post('/me/received-requests/:id/transitions', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
-  if (!viewer) return
-  const request = await receivedRequestOf(req, viewer.id)
-  if (!request) return sendError(res, 404, 'Solicitação não encontrada')
+organizationRouter.post(
+  '/me/received-requests/:id/transitions',
+  validate({ body: organizationTransitionSchema }),
+  async (req, res) => {
+    const viewer = await requireGuardian(req, res)
+    if (!viewer) return
+    const request = await receivedRequestOf(req, viewer.id)
+    if (!request) return sendError(res, 404, 'Solicitação não encontrada')
 
-  const body = asRecord(req.body)
-  const status = ORGANIZATION_REQUEST_TRANSITIONS[String(body?.to ?? '').toUpperCase()]
-  if (!status) return sendError(res, 400, 'Transição não suportada')
+    const { to, reason: bodyReason } = req.body as OrganizationTransitionPayload
+    const status = ORGANIZATION_REQUEST_TRANSITIONS[to]
+    if (!status) return sendError(res, 400, 'Transição não suportada')
 
-  const role = demoRole(req)
-  if (role === 'VOLUNTEER' && status === 'Aprovada') {
-    return sendError(res, 403, 'Apenas administradores podem aprovar solicitações.')
-  }
+    // Cada transição exige uma permissão diferente da matriz (#28/#RBAC).
+    const permission =
+      status === 'Aprovada'
+        ? 'requests:approve'
+        : status === 'Recusada'
+          ? 'requests:reject'
+          : 'requests:review'
+    if (!requirePermission(req, res, permission)) return
 
-  const interview = asRecord(request.interview)
-  if (status === 'Aprovada' && interview?.completed !== true) {
-    return sendError(
-      res,
-      400,
-      'O agendamento da etapa precisa estar marcado como realizado antes de aprovar.',
-      [{ field: 'interview', message: 'Marque a entrevista como realizada antes de aprovar.' }],
-    )
-  }
+    const interview = asRecord(request.interview)
+    if (status === 'Aprovada' && interview?.completed !== true) {
+      return sendError(
+        res,
+        400,
+        'O agendamento da etapa precisa estar marcado como realizado antes de aprovar.',
+        [{ field: 'interview', message: 'Marque a entrevista como realizada antes de aprovar.' }],
+      )
+    }
 
-  const allowed =
-    (request.status === 'Enviada' && ['Em análise', 'Recusada'].includes(status)) ||
-    (request.status === 'Em análise' && ['Aprovada', 'Recusada'].includes(status))
-  if (!allowed)
-    return sendError(
-      res,
-      409,
-      `Não é possível alterar uma solicitação com status "${request.status}" para "${status}"`,
-    )
+    const allowed =
+      (request.status === 'Enviada' && ['Em análise', 'Recusada'].includes(status)) ||
+      (request.status === 'Em análise' && ['Aprovada', 'Recusada'].includes(status))
+    if (!allowed)
+      return sendError(
+        res,
+        409,
+        `Não é possível alterar uma solicitação com status "${request.status}" para "${status}"`,
+      )
 
-  const reasonValue = body?.reason
-  const reason = typeof reasonValue === 'string' ? reasonValue.trim() : ''
-  if (status === 'Recusada' && reason.length < 10) {
-    return sendError(res, 400, 'Informe o motivo da recusa', [
-      { field: 'reason', message: 'O motivo deve ter pelo menos 10 caracteres.' },
-    ])
-  }
-  const messages: Record<string, string> = {
-    'Em análise': 'A instituição iniciou a análise da sua solicitação.',
-    Aprovada: 'Sua solicitação foi aprovada pela instituição.',
-    Recusada: reason
-      ? `A instituição encerrou esta solicitação: ${reason}`
-      : 'A instituição encerrou esta solicitação.',
-  }
-  const updated = await prisma.adoptionRequest.update({
-    where: { id: request.id },
-    data: {
-      status,
-      message: messages[status],
-      ...(status === 'Recusada' && reason ? { rejectionReason: reason } : {}),
-    },
-  })
-  res.json(await withReceivedRequest(updated, viewer.id))
-})
+    const reason = bodyReason?.trim() ?? ''
+    if (status === 'Recusada') {
+      const parsedReason = rejectionFormSchema.safeParse({ reason })
+      if (!parsedReason.success) {
+        return sendError(res, 400, 'Informe o motivo da recusa', zodDetails(parsedReason.error))
+      }
+    }
+    const messages: Record<string, string> = {
+      'Em análise': 'A instituição iniciou a análise da sua solicitação.',
+      Aprovada: 'Sua solicitação foi aprovada pela instituição.',
+      Recusada: reason
+        ? `A instituição encerrou esta solicitação: ${reason}`
+        : 'A instituição encerrou esta solicitação.',
+    }
+    const updated = await prisma.adoptionRequest.update({
+      where: { id: request.id },
+      data: {
+        status,
+        message: messages[status],
+        ...(status === 'Recusada' && reason ? { rejectionReason: reason } : {}),
+      },
+    })
+    res.json(await withReceivedRequest(updated, viewer.id))
+  },
+)

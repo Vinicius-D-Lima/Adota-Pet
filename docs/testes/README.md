@@ -2,7 +2,7 @@
 
 Catálogo dos testes que o backend do AdotaPet deve ter, com **238 testes** em 26 módulos (107 funcionais, 112 de segurança e 19 de integração ou infraestrutura). Cada teste tem um ID estável e uma explicação do que prova e de como é feito.
 
-> **Estado:** este catálogo nasceu como especificação, antes da implementação do backend. Já estão implementados os 6 testes `MONO` ([monorepo.md](monorepo.md)) e os 12 testes `INF` ([infra-api.md](infra-api.md)); os demais IDs abaixo ainda descrevem o contrato futuro. Cada issue de backend traz a lista dos seus testes em uma seção "Testes obrigatórios". À medida que os testes são implementados, a coluna "Como é testado" deve ser mantida em dia.
+> **Estado:** este catálogo nasceu como especificação, antes da implementação do backend. Já estão implementados os prefixos `MONO` ([monorepo.md](monorepo.md)), `INF` ([infra-api.md](infra-api.md)), `AUTH` ([auth.md](auth.md)), `JOB` ([fila-jobs.md](fila-jobs.md)), `STO` ([armazenamento.md](armazenamento.md)) e `FAV` ([favoritos.md](favoritos.md)), além dos testes de pets e solicitações. Há também cobertura **parcial** de `RBAC`, `ORG`, `AGD` e `MATCH` em `apps/api/src/organization.test.ts` (autorização da instituição, filtros/contadores da fila, validação de horários e score no detalhe); os demais IDs abaixo ainda descrevem o contrato futuro. Cada issue de backend traz a lista dos seus testes em uma seção "Testes obrigatórios". À medida que os testes são implementados, a coluna "Como é testado" deve ser mantida em dia.
 
 ## Convenção
 

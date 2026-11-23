@@ -42,13 +42,14 @@ describe('useFavorite', () => {
   })
 
   it('atualiza o coração na hora, antes da resposta da API', async () => {
-    const { server, user } = setup({ writeDelayMs: 200 })
+    const { server, user } = setup({ deferWrites: true })
     await waitFor(() => expect(mocks.get).toHaveBeenCalled())
 
     await user.click(heart())
 
-    expect(heart()).toHaveAttribute('aria-pressed', 'true')
+    await waitFor(() => expect(heart()).toHaveAttribute('aria-pressed', 'true'))
     expect(server.ids.has('luna')).toBe(false)
+    server.releaseWrites()
     await waitFor(() => expect(server.ids.has('luna')).toBe(true))
     expect(mocks.put).toHaveBeenCalledWith('/me/favorites/luna')
   })

@@ -63,7 +63,7 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 ## 12. A compatibilidade é calculada no cliente
 
 - **Decisão:** `calculateCompatibility` roda no navegador, com 7 critérios de peso igual.
-- **Consequência:** simples e testável, sem rota no mock. A área da organização reutiliza o mesmo cálculo para mostrar o score no detalhe da solicitação, com um adaptador para o perfil resumido que a API devolve. Quando existir o serviço de matching no backend (#19), as telas passam a consumir o resultado da API.
+- **Consequência:** simples e testável, sem rota no mock. A área da organização reutilizava o mesmo cálculo para mostrar o score no detalhe da solicitação. A decisão 34 moveu o cálculo para o backend; o cálculo local ficou apenas como fallback do modo demo/respostas antigas.
 
 ## 13. Sem Next.js
 
@@ -166,6 +166,23 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 - **Contexto:** a decisão 22 definiu o modelo (JWT curto + refresh rotacionado em cookie), mas não as bibliotecas nem como conviver com os módulos legados que ainda leem `X-Demo-User-Id`.
 - **Decisão:** `jose` para JWT HS256 (algoritmo fixo na verificação, o que rejeita `alg: none` e troca de algoritmo), `@node-rs/argon2` para senhas (hash `$argon2id$`, sem etapa de compilação nativa no CI) e SHA-256 do token opaco para o refresh no banco. `platformRole` (`USUARIO`/`MODERADOR`) é um enum novo, separado de `role`/`roles`, que pertencem ao contrato do mock. O middleware `requireAuth` preenche `req.auth`/`req.user`; `currentUser` prefere essa identidade quando presente, mantendo o cabeçalho demo apenas como transição até o frontend #4.
 - **Consequência:** cadastro descarta campos privilegiados por padrão do Zod (sem `.strict()` no corpo de registro), login roda argon2 mesmo para e-mail inexistente e reuso de refresh revoga a cadeia inteira. As rotas ficam em `/auth/*` e `/api/auth/*`, com `GET /me` como alias. O e-mail virou único no banco; o seed dá um e-mail válido ao `demo-empty`, que vinha com `""` do mock. Sem URL de banco, os 16 testes `AUTH-*` são ignorados como `INF-11`/`INF-12` (ver [`docs/testes/auth.md`](testes/auth.md)).
+
+## 32. Armazenamento de arquivos: API S3, SeaweedFS e URLs assinadas pela API (#94)
+
+- **Contexto:** a issue #24 sugeria MinIO, mas a edição comunitária parou de publicar imagens em outubro de 2025 e entrou em manutenção em dezembro de 2025. A decisão 28 suspendeu o Docker, então não há compose onde subir SeaweedFS.
+- **Decisão:** o código depende apenas da API S3 (`@aws-sdk/client-s3` e `@aws-sdk/s3-request-presigner`) atrás da interface `StorageProvider`. O backend local recomendado é SeaweedFS (Apache-2.0), executado fora do projeto; R2/S3 trocam apenas variáveis de ambiente. O bucket é privado e o cliente recebe uma **URL assinada da própria API** (HMAC curto via `jose`), não uma URL do bucket. A rota de entrega valida a assinatura, busca o objeto com credenciais no servidor e responde com `Content-Type` detectado e `X-Content-Type-Options: nosniff`. O tipo vem da assinatura do arquivo (`file-type`), o nome do objeto é UUID gerado no servidor e os limites são por escopo. A tabela `StorageObject` guarda o vínculo com o registro dono e permite apagar objetos órfãos.
+- **Consequência:** ausência/expiração de assinatura retorna 403 de forma idêntica em qualquer provedor (não dependemos da política de bucket do emulador), e `nosniff` pode ser aplicado na resposta — algo que uma URL presignada direta não permitiria. Os nove testes `STO` rodam com um S3 em processo (`s3rver`), sem Docker. Os módulos `#24`, `#26`, `#29` e `#49` ainda não usam o storage; o checklist de integração está em [`storage-integracao.md`](storage-integracao.md).
+
+## 33. Favoritos persistidos, paginados e resumidos (#51)
+
+- **Decisão:** `Favorite` usa par único `(userId, petId)` e `createdAt`; PUT é `upsert` e DELETE é `deleteMany`, ambos 204. `GET /me/favorites` aceita `page`/`limit` (padrão 1/12, máximo 100), devolve `{ data, total }` com `total` **global** e um resumo do pet (sem coordenadas/descrição) com `status` obrigatório, para que adotados/arquivados continuem visíveis e sinalizados. `GET /me/favorites/ids` continua sem paginação para o frontend marcar os corações sem baixar a lista.
+- **Consequência:** o frontend usa os mesmos schemas Zod de `@adotapet/shared` (fonte única do contrato), com `useInfiniteQuery` para "carregar mais". O mock-server espelha o mesmo contrato, então os modos demo e real não divergem. Os sete testes `FAV` rodam contra o Postgres de teste sem Docker.
+
+## 34. Área da instituição com autorização no servidor, fila filtrada e matching persistido (#19/#26/#28)
+
+- **Contexto:** as telas e os endpoints da instituição já existiam, mas a matriz de permissões era aplicada só no cliente: todo `GUARDIAN` com JWT recebia `ADMIN`, e o cabeçalho `X-Demo-Role: VOLUNTEER` era ignorado na API real. Filtros e contadores da fila eram calculados no navegador, e o score de compatibilidade também.
+- **Decisão:** `User.organizationRole` (`ADMIN`/`VOLUNTEER`, padrão `ADMIN`) persiste o papel na instituição — o modelo ainda não tem uma entidade `Organization` separada, então o papel é por usuário guardião. `requirePermission` aplica a matriz `requests:view|review|reject|approve` em **toda** rota de `/me/received-requests`; `X-Demo-Role` continua valendo apenas no mock, onde não há JWT. Moderadores da plataforma (`platformRole: MODERADOR`) seguem como ADMIN. `GET /me/received-requests` aceita `?stage=` e `?petId=` e devolve `counters` (calculados pets primeiro, etapa depois) e `pets` para o filtro. O score de compatibilidade de 7 critérios foi portado para `apps/api/src/matching.ts` e volta no campo `matching` do detalhe; o frontend prefere esse valor e cai no cálculo local quando ausente. `interviewApiSchema` e `rejectionFormSchema` passaram a validar também no servidor (tipo inválido deixou de cair silenciosamente em "Entrevista online").
+- **Consequência:** esconder o botão virou UX, não segurança: uma chamada direta de voluntário para aprovar retorna 403. `lat`/`lng` de pets passaram a ser opcionais e anuláveis no contrato compartilhado, porque pets legados voltam sem coordenadas e isso quebrava o parse da fila no modo real. Os testes `RBAC`, `ORG`, `AGD` e `MATCH` em `apps/api/src/organization.test.ts` rodam contra o Postgres de teste.
 
 ## Decisão pendente: acessibilidade
 

@@ -846,14 +846,46 @@ export function createApp({
   server.get('/me/received-requests', (req, res) => {
     if (!requireGuardian(req, res)) return
     const userId = currentUserId(req)
-    const petIds = new Set(organizationPets(userId).map(({ id }) => id))
-    const requests = store
+    const ownedPets = organizationPets(userId)
+    const petIds = new Set(ownedPets.map(({ id }) => id))
+    const requestedPet = typeof req.query.petId === 'string' ? req.query.petId : ''
+    const requestedStage = typeof req.query.stage === 'string' ? req.query.stage : 'all'
+
+    const stageOf = (request) => {
+      if (request.status === 'Enviada') return 'new'
+      if (request.status === 'Em análise') {
+        return request.interview?.completed ? 'interview-done' : 'interview'
+      }
+      if (request.status === 'Aprovada') return 'approved'
+      return 'closed'
+    }
+
+    const scoped = store
       .get('requests')
       .value()
-      .filter(({ petId }) => petIds.has(petId))
+      .filter(({ petId }) => petIds.has(petId) && (!requestedPet || petId === requestedPet))
       .reverse()
-      .map((request) => withReceivedRequest(request, userId))
-    res.json(list(requests))
+    const counters = {
+      all: scoped.length,
+      new: 0,
+      interview: 0,
+      'interview-done': 0,
+      approved: 0,
+      closed: 0,
+    }
+    scoped.forEach((request) => {
+      counters[stageOf(request)] += 1
+    })
+    const selected =
+      requestedStage === 'all'
+        ? scoped
+        : scoped.filter((request) => stageOf(request) === requestedStage)
+    const requests = selected.map((request) => withReceivedRequest(request, userId))
+    res.json({
+      ...list(requests),
+      counters,
+      pets: ownedPets.map((pet) => ({ ...pet, distance: null, distanceKm: null })),
+    })
   })
 
   server.get('/me/received-requests/:id', (req, res) => {
@@ -1275,12 +1307,49 @@ export function createApp({
     res.json(list(myFavorites(currentUserId(req)).map((f) => f.petId))),
   )
 
+  // Mesmo resumo/paginação da API real (#51); o frontend usa o mesmo schema Zod.
+  const presentFavoritePet = (pet) => {
+    const { distanceKm, distance } = presentPet(pet)
+    return {
+      id: pet.id,
+      name: pet.name,
+      species: pet.species,
+      breed: pet.breed,
+      age: pet.age,
+      ageLabel: pet.ageLabel,
+      size: pet.size,
+      sex: pet.sex,
+      city: pet.city,
+      image: pet.image,
+      summary: pet.summary,
+      traits: pet.traits,
+      vaccinated: pet.vaccinated,
+      neutered: pet.neutered,
+      organization: pet.organization,
+      status: pet.status || 'DISPONIVEL',
+      distanceKm,
+      distance,
+    }
+  }
+
   server.get('/me/favorites', (req, res) => {
+    const { page, limit, ...unknown } = req.query
+    const details = Object.keys(unknown).map((field) => ({
+      field,
+      message: 'Parâmetro desconhecido',
+    }))
+    const pageNumber = positiveInt(page, 'page', details, 1)
+    const limitNumber = positiveInt(limit, 'limit', details, DEFAULT_LIMIT)
+    if (limitNumber > MAX_LIMIT)
+      details.push({ field: 'limit', message: `limit máximo é ${MAX_LIMIT}` })
+    if (details.length) return sendError(res, 400, 'Parâmetros de consulta inválidos', details)
+
     const pets = myFavorites(currentUserId(req))
       .map((favorite) => findPet(favorite.petId))
       .filter(Boolean)
-      .map(presentPet)
-    res.json(list(pets))
+      .map(presentFavoritePet)
+    const start = (pageNumber - 1) * limitNumber
+    res.json({ data: pets.slice(start, start + limitNumber), total: pets.length })
   })
 
   server.put('/me/favorites/:petId', (req, res) => {

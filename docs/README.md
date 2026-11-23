@@ -15,6 +15,7 @@ Esta pasta reúne o que o AdotaPet faz, como o monorepo está organizado, como a
 | [Componentes de UI](componentes-ui.md)                         | A biblioteca de componentes em `apps/web/src/components/ui` e os componentes de aplicação |
 | [Qualidade, testes e CI](qualidade-e-ci.md)                    | Scripts, ESLint, Prettier, testes, workflow de CI e fluxo de branches e PRs               |
 | [Testes do monorepo](testes/monorepo.md)                       | Verificações `MONO-01` a `MONO-06` e onde cada uma roda no CI                             |
+| [Integração do storage](storage-integracao.md)                 | Como #24, #26, #29 e #49 devem usar o módulo de arquivos (#94)                            |
 | [Decisões técnicas](decisoes.md)                               | Por que as coisas foram feitas do jeito que foram                                         |
 | [Histórico](historico.md)                                      | Linha do tempo de PRs e issues, inclusive o revert da acessibilidade                      |
 | [Roadmap e pendências](roadmap.md)                             | O que ainda falta, limitações conhecidas e a fase do backend                              |
@@ -34,3 +35,4 @@ Esta pasta reúne o que o AdotaPet faz, como o monorepo está organizado, como a
 - **Quero entender uma regra de negócio** (compatibilidade, solicitação duplicada, cancelamento): [Funcionalidades](funcionalidades.md).
 - **Vou mexer no código:** [Arquitetura](arquitetura.md) e [Qualidade, testes e CI](qualidade-e-ci.md).
 - **Vou integrar um backend real:** [API simulada](api-simulada.md) e [Roadmap](roadmap.md#fase-2-backend).
+- **Vou implementar fotos/check-ins/denúncias/prontuário:** [Integração do storage](storage-integracao.md) — leia antes de escrever código.

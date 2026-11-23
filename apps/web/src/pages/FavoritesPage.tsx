@@ -6,6 +6,7 @@ import { useFavoritePets } from '../hooks/useFavorites'
 
 export function FavoritesPage() {
   const favoritesQuery = useFavoritePets()
+  const pets = favoritesQuery.data?.pages.flatMap((page) => page.data) ?? []
 
   return (
     <PageSurface>
@@ -29,12 +30,25 @@ export function FavoritesPage() {
           >
             <Button onClick={() => void favoritesQuery.refetch()}>Tentar novamente</Button>
           </EmptyState>
-        ) : favoritesQuery.data.length ? (
-          <PetGrid>
-            {favoritesQuery.data.map((pet) => (
-              <PetCard key={pet.id} pet={pet} />
-            ))}
-          </PetGrid>
+        ) : pets.length ? (
+          <>
+            <PetGrid>
+              {pets.map((pet) => (
+                <PetCard key={pet.id} pet={pet} />
+              ))}
+            </PetGrid>
+            {favoritesQuery.hasNextPage && (
+              <div className="mt-8 flex justify-center">
+                <Button
+                  variant="secondary"
+                  disabled={favoritesQuery.isFetchingNextPage}
+                  onClick={() => void favoritesQuery.fetchNextPage()}
+                >
+                  {favoritesQuery.isFetchingNextPage ? 'Carregando...' : 'Carregar mais'}
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <EmptyState
             icon={<Heart size={36} />}

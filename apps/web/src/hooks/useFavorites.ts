@@ -1,8 +1,17 @@
-import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { z } from 'zod'
+import {
+  useInfiniteQuery,
+  useIsMutating,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query'
 import { api } from '../lib/api'
-import { petsResponseSchema } from '@adotapet/shared'
-import type { Pet } from '../types'
+import {
+  favoriteIdsResponseSchema,
+  favoritesResponseSchema,
+  type FavoritesResponse,
+} from '@adotapet/shared'
 import { showFavoriteNotice } from './useFavoriteNotice'
 
 export const favoriteKeys = {
@@ -12,11 +21,6 @@ export const favoriteKeys = {
 }
 
 const favoriteMutationKey = ['favorites', 'toggle'] as const
-
-const favoriteIdsResponseSchema = z.object({
-  data: z.array(z.string()),
-  total: z.number().int().nonnegative(),
-})
 
 interface ToggleVariables {
   petId: string
@@ -29,6 +33,19 @@ const withMembership = (ids: string[], petId: string, favorite: boolean) => {
   return favorite ? [...rest, petId] : rest
 }
 
+type FavoritePages = InfiniteData<FavoritesResponse, number>
+
+/** Atualização otimista precisa respeitar o formato de `useInfiniteQuery`. */
+const removeFromPages = (pages: FavoritePages | undefined, petId: string) =>
+  pages && {
+    ...pages,
+    pages: pages.pages.map((page) => ({
+      ...page,
+      data: page.data.filter((pet) => pet.id !== petId),
+      total: Math.max(0, page.total - 1),
+    })),
+  }
+
 export function useFavoriteIds(enabled = true) {
   return useQuery({
     enabled,
@@ -38,11 +55,19 @@ export function useFavoriteIds(enabled = true) {
   })
 }
 
+/** Lista paginada: `/me/favorites/ids` continua trazendo todos os ids para os cards. */
 export function useFavoritePets() {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: favoriteKeys.pets,
-    queryFn: async ({ signal }) =>
-      petsResponseSchema.parse(await api.get<unknown>('/me/favorites', { signal })).data,
+    queryFn: async ({ pageParam, signal }) =>
+      favoritesResponseSchema.parse(
+        await api.get<unknown>('/me/favorites', { query: { page: pageParam }, signal }),
+      ),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, pages) => {
+      const loaded = pages.reduce((total, page) => total + page.data.length, 0)
+      return loaded < lastPage.total ? pages.length + 1 : undefined
+    },
   })
 }
 
@@ -59,14 +84,14 @@ export function useToggleFavorite() {
     },
     onMutate: async ({ petId, favorite }) => {
       await queryClient.cancelQueries({ queryKey: favoriteKeys.all })
-      const previousPets = queryClient.getQueryData<Pet[]>(favoriteKeys.pets)
+      const previousPets = queryClient.getQueryData<FavoritePages>(favoriteKeys.pets)
 
       queryClient.setQueryData<string[]>(favoriteKeys.ids, (ids = []) =>
         withMembership(ids, petId, favorite),
       )
       if (!favorite) {
-        queryClient.setQueryData<Pet[]>(favoriteKeys.pets, (pets) =>
-          pets?.filter((pet) => pet.id !== petId),
+        queryClient.setQueryData<FavoritePages | undefined>(favoriteKeys.pets, (pages) =>
+          removeFromPages(pages, petId),
         )
       }
 
@@ -77,7 +102,9 @@ export function useToggleFavorite() {
       queryClient.setQueryData<string[]>(favoriteKeys.ids, (ids = []) =>
         withMembership(ids, petId, !favorite),
       )
-      if (context?.previousPets) queryClient.setQueryData(favoriteKeys.pets, context.previousPets)
+      if (context?.previousPets) {
+        queryClient.setQueryData<FavoritePages>(favoriteKeys.pets, context.previousPets)
+      }
       showFavoriteNotice(
         favorite
           ? 'Não foi possível favoritar o pet. Tente novamente.'

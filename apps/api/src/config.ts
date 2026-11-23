@@ -8,6 +8,12 @@ import { z } from 'zod'
  * tudo na inicialização: se faltar `DATABASE_URL`, o processo morre antes de
  * abrir a porta, com uma mensagem que diz exatamente qual variável falta.
  */
+/** Variável opcional: string vazia (comum no CI) conta como ausente. */
+const optionalEnv = z.preprocess(
+  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  z.string().trim().min(1).optional(),
+)
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3002),
@@ -51,6 +57,31 @@ const envSchema = z.object({
     .transform((value) => value === 'true'),
   COOKIE_SAME_SITE: z.enum(['strict', 'lax', 'none']).default('lax'),
   REFRESH_COOKIE_NAME: z.string().min(1).default('refresh_token'),
+
+  // Fila de jobs (#95). O schema é criado pela migration; `JOBS_ENABLED=false`
+  // mantém a API respondendo sem registrar workers (útil em desenvolvimento).
+  JOBS_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+  PG_BOSS_SCHEMA: z.string().min(1).default('pgboss'),
+  JOBS_SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+
+  // Armazenamento de arquivos (#94). Nenhum segredo é versionado: endpoint,
+  // bucket e credenciais vêm de variáveis de ambiente. Sem endpoint o módulo
+  // fica desligado e as rotas respondem 503 — a API continua subindo.
+  STORAGE_ENDPOINT: optionalEnv,
+  STORAGE_REGION: z.string().trim().min(1).default('us-east-1'),
+  STORAGE_BUCKET: z.string().trim().min(1).default('adotapet'),
+  STORAGE_ACCESS_KEY_ID: optionalEnv,
+  STORAGE_SECRET_ACCESS_KEY: optionalEnv,
+  STORAGE_FORCE_PATH_STYLE: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((value) => value === 'true'),
+  STORAGE_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(60),
+  /** Segredo das URLs assinadas da API; por padrão reusa JWT_SECRET. */
+  STORAGE_URL_SECRET: optionalEnv,
 })
 
 export type ApiConfig = z.infer<typeof envSchema>

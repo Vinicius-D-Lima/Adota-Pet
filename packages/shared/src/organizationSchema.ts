@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { matchingScoreSchema } from './matchingSchema.js'
 import { requestPetSchema, requestStatuses } from './requestSchema.js'
 
 const requiredChoice = (message: string) => z.string().min(1, message)
@@ -83,6 +84,107 @@ export const rejectionFormSchema = z.object({
     .max(500, 'O motivo deve ter no máximo 500 caracteres.'),
 })
 
+/** Papel dentro da instituição (#26/#28), distinto de PlatformRole (#48). */
+export const organizationRoles = ['ADMIN', 'VOLUNTEER'] as const
+export const organizationRoleSchema = z.enum(organizationRoles)
+export type OrganizationRole = z.infer<typeof organizationRoleSchema>
+
+export const organizationPermissions = [
+  'requests:view',
+  'requests:review',
+  'requests:approve',
+  'requests:reject',
+] as const
+export const organizationPermissionSchema = z.enum(organizationPermissions)
+export type OrganizationPermission = z.infer<typeof organizationPermissionSchema>
+
+export const permissionsForOrganizationRole = (role: OrganizationRole): OrganizationPermission[] =>
+  role === 'ADMIN'
+    ? [...organizationPermissions]
+    : ['requests:view', 'requests:review', 'requests:reject']
+
+export const organizationPermissionsResponseSchema = z.object({
+  role: organizationRoleSchema,
+  canApprove: z.boolean(),
+  permissions: z.array(organizationPermissionSchema),
+  organization: z.object({ id: z.string(), name: z.string(), initials: z.string() }).nullable(),
+})
+export type OrganizationPermissionsResponse = z.infer<typeof organizationPermissionsResponseSchema>
+
+/** Etapas da fila da instituição — mesma origem para API, web e mock. */
+export const organizationRequestStages = [
+  'all',
+  'new',
+  'interview',
+  'interview-done',
+  'approved',
+  'closed',
+] as const
+export const organizationRequestStageSchema = z.enum(organizationRequestStages)
+export type OrganizationRequestStage = z.infer<typeof organizationRequestStageSchema>
+export type RequestStage = Exclude<OrganizationRequestStage, 'all'>
+
+type StageSource = { status: string; interview?: unknown }
+
+export function organizationRequestStageOf(request: StageSource): RequestStage {
+  if (request.status === 'Enviada') return 'new'
+  if (request.status === 'Em análise') {
+    const interview = request.interview
+    const completed =
+      typeof interview === 'object' &&
+      interview !== null &&
+      'completed' in interview &&
+      (interview as { completed?: unknown }).completed === true
+    return completed ? 'interview-done' : 'interview'
+  }
+  if (request.status === 'Aprovada') return 'approved'
+  return 'closed'
+}
+
+export const receivedRequestsQuerySchema = z.object({
+  stage: organizationRequestStageSchema.optional().default('all'),
+  petId: z.string().min(1).optional(),
+})
+export type ReceivedRequestsQuery = z.infer<typeof receivedRequestsQuerySchema>
+
+const stageCountSchema = z.number().int().nonnegative()
+export const requestStageCountersSchema = z.object({
+  all: stageCountSchema,
+  new: stageCountSchema,
+  interview: stageCountSchema,
+  'interview-done': stageCountSchema,
+  approved: stageCountSchema,
+  closed: stageCountSchema,
+})
+export type RequestStageCounters = z.infer<typeof requestStageCountersSchema>
+
+export function emptyRequestStageCounters(): RequestStageCounters {
+  return { all: 0, new: 0, interview: 0, 'interview-done': 0, approved: 0, closed: 0 }
+}
+
+/** Payload da API de agendamento: a validação Zod também roda no backend. */
+export const interviewApiSchema = z.object({
+  type: z.enum(interviewTypes, 'Selecione o tipo de encontro.'),
+  proposedSlots: z
+    .array(
+      z
+        .string()
+        .trim()
+        .min(1, 'Informe o horário.')
+        .refine(isFutureDateTime, 'Todos os horários precisam ser datas futuras.'),
+    )
+    .min(1, 'Proponha de 1 a 3 horários para a entrevista.')
+    .max(3, 'Proponha no máximo 3 horários para a entrevista.'),
+})
+export type InterviewApiPayload = z.infer<typeof interviewApiSchema>
+
+export const organizationTransitionTos = ['EM_ANALISE', 'APROVADA', 'RECUSADA'] as const
+export const organizationTransitionSchema = z.object({
+  to: z.enum(organizationTransitionTos, 'Transição não suportada'),
+  reason: z.string().trim().max(500, 'O motivo deve ter no máximo 500 caracteres.').optional(),
+})
+export type OrganizationTransitionPayload = z.infer<typeof organizationTransitionSchema>
+
 export const receivedRequestSchema = z.object({
   id: z.string().min(1),
   petId: z.string().min(1),
@@ -103,6 +205,8 @@ export const receivedRequestSchema = z.object({
       commitment: z.boolean(),
     })
     .optional(),
+  /** Score calculado no backend (#19); ausente no mock legado cai no cálculo local. */
+  matching: matchingScoreSchema.nullable().optional(),
   adopter: z.object({
     id: z.string(),
     name: z.string(),
@@ -128,6 +232,9 @@ export const receivedRequestSchema = z.object({
 export const receivedRequestsResponseSchema = z.object({
   data: z.array(receivedRequestSchema),
   total: z.number().int().nonnegative(),
+  counters: requestStageCountersSchema.optional(),
+  /** Catálogo da instituição para o filtro de pet, mesmo com a fila filtrada. */
+  pets: z.array(requestPetSchema).optional(),
 })
 
 export type OrganizationPetFormData = z.input<typeof organizationPetFormSchema>

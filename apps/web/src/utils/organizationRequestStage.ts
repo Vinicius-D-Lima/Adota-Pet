@@ -1,3 +1,4 @@
+import { organizationRequestStageOf } from '@adotapet/shared'
 import type { ReceivedRequest } from '../types'
 
 /**
@@ -9,30 +10,27 @@ export const ORGANIZATION_REQUEST_STAGES = [
   {
     key: 'new',
     label: 'Novas',
-    matches: (request: ReceivedRequest) => request.status === 'Enviada',
+    matches: (request: ReceivedRequest) => organizationRequestStageOf(request) === 'new',
   },
   {
     key: 'interview',
     label: 'Em entrevista',
-    matches: (request: ReceivedRequest) =>
-      request.status === 'Em análise' && request.interview?.completed !== true,
+    matches: (request: ReceivedRequest) => organizationRequestStageOf(request) === 'interview',
   },
   {
     key: 'interview-done',
     label: 'Entrevista realizada',
-    matches: (request: ReceivedRequest) =>
-      request.status === 'Em análise' && request.interview?.completed === true,
+    matches: (request: ReceivedRequest) => organizationRequestStageOf(request) === 'interview-done',
   },
   {
     key: 'approved',
     label: 'Aprovadas',
-    matches: (request: ReceivedRequest) => request.status === 'Aprovada',
+    matches: (request: ReceivedRequest) => organizationRequestStageOf(request) === 'approved',
   },
   {
     key: 'closed',
     label: 'Encerradas',
-    matches: (request: ReceivedRequest) =>
-      request.status === 'Recusada' || request.status === 'Cancelada',
+    matches: (request: ReceivedRequest) => organizationRequestStageOf(request) === 'closed',
   },
 ] as const
 

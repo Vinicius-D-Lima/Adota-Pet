@@ -4,7 +4,7 @@ import { prisma } from '../src/db.js'
 export async function resetTestDatabase() {
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
-      "RefreshToken", "NotificationPreference", "Notification", "EventOutbox", "SavedFilter",
+      "RefreshToken", "NotificationPreference", "Notification", "EventOutbox", "JobEffect", "SavedFilter", "StorageObject",
       "ChatMessage", "AdoptionRequest", "Favorite", "Pet", "GuardianProfile", "AdopterProfile", "User"
     RESTART IDENTITY CASCADE
   `)

@@ -26,4 +26,12 @@ describe('PetCard - selos de saúde', () => {
     expect(screen.getByText('Não castrado')).toBeInTheDocument()
     await waitFor(() => expect(mocks.get).toHaveBeenCalled())
   })
+
+  it.each([
+    ['ADOTADO', 'Adotado'],
+    ['ARQUIVADO', 'Arquivado'],
+  ] as const)('sinaliza o pet %s na lista de favoritos', (status, label) => {
+    renderWithProviders(<PetCard pet={{ ...petFixture, status }} />)
+    expect(screen.getByText(label)).toBeInTheDocument()
+  })
 })

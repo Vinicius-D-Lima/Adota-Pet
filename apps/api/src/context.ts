@@ -1,7 +1,13 @@
+import {
+  permissionsForOrganizationRole,
+  type OrganizationPermission,
+  type OrganizationRole,
+} from '@adotapet/shared'
 import type { Request, Response } from 'express'
 import { prisma } from './db.js'
 import type { AdoptionRequest, ChatMessage, Pet, User } from './generated/prisma/client.js'
 import { haversineKm, isBlank, sendError } from './http.js'
+import { calculateRequestMatching } from './matching.js'
 import {
   PROFILE_FIELDS,
   missingGuardianFields,
@@ -149,23 +155,38 @@ export const organizationPets = async (userId: string) => {
 }
 
 /**
- * Papel na organização. No modo JWT o cabeçalho `X-Demo-Role` é ignorado:
- * clientes não podem decidir own permission. Até existir membership real (#26/#28),
- * guardiões e moderadores da plataforma podem aprovar; os demais não.
+ * Papel na instituição (#26/#28). Com JWT o cabeçalho `X-Demo-Role` é ignorado:
+ * o cliente não pode decidir sua própria permissão. O papel vem do banco
+ * (`User.organizationRole`); moderadores da plataforma continuam como ADMIN.
  */
-export function demoRole(req: Request): 'ADMIN' | 'VOLUNTEER' {
+export function demoRole(req: Request): OrganizationRole {
   if (req.auth) {
+    if (req.auth.platformRole === 'MODERADOR') return 'ADMIN'
     const guardian = req.user?.roles?.includes('GUARDIAN') ?? false
-    return req.auth.platformRole === 'MODERADOR' || guardian ? 'ADMIN' : 'VOLUNTEER'
+    if (!guardian) return 'VOLUNTEER'
+    return req.user?.organizationRole === 'VOLUNTEER' ? 'VOLUNTEER' : 'ADMIN'
   }
   const value = String(req.headers['x-demo-role'] || req.query.role || '').toUpperCase()
   return value === 'VOLUNTEER' ? 'VOLUNTEER' : 'ADMIN'
 }
 
-export const permissionsForRole = (role: string) =>
-  role === 'ADMIN'
-    ? ['requests:view', 'requests:review', 'requests:approve', 'requests:reject']
-    : ['requests:view', 'requests:review', 'requests:reject']
+export const permissionsForRole = (role: OrganizationRole): OrganizationPermission[] =>
+  permissionsForOrganizationRole(role)
+
+/**
+ * Aplicação server-side da matriz (#28/#RBAC): esconder o botão é só UX, então
+ * toda ação da área da instituição passa por aqui. Chamar depois de
+ * `requireGuardian`, que garante que o usuário pertence a uma instituição.
+ */
+export function requirePermission(
+  req: Request,
+  res: Response,
+  permission: OrganizationPermission,
+): boolean {
+  if (permissionsForRole(demoRole(req)).includes(permission)) return true
+  sendError(res, 403, 'Você não tem permissão para realizar esta ação.')
+  return false
+}
 
 export const isChatParticipant = async (
   request: Pick<AdoptionRequest, 'userId' | 'petId'>,
@@ -250,30 +271,32 @@ export async function withReceivedRequest(request: AdoptionRequest, viewerId: st
   const profile = await getProfile(request.userId)
   const completed = PROFILE_FIELDS.length - profile.missingFields.length
   const base = await withPet(request)
+  const adopter = {
+    id: request.userId,
+    name: str(profile.name) || user?.name || '',
+    email: str(profile.email) || user?.email || '',
+    phone: str(profile.phone) || user?.phone || '',
+    completion: Math.round((completed / PROFILE_FIELDS.length) * 100),
+    housing: optional(str(profile.housing)),
+    dailyTime: optional(str(profile.dailyTime)),
+    activityLevel: str(profile.activityLevel) || 'Moderado',
+    hasOutdoorArea: profile.hasOutdoorArea ?? false,
+    acceptsSpecialCare: profile.acceptsSpecialCare ?? false,
+    experience: optional(str(profile.experience)),
+    hasChildren: optional(profile.hasChildren),
+    hasOtherPets: optional(profile.hasOtherPets),
+    preferredSpecies: optional(str(profile.preferredSpecies)),
+    preferredSize: optional(str(profile.preferredSize)),
+    zipCode: optional(str(profile.zipCode)),
+    address: optional(str(profile.address)),
+    city: optional(user?.city),
+  }
   return {
     ...base,
     unreadMessageCount: await unreadChatCount(request.id, viewerId),
     interview: request.interview ?? null,
     rejectionReason: request.rejectionReason ?? null,
-    adopter: {
-      id: request.userId,
-      name: str(profile.name) || user?.name || '',
-      email: str(profile.email) || user?.email || '',
-      phone: str(profile.phone) || user?.phone || '',
-      completion: Math.round((completed / PROFILE_FIELDS.length) * 100),
-      housing: optional(str(profile.housing)),
-      dailyTime: optional(str(profile.dailyTime)),
-      activityLevel: str(profile.activityLevel) || 'Moderado',
-      hasOutdoorArea: profile.hasOutdoorArea ?? false,
-      acceptsSpecialCare: profile.acceptsSpecialCare ?? false,
-      experience: optional(str(profile.experience)),
-      hasChildren: optional(profile.hasChildren),
-      hasOtherPets: optional(profile.hasOtherPets),
-      preferredSpecies: optional(str(profile.preferredSpecies)),
-      preferredSize: optional(str(profile.preferredSize)),
-      zipCode: optional(str(profile.zipCode)),
-      address: optional(str(profile.address)),
-      city: optional(user?.city),
-    },
+    matching: calculateRequestMatching(base.pet, adopter),
+    adopter,
   }
 }
