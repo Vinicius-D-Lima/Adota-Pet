@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { Router } from 'express'
 import { currentUser } from '../context.js'
 import { prisma } from '../db.js'
@@ -30,23 +31,26 @@ savedFiltersRouter.post('/me/saved-filters', async (req, res) => {
   if (!body) return sendError(res, 400, 'Critérios de busca inválidos', details)
 
   const { id: userId } = await currentUser(req)
-  const existing = await mySavedFilters(userId)
-  if (existing.length >= 10) {
+  const savedFilter = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(31, hashtext(${userId}))`
+    const count = await tx.savedFilter.count({ where: { userId } })
+    if (count >= 10) return null
+
+    return tx.savedFilter.create({
+      data: {
+        id: randomUUID(),
+        userId,
+        name: String(body.name).trim(),
+        criteria: body.criteria as Prisma.InputJsonValue,
+        active: body.active === true,
+        createdAt: new Date(),
+      },
+    })
+  })
+  if (!savedFilter) {
     return sendError(res, 409, 'Você atingiu o limite de 10 buscas salvas')
   }
 
-  const rows = await prisma.savedFilter.findMany({ select: { id: true } })
-  const nextId = rows.reduce((max, filter) => Math.max(max, Number(filter.id) || 0), 0) + 1
-  const savedFilter = await prisma.savedFilter.create({
-    data: {
-      id: String(nextId),
-      userId,
-      name: String(body.name).trim(),
-      criteria: body.criteria as Prisma.InputJsonValue,
-      active: body.active === true,
-      createdAt: new Date(),
-    },
-  })
   res.status(201).json(presentSavedFilter(savedFilter))
 })
 
