@@ -6,11 +6,17 @@ import { prisma } from './db.js'
 import {
   domainEventSchemas,
   markEventProcessed,
-  newRequestEventSchema,
   pendingEvents,
+  type DomainEventType,
 } from './events.js'
 import type { Prisma } from './generated/prisma/client.js'
 import { logger as defaultLogger } from './logger.js'
+import {
+  notificationEmailJobSchema,
+  notificationHandlerFor,
+  sendNotificationEmail,
+  type EnqueueEmail,
+} from './notificationService.js'
 
 /**
  * Fila de jobs com pg-boss (#95 / épico #45).
@@ -22,6 +28,15 @@ import { logger as defaultLogger } from './logger.js'
 export const QUEUES = {
   dispatch: 'outbox-dispatch',
   newRequest: 'NewRequestForOrganization',
+  requestStatus: 'RequestStatusChanged',
+  appointmentProposed: 'AppointmentProposed',
+  appointmentConfirmed: 'AppointmentConfirmed',
+  messageReceived: 'MessageReceived',
+  checkInDue: 'CheckInDue',
+  checkInOverdueEvent: 'CheckInOverdue',
+  checkInReviewed: 'CheckInReviewed',
+  newMatchingPet: 'NewMatchingPet',
+  notificationEmail: 'notification-email',
   checkInOverdue: 'check-in-overdue',
   dailyDigest: 'daily-digest',
   deadLetter: 'jobs-dead-letter',
@@ -217,15 +232,27 @@ async function setupJobs(boss: PgBoss, options: JobRunnerOptions): Promise<void>
 
   await boss.start()
 
-  await registerTypedWorker(
-    boss,
-    QUEUES.newRequest,
-    newRequestEventSchema,
-    (payload, job) => {
-      const handler = handlers.get(QUEUES.newRequest)
-      return handler?.(payload, job) ?? runOnce(job.id, QUEUES.newRequest, async () => undefined)
-    },
-    { pollingIntervalSeconds },
+  const enqueueEmail: EnqueueEmail = (job, options) =>
+    enqueueJob(boss, QUEUES.notificationEmail, job, {
+      tx: options.tx,
+      singletonKey: options.singletonKey,
+    })
+
+  // Cada evento de domínio tem sua fila; o consumidor de notificações é o mesmo
+  // para todos (#30). O payload já chega validado pelo schema registrado no outbox.
+  // Usamos o polling padrão (2s): notificações não precisam de latência de 500ms
+  // e menos round-trips evitam competir com os workers de teste no mesmo banco.
+  for (const [type, schema] of Object.entries(domainEventSchemas)) {
+    await registerTypedWorker(
+      boss,
+      type,
+      schema,
+      notificationHandlerFor(type as DomainEventType, enqueueEmail),
+    )
+  }
+
+  await registerTypedWorker(boss, QUEUES.notificationEmail, notificationEmailJobSchema, (payload) =>
+    sendNotificationEmail(payload),
   )
 
   for (const schedule of SCHEDULES) {

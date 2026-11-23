@@ -67,13 +67,14 @@ Comparação entre o [Plano de Projeto](plano-de-projeto.md) (versão 1.0, de 01
 - **Plano:** pode cancelar qualquer solicitação com status diferente de `Cancelada` ou `Recusada`. Na prática, isso inclui `Aprovada`.
 - **Entregue:** só `Enviada` e `Em análise` cancelam. `Aprovada`, `Recusada` e `Cancelada` não. O servidor responde **409** para as demais, e a interface não mostra o botão.
 - **Por quê (justificativa inferida; a regra veio do mock, e o motivo não está registrado no repositório):** uma adoção já aprovada é um acordo com a organização, e cancelá-la com um clique pertence à futura máquina de estados da solicitação (issues #20 a #22). A equipe deve confirmar se é essa a intenção.
-- **Pendência:** se a equipe quiser seguir o texto do REQ-18 ao pé da letra, a mudança é pequena (`CANCELLABLE_STATUSES` em `apps/web/src/utils/requestStatus.ts` e a regra equivalente em `apps/web/mock-server/server.js`). Fica como **decisão da equipe**; ver [Pendências](#5-pendências-em-relação-ao-plano).
+- **Atualização (#20):** no backend, a regra passou a ser a do plano — o adotante cancela em qualquer estado não final; estados finais retornam **409**. A tabela fica em `requestTransitionTable` (`@adotapet/shared`). A interface e o mock seguem com os rótulos legados; alinhá-los é decisão de UX.
 
 ### 4. Decisão da instituição sem as etapas do processo
 
 - **Plano:** a lista mostra os cinco status.
 - **Entregue:** a interface mostra os cinco status, e a área da instituição (PR #86) permite **Iniciar análise**, **Aprovar** e **Recusar** (`Enviada` → `Em análise` ou `Recusada`; `Em análise` → `Aprovada` ou `Recusada`). O seed ainda traz uma solicitação de cada status (`SOL-1039` a `SOL-1042`) para a demonstração inicial.
-- **Por quê:** o plano exclui "aprovação real de adoções" e o "painel administrativo para organizações", então isto é **além** do escopo do plano. Continuam fora as etapas de entrevista e visita, o motivo obrigatório da recusa e a diferença entre administrador e voluntário (issues #20, #21, #28 e #35).
+- **Por quê:** o plano exclui "aprovação real de adoções" e o "painel administrativo para organizações", então isto é **além** do escopo do plano.
+- **Atualização (#20/#28):** o backend já implementa as etapas de entrevista e visita, o motivo obrigatório na recusa, a diferença entre administrador e voluntário e a auditoria em `RequestStatusHistory`. A interface ainda usa os rótulos legados e não expõe todas as etapas.
 
 ### 5. Acessibilidade parcial (#57 revertida)
 

@@ -46,6 +46,18 @@ enum ReportStatus {
   ARQUIVADA
 }
 
+enum MembershipStatus {
+  ATIVO
+  REMOVIDO
+}
+
+enum CheckInStatus {
+  PENDENTE
+  ENVIADO
+  ATRASADO
+  REVISADO
+}
+
 model User {
   id               String           @id
   name             String           @default("")
@@ -83,6 +95,9 @@ model User {
   reportsModerated Report[]                 @relation("ReportModerator")
   reviewsWritten   Review[]                 @relation("ReviewAuthor")
   reviewsReceived  Review[]                 @relation("ReviewOrganization")
+  memberships          Membership[]
+  adoptionsAsAdopter   Adoption[]               @relation("Adopter")
+  createdFollowUpPlans FollowUpPlan[]           @relation("FollowUpPlanCreator")
 }
 
 /// Refresh token fica no banco só como hash (#48): permite revogar e detectar reuso.
@@ -141,6 +156,36 @@ model GuardianProfile {
   reviewCount  Int     @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Organization {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  initials     String
+  description  String  @default("")
+  city         String  @default("")
+  contactEmail String  @default("")
+  phone        String  @default("")
+  logoUrl      String?
+  cnpj         String?
+
+  memberships Membership[]
+  adoptions   Adoption[]
+}
+
+model Membership {
+  id             String           @id @default(cuid())
+  userId         String
+  organizationId String
+  role           OrganizationRole @default(VOLUNTEER)
+  status         MembershipStatus @default(ATIVO)
+  joinedAt       DateTime         @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, status, role])
 }
 
 /// Base mínima da issue #25, necessária para a moderação ocultar uma avaliação
@@ -217,6 +262,7 @@ model Pet {
 
   favorites Favorite[]
   requests  AdoptionRequest[]
+  adoption  Adoption?
 }
 
 model Favorite {
@@ -235,16 +281,87 @@ model AdoptionRequest {
   id              String   @id
   userId          String
   petId           String
+  /// Código da máquina de estados (#20): ENVIADA, ANALISE_QUESTIONARIO, ...
   status          String
+  /// Controle otimista de concorrência: só a transição que venceu a versão grava.
+  version         Int      @default(1)
   date            DateTime
   message         String
   answers         Json?
   interview       Json?
   rejectionReason String?
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pet      Pet           @relation(fields: [petId], references: [id], onDelete: Restrict)
-  messages ChatMessage[]
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pet           Pet                    @relation(fields: [petId], references: [id], onDelete: Restrict)
+  messages      ChatMessage[]
+  statusHistory RequestStatusHistory[]
+  adoption      Adoption?
+}
+
+/// Auditoria do fluxo (#20): de, para, quem, quando e motivo.
+model RequestStatusHistory {
+  id         String   @id @default(cuid())
+  requestId  String
+  fromStatus String
+  toStatus   String
+  actorId    String
+  actorRole  String
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  request AdoptionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+}
+
+model Adoption {
+  id             String   @id @default(cuid())
+  requestId      String   @unique
+  petId          String   @unique
+  adopterId      String
+  organizationId String
+  adoptedAt      DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  request      AdoptionRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  pet          Pet             @relation(fields: [petId], references: [id], onDelete: Restrict)
+  adopter      User            @relation("Adopter", fields: [adopterId], references: [id], onDelete: Restrict)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  plan         FollowUpPlan?
+  checkIns     CheckIn[]
+
+  @@index([adopterId, adoptedAt])
+  @@index([organizationId, adoptedAt])
+}
+
+model FollowUpPlan {
+  id           String    @id @default(cuid())
+  adoptionId   String    @unique
+  durationDays Int
+  intervalDays Int
+  createdBy    String
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  adoption Adoption @relation(fields: [adoptionId], references: [id], onDelete: Cascade)
+  creator  User     @relation("FollowUpPlanCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+}
+
+model CheckIn {
+  id              String        @id @default(cuid())
+  adoptionId      String
+  dueDate         DateTime
+  status          CheckInStatus @default(PENDENTE)
+  submittedAt     DateTime?
+  report          String?
+  photos          String[]      @default([])
+  reviewerComment String?
+  reviewedAt      DateTime?
+  createdAt       DateTime      @default(now())
+
+  adoption Adoption @relation(fields: [adoptionId], references: [id], onDelete: Cascade)
+
+  @@index([adoptionId, dueDate])
 }
 
 /// Outbox de eventos de domínio (#50): o evento entra na mesma transação da

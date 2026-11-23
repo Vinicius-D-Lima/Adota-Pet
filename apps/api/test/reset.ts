@@ -4,8 +4,11 @@ import { prisma } from '../src/db.js'
 export async function resetTestDatabase() {
   await prisma.$executeRawUnsafe(`
     TRUNCATE TABLE
-      "RefreshToken", "NotificationPreference", "Notification", "EventOutbox", "JobEffect", "SavedFilter", "StorageObject", "Report", "Review",
-      "ChatMessage", "AdoptionRequest", "Favorite", "Pet", "GuardianProfile", "AdopterProfile", "User"
+      "RefreshToken", "NotificationPreference", "Notification", "EventOutbox", "JobEffect",
+      "SavedFilter", "StorageObject", "Report", "Review", "CheckIn", "FollowUpPlan", "Adoption", "Membership",
+      "Organization",
+      "ChatMessage", "RequestStatusHistory", "AdoptionRequest", "Favorite", "Pet",
+      "GuardianProfile", "AdopterProfile", "User"
     RESTART IDENTITY CASCADE
   `)
 }

@@ -1,6 +1,7 @@
 import type { Express } from 'express'
 import swaggerUi from 'swagger-ui-express'
 import {
+  adoptionRequestSchema,
   authLoginSchema,
   createAccountSchema,
   favoriteIdsResponseSchema,
@@ -8,6 +9,10 @@ import {
   favoritesQuerySchema,
   favoritesResponseSchema,
   interviewApiSchema,
+  notificationPageSchema,
+  notificationPreferencesResponseSchema,
+  notificationPreferencesUpdateSchema,
+  notificationsQuerySchema,
   organizationPermissionsResponseSchema,
   organizationTransitionSchema,
   petIdParamsSchema,
@@ -19,6 +24,12 @@ import {
   receivedRequestsQuerySchema,
   receivedRequestsResponseSchema,
   registerSchema,
+  requestChatCursorQuerySchema,
+  requestChatMessageBodySchema,
+  requestChatMessageSchema,
+  requestChatPageSchema,
+  requestStatusHistoryResponseSchema,
+  requestTransitionSchema,
 } from '@adotapet/shared'
 import { z, type ZodType } from 'zod'
 
@@ -44,6 +55,25 @@ const authResponseSchema = z.object({
   expiresIn: z.number().int(),
 })
 
+/** Parâmetro das rotas de adoção (#23). */
+const idParamsSchema = z.object({ id: z.string().min(1) })
+const followUpPlanSchema = z
+  .object({
+    durationDays: z.number().int().min(1).max(3650),
+    intervalDays: z.number().int().min(1),
+  })
+  .strict()
+  .refine(({ durationDays, intervalDays }) => intervalDays <= durationDays, {
+    path: ['intervalDays'],
+    message: 'intervalDays deve ser menor ou igual a durationDays',
+  })
+
+/** Parâmetro das rotas de leitura individual (#30). */
+const notificationIdParamsSchema = z.object({ id: z.string().min(1) })
+
+/** Parâmetro `id` das rotas de solicitação, incluindo o chat (#22/#50). */
+const requestIdParamsSchema = z.object({ id: z.string().min(1) })
+
 const authDocs: Record<string, RouteSchemas> = Object.fromEntries(
   ['/auth', '/api/auth'].flatMap((base) => [
     [`POST ${base}/register`, { body: registerSchema, response: authResponseSchema }],
@@ -68,6 +98,7 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'GET /api/pets': { query: petsQuerySchema, response: petsResponseSchema },
   'GET /api/pets/{id}': { params: petIdParamsSchema, response: petSchema },
   'PUT /api/me/account': { body: createAccountSchema, response: profileSchema },
+  'GET /api/me/matches': {},
   'GET /api/me/permissions': { response: organizationPermissionsResponseSchema },
   'GET /api/me/received-requests': {
     query: receivedRequestsQuerySchema,
@@ -87,6 +118,51 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'GET /api/me/favorites': { query: favoritesQuerySchema, response: favoritesResponseSchema },
   'PUT /api/me/favorites/{petId}': { params: favoritePetIdParamsSchema },
   'DELETE /api/me/favorites/{petId}': { params: favoritePetIdParamsSchema },
+  // Adoções e plano de acompanhamento (#23).
+  'GET /api/me/adoptions': {},
+  'GET /api/organizations/{id}/adoptions': { params: idParamsSchema },
+  'POST /api/adoptions/{id}/follow-up-plan': {
+    params: idParamsSchema,
+    body: followUpPlanSchema,
+  },
+  'PUT /api/adoptions/{id}/follow-up-plan': {
+    params: idParamsSchema,
+    body: followUpPlanSchema,
+  },
+  // Notificações (#30): contrato idêntico ao consumido pelo frontend.
+  'GET /api/me/notifications': {
+    query: notificationsQuerySchema,
+    response: notificationPageSchema,
+  },
+  'PATCH /api/me/notifications/read-all': {},
+  'PATCH /api/me/notifications/{id}/read': { params: notificationIdParamsSchema },
+  'GET /api/me/notification-preferences': { response: notificationPreferencesResponseSchema },
+  'PUT /api/me/notification-preferences': {
+    body: notificationPreferencesUpdateSchema,
+    response: notificationPreferencesResponseSchema,
+  },
+  // Chat da solicitação (#22): REST + polling na v1, contrato Zod compartilhado.
+  'GET /api/requests/{id}/messages': {
+    params: requestIdParamsSchema,
+    query: requestChatCursorQuerySchema,
+    response: requestChatPageSchema,
+  },
+  'POST /api/requests/{id}/messages': {
+    params: requestIdParamsSchema,
+    body: requestChatMessageBodySchema,
+    response: requestChatMessageSchema,
+  },
+  'PATCH /api/requests/{id}/messages/read': { params: requestIdParamsSchema },
+  // Máquina de estados (#20): endpoint central e linha do tempo auditável.
+  'POST /api/requests/{id}/transitions': {
+    params: requestIdParamsSchema,
+    body: requestTransitionSchema,
+    response: adoptionRequestSchema,
+  },
+  'GET /api/requests/{id}/status-history': {
+    params: requestIdParamsSchema,
+    response: requestStatusHistoryResponseSchema,
+  },
 }
 
 export interface ApiRoute {
@@ -169,6 +245,9 @@ const isPrivatePath = (path: string) =>
   path === '/me' ||
   path.startsWith('/me/') ||
   path.startsWith('/api/me/') ||
+  path.startsWith('/api/requests/') ||
+  path.startsWith('/api/adoptions/') ||
+  path.startsWith('/api/organizations/') ||
   path.endsWith('/auth/me')
 
 const errorResponse = {
@@ -198,10 +277,15 @@ export function buildOpenApiDocument(app: Express) {
               }
             : {}),
         },
+        ...(method === 'POST' && path.endsWith('/follow-up-plan')
+          ? { 201: { description: 'Plano criado' } }
+          : {}),
         ...(method === 'GET' ? { 503: errorResponse } : {}),
         400: errorResponse,
         ...(isPrivatePath(path) || path.includes('/auth/') ? { 401: errorResponse } : {}),
-        ...(path.includes('/auth/') ? { 409: errorResponse } : {}),
+        403: errorResponse,
+        404: errorResponse,
+        409: errorResponse,
         413: errorResponse,
         429: errorResponse,
         500: errorResponse,
