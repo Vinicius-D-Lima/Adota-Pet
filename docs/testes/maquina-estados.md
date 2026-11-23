@@ -6,7 +6,17 @@ Garante que a solicitação só muda de estado por transições válidas, pela p
 
 ## Como ler
 
-Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest contra o Postgres de teste. O nome do teste no código começa com o ID entre colchetes, por exemplo `it('[FSM-01] ...')`, para que este documento, a issue e o código se encontrem pelo mesmo identificador.
+Cada linha da tabela é um teste de `apps/api/src/fsm.test.ts`, escrito com Vitest e supertest contra o Postgres de teste da nuvem — **sem Docker e sem serviço externo**. O nome do teste no código começa com o ID entre colchetes, por exemplo `it('[FSM-01] ...')`, para que este documento, a issue e o código se encontrem pelo mesmo identificador.
+
+## Fluxo implementado
+
+```text
+ENVIADA → ANALISE_QUESTIONARIO → ENTREVISTA → VISITA_DOMICILIAR → DECISAO_FINAL → APROVADA
+   └──────────────────────── RECUSADA (responsável, com motivo) ────────────────────────┘
+   └──────────────────────── CANCELADA (adotante, qualquer estado não final) ──────────┘
+```
+
+`ENTREVISTA → VISITA_DOMICILIAR` exige uma entrevista online realizada; `VISITA_DOMICILIAR → DECISAO_FINAL` exige uma visita presencial realizada. A tabela fica em `@adotapet/shared` (`requestTransitionTable`) e é usada pelo endpoint central e pelo adapter antigo da área da instituição.
 
 ## Testes
 

@@ -97,7 +97,7 @@ O seed inclui pets e solicitações em diferentes estados para exercitar os flux
 
 As buscas são isoladas por `X-Demo-User-Id` e persistem em `db.json`. A resposta de listagem tem o formato `{ data: SavedFilter[], total }`; cada item contém `id`, `name`, `criteria`, `active` e `createdAt`. Os critérios aceitos são `search`, `species` (`Cachorro` ou `Gato`), `size` (lista de portes), `sex` e `city`. Critérios desconhecidos ou valores inválidos retornam 400, e o 11º filtro da conta retorna 409.
 
-O mock salva e atualiza o estado do alerta, mas não avalia novos pets, não cria notificações `NewMatchingPet` e não envia o resumo diário por e-mail. O processamento de eventos e o resumo dependem do backend real descrito na issue #31 e da infraestrutura da #95.
+O mock salva e atualiza o estado do alerta, mas não avalia novos pets nem cria notificações `NewMatchingPet`. No backend real, o evento entra no outbox na mesma transação do filtro e o worker de domínio gera a notificação; a infraestrutura é a da #95.
 
 ### Notificações
 
@@ -105,7 +105,7 @@ As notificações e preferências são separadas por `X-Demo-User-Id` e persiste
 
 As preferências retornam `{ data: [{ type, inApp, email }] }`. O `PUT` recebe a lista completa em `data`, com exatamente uma entrada para cada tipo. Os valores padrão deixam o canal in-app ativo e habilitam e-mail apenas para os tipos marcados como críticos no mock.
 
-Este servidor apenas simula a API: não processa eventos de domínio, não envia e-mails e não implementa autenticação/autorização real. Os endpoints do backend continuam descritos na issue #30.
+Este servidor apenas simula a API: não processa eventos de domínio, não envia e-mails e não implementa autenticação/autorização real. O backend real (#30) persiste eventos no outbox, publica no pg-boss, respeita preferências, grava notificações in-app e envia e-mail por SMTP (Mailpit em desenvolvimento, servidor SMTP em processo nos testes). O contrato HTTP das cinco rotas é o mesmo nos dois lados.
 
 ### Chat da solicitação
 
@@ -178,12 +178,15 @@ Parâmetros aceitos: `search`, `species`, `size`, `sex`, `city`, `sort`, `page` 
 
 Toda solicitação devolvida traz o **pet embutido** (`pet`, ou `null` se o pet não existir mais) e a data em ISO.
 
-`POST /requests/:id/transitions` com `{ "to": "CANCELADA" }`:
+`POST /requests/:id/transitions` com `{ "to": "ANALISE_QUESTIONARIO", "reason"?: string }` é a entrada única da máquina de estados (#20). Os destinos aceitos são os códigos `ANALISE_QUESTIONARIO`, `ENTREVISTA`, `VISITA_DOMICILIAR`, `DECISAO_FINAL`, `APROVADA`, `RECUSADA` e `CANCELADA`:
 
-- **200** se o status é `Enviada` ou `Em análise`;
-- **409** se o status não permite cancelar (por exemplo, já cancelada);
-- **404** se a solicitação não existe;
-- **400** se o destino for outro (hoje só `CANCELADA` é aceito).
+- **200** se a transição existe na tabela para o papel do usuário;
+- **403** se o papel não pode dispará-la (só a instituição avança/recusa, só o adotante cancela);
+- **409** com `transição inválida de X para Y` se o par origem/destino não existe ou o estado é final;
+- **400** se `to` não é um código conhecido ou se uma recusa não tem `reason`;
+- **404** se a solicitação não existe.
+
+`GET /requests/:id/status-history` devolve `{ data, total }` com `from`, `to`, `actorId`, `actorRole`, `reason` e `createdAt` de cada transição.
 
 ### Favoritos
 
@@ -224,13 +227,14 @@ No backend real, o papel vem de `User.organizationRole` (`ADMIN`/`VOLUNTEER`, pa
 
 Com `VOLUNTEER`, `requests:approve` e `canApprove: false` não são devolvidos. No frontend, o perfil do `npm run dev:mock` "Instituto — voluntário(a)" envia esse cabeçalho.
 
-As transições da instituição aceitas são `Enviada` → `Em análise` ou `Recusada`, e `Em análise` → `Aprovada` ou `Recusada`. Destino desconhecido retorna **400**, transição fora dessa tabela retorna **409**, e solicitação de pet de outra instituição retorna **404**.
+A rota antiga `/me/received-requests/:id/transitions` continua aceitando `EM_ANALISE`, `APROVADA` e `RECUSADA`, mas agora delega à mesma tabela do endpoint central. O fluxo completo é `ENVIADA → ANALISE_QUESTIONARIO → ENTREVISTA → VISITA_DOMICILIAR → DECISAO_FINAL → APROVADA`, com recusa a partir de qualquer etapa de análise e cancelamento do adotante a partir de qualquer estado não final. Destino desconhecido retorna **400**, transição fora da tabela retorna **409**, e solicitação de pet de outra instituição retorna **404**.
 
 Regras adicionais:
 
-- **Recusa:** `reason` é obrigatório e precisa ter pelo menos 10 caracteres; sem ele a API responde **400** com `details` no campo `reason`. O motivo é gravado em `rejectionReason` e aparece na mensagem da solicitação.
-- **Entrevista:** só pode ser agendada com a solicitação em `Em análise` (senão **409**); os horários precisam ser datas ISO **futuras** e a quantidade fica entre 1 e 3 (senão **400**).
-- **Aprovação:** exige uma entrevista com `status: "REALIZADA"` (`completed: true`). Sem isso, a API responde **400**; com papel `VOLUNTEER`, responde **403**.
+- **Recusa:** `reason` é obrigatório; sem ele a API responde **400** com `details` no campo `reason`. O motivo é gravado em `rejectionReason`, no histórico e aparece na mensagem da solicitação.
+- **Entrevista:** só pode ser agendada com a solicitação em análise (senão **409**); os horários precisam ser datas ISO **futuras** e a quantidade fica entre 1 e 3 (senão **400**).
+- **Aprovação:** exige uma entrevista com `status: "REALIZADA"` (`completed: true`) no atalho legado; o caminho canônico passa por `DECISAO_FINAL`. Com papel `VOLUNTEER`, aprovar responde **403**.
+- **Avanço de etapa:** `ENTREVISTA → VISITA_DOMICILIAR` exige entrevista online realizada; `VISITA_DOMICILIAR → DECISAO_FINAL` exige visita presencial realizada. Sem isso, a API responde **409**.
 - **Marcar como realizado:** exige entrevista previamente agendada (**400** se não existir).
 
 ## Formato de erro

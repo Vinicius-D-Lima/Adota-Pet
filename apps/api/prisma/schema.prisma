@@ -209,17 +209,37 @@ model AdoptionRequest {
   id              String   @id
   userId          String
   petId           String
+  /// Código da máquina de estados (#20): ENVIADA, ANALISE_QUESTIONARIO, ...
   status          String
+  /// Controle otimista de concorrência: só a transição que venceu a versão grava.
+  version         Int      @default(1)
   date            DateTime
   message         String
   answers         Json?
   interview       Json?
   rejectionReason String?
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pet      Pet           @relation(fields: [petId], references: [id], onDelete: Restrict)
-  messages ChatMessage[]
-  adoption Adoption?
+  user          User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pet           Pet                    @relation(fields: [petId], references: [id], onDelete: Restrict)
+  messages      ChatMessage[]
+  statusHistory RequestStatusHistory[]
+  adoption      Adoption?
+}
+
+/// Auditoria do fluxo (#20): de, para, quem, quando e motivo.
+model RequestStatusHistory {
+  id         String   @id @default(cuid())
+  requestId  String
+  fromStatus String
+  toStatus   String
+  actorId    String
+  actorRole  String
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  request AdoptionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
 }
 
 model Adoption {

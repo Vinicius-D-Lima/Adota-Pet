@@ -4,10 +4,11 @@ import {
   organizationRequestStageOf,
   organizationTransitionSchema,
   receivedRequestsQuerySchema,
-  rejectionFormSchema,
+  requestStatusCodeOf,
   type InterviewApiPayload,
   type OrganizationTransitionPayload,
   type ReceivedRequestsQuery,
+  type RequestStatusCode,
 } from '@adotapet/shared'
 import type { Request } from 'express'
 import { Router } from 'express'
@@ -22,18 +23,21 @@ import {
   withReceivedRequest,
 } from '../context.js'
 import { prisma } from '../db.js'
+import { APPOINTMENT_CONFIRMED, APPOINTMENT_PROPOSED, enqueueDomainEvent } from '../events.js'
 import { Prisma, type Pet } from '../generated/prisma/client.js'
-import { list, sendError, zodDetails } from '../http.js'
+import { HttpError, list, sendError } from '../http.js'
+import { applyTransition } from '../requestStatusMachine.js'
 import { deleteStorageObjectsForResource } from '../storage.js'
 import { validate } from '../validate.js'
 import { ORGANIZATION_PET_FIELDS, asRecord, validateOrganizationPet } from '../validation.js'
 
 export const organizationRouter = Router()
 
-const ORGANIZATION_REQUEST_TRANSITIONS: Record<string, string> = {
-  EM_ANALISE: 'Em análise',
-  APROVADA: 'Aprovada',
-  RECUSADA: 'Recusada',
+/** Adapter dos códigos antigos da área da instituição para a FSM (#20). */
+const ORGANIZATION_REQUEST_TRANSITIONS: Record<string, RequestStatusCode> = {
+  EM_ANALISE: 'ANALISE_QUESTIONARIO',
+  APROVADA: 'APROVADA',
+  RECUSADA: 'RECUSADA',
 }
 const isUniqueViolation = (error: unknown) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
@@ -42,6 +46,9 @@ const presentOrganizationPet = (pet: Pet) => ({
   distance: null,
   distanceKm: null,
 })
+
+const petNameOf = async (petId: string) =>
+  (await prisma.pet.findUnique({ where: { id: petId }, select: { name: true } }))?.name ?? 'pet'
 
 /** Solicitação dos pets da instituição ou `null` (com 404 já enviado). */
 async function receivedRequestOf(req: Request, viewerId: string) {
@@ -221,7 +228,7 @@ organizationRouter.post(
     if (!requirePermission(req, res, 'requests:review')) return
     const request = await receivedRequestOf(req, viewer.id)
     if (!request) return sendError(res, 404, 'Solicitação não encontrada')
-    if (request.status !== 'Em análise') {
+    if (requestStatusCodeOf(request.status) !== 'ANALISE_QUESTIONARIO') {
       return sendError(
         res,
         409,
@@ -234,17 +241,28 @@ organizationRouter.post(
     }
 
     const { type, proposedSlots } = req.body as InterviewApiPayload
-    const updated = await prisma.adoptionRequest.update({
-      where: { id: request.id },
-      data: {
-        interview: {
-          type,
-          proposedSlots,
-          status: 'AGENDADA',
-          completed: false,
-          scheduledAt: new Date().toISOString(),
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.adoptionRequest.update({
+        where: { id: request.id },
+        data: {
+          interview: {
+            type,
+            proposedSlots,
+            status: 'AGENDADA',
+            completed: false,
+            scheduledAt: new Date().toISOString(),
+          },
         },
-      },
+      })
+      // NOT: evento e agendamento entram juntos (o worker publica depois).
+      await enqueueDomainEvent(tx, APPOINTMENT_PROPOSED, {
+        requestId: row.id,
+        adopterId: row.userId,
+        petName: await petNameOf(row.petId),
+        type,
+        slotCount: proposedSlots.length,
+      })
+      return row
     })
     res.json(await withReceivedRequest(updated, viewer.id))
   },
@@ -261,19 +279,30 @@ organizationRouter.post('/me/received-requests/:id/interview/complete', async (r
   if (!interview) {
     return sendError(res, 400, 'Nenhuma entrevista foi agendada para esta solicitação.')
   }
-  if (!['Em análise', 'Aprovada'].includes(request.status)) {
+  const statusCode = requestStatusCodeOf(request.status)
+  if (statusCode !== 'ANALISE_QUESTIONARIO' && statusCode !== 'APROVADA') {
     return sendError(res, 409, 'Esta solicitação não está em etapa de entrevista.')
   }
-  const updated = await prisma.adoptionRequest.update({
-    where: { id: request.id },
-    data: {
-      interview: {
-        ...interview,
-        status: 'REALIZADA',
-        completed: true,
-        completedAt: new Date().toISOString(),
+  const completedAt = new Date().toISOString()
+  const updated = await prisma.$transaction(async (tx) => {
+    const row = await tx.adoptionRequest.update({
+      where: { id: request.id },
+      data: {
+        interview: {
+          ...interview,
+          status: 'REALIZADA',
+          completed: true,
+          completedAt,
+        },
       },
-    },
+    })
+    await enqueueDomainEvent(tx, APPOINTMENT_CONFIRMED, {
+      requestId: row.id,
+      adopterId: row.userId,
+      petName: await petNameOf(row.petId),
+      completedAt,
+    })
+    return row
   })
   res.json(await withReceivedRequest(updated, viewer.id))
 })
@@ -287,111 +316,69 @@ organizationRouter.post(
     const request = await receivedRequestOf(req, viewer.id)
     if (!request) return sendError(res, 404, 'Solicitação não encontrada')
 
-    const { to, reason: bodyReason } = req.body as OrganizationTransitionPayload
-    const status = ORGANIZATION_REQUEST_TRANSITIONS[to]
-    if (!status) return sendError(res, 400, 'Transição não suportada')
+    const { to, reason } = req.body as OrganizationTransitionPayload
+    const target = ORGANIZATION_REQUEST_TRANSITIONS[to]
+    if (!target) return sendError(res, 400, 'Transição não suportada')
 
     // Cada transição exige uma permissão diferente da matriz (#28/#RBAC).
     const permission =
-      status === 'Aprovada'
+      target === 'APROVADA'
         ? 'requests:approve'
-        : status === 'Recusada'
+        : target === 'RECUSADA'
           ? 'requests:reject'
           : 'requests:review'
     if (!requirePermission(req, res, permission)) return
 
-    const interview = asRecord(request.interview)
-    if (status === 'Aprovada' && interview?.completed !== true) {
-      return sendError(
-        res,
-        400,
-        'O agendamento da etapa precisa estar marcado como realizado antes de aprovar.',
-        [{ field: 'interview', message: 'Marque a entrevista como realizada antes de aprovar.' }],
-      )
-    }
-
-    const allowed =
-      (request.status === 'Enviada' && ['Em análise', 'Recusada'].includes(status)) ||
-      (request.status === 'Em análise' && ['Aprovada', 'Recusada'].includes(status))
-    if (!allowed)
-      return sendError(
-        res,
-        409,
-        `Não é possível alterar uma solicitação com status "${request.status}" para "${status}"`,
-      )
-
-    const reason = bodyReason?.trim() ?? ''
-    if (status === 'Recusada') {
-      const parsedReason = rejectionFormSchema.safeParse({ reason })
-      if (!parsedReason.success) {
-        return sendError(res, 400, 'Informe o motivo da recusa', zodDetails(parsedReason.error))
-      }
-    }
-    const messages: Record<string, string> = {
-      'Em análise': 'A instituição iniciou a análise da sua solicitação.',
-      Aprovada: 'Sua solicitação foi aprovada pela instituição.',
-      Recusada: reason
-        ? `A instituição encerrou esta solicitação: ${reason}`
-        : 'A instituição encerrou esta solicitação.',
-    }
-    let approval: { organizationId: string } | null = null
-    if (status === 'Aprovada') {
-      const pet = await prisma.pet.findUnique({ where: { id: request.petId } })
-      if (!pet) return sendError(res, 404, 'Pet não encontrado')
-      if (pet.status !== 'DISPONIVEL') {
-        return sendError(res, 409, 'Este pet não está mais disponível para adoção')
-      }
-
-      const organization = await prisma.organization.findUnique({
-        where: { name: pet.organization },
-        select: { id: true },
-      })
-      if (!organization) {
-        return sendError(res, 409, 'A organização do pet ainda não foi cadastrada')
-      }
-      const membership = await prisma.membership.findFirst({
-        where: { userId: viewer.id, organizationId: organization.id, status: 'ATIVO' },
-      })
-      if (!membership) return sendError(res, 403, 'Você não é membro ativo desta organização')
-      if (membership.role !== 'ADMIN') {
-        return sendError(res, 403, 'Apenas administradores podem aprovar adoções')
-      }
-      approval = { organizationId: organization.id }
-    }
-
+    // #20 + #23: a rota antiga usa a tabela da FSM e, ao aprovar, formaliza a
+    // adoção dentro da mesma transação da mudança de status.
     try {
-      const updated = await prisma.$transaction(async (tx) => {
-        const changed = await tx.adoptionRequest.updateMany({
-          where: { id: request.id, status: request.status },
-          data: {
-            status,
-            message: messages[status],
-            ...(status === 'Recusada' && reason ? { rejectionReason: reason } : {}),
-          },
-        })
-        if (changed.count !== 1) return null
+      const { row } = await applyTransition({
+        req,
+        requestId: request.id,
+        to: target,
+        reason,
+        onTransition:
+          target === 'APROVADA'
+            ? async ({ tx }) => {
+                const pet = await tx.pet.findUnique({ where: { id: request.petId } })
+                if (!pet) throw new HttpError(404, 'Pet não encontrado')
+                if (pet.status !== 'DISPONIVEL') {
+                  throw new HttpError(409, 'Este pet não está mais disponível para adoção')
+                }
 
-        if (approval) {
-          await tx.adoption.create({
-            data: {
-              requestId: request.id,
-              petId: request.petId,
-              adopterId: request.userId,
-              organizationId: approval.organizationId,
-            },
-          })
-          await tx.pet.update({
-            where: { id: request.petId },
-            data: { status: 'ADOTADO' },
-          })
-        }
+                const organization = await tx.organization.findUnique({
+                  where: { name: pet.organization },
+                  select: { id: true },
+                })
+                if (!organization) {
+                  throw new HttpError(409, 'A organização do pet ainda não foi cadastrada')
+                }
+                const membership = await tx.membership.findFirst({
+                  where: { userId: viewer.id, organizationId: organization.id, status: 'ATIVO' },
+                })
+                if (!membership) {
+                  throw new HttpError(403, 'Você não é membro ativo desta organização')
+                }
+                if (membership.role !== 'ADMIN') {
+                  throw new HttpError(403, 'Apenas administradores podem aprovar adoções')
+                }
 
-        return tx.adoptionRequest.findUniqueOrThrow({ where: { id: request.id } })
+                await tx.adoption.create({
+                  data: {
+                    requestId: request.id,
+                    petId: request.petId,
+                    adopterId: request.userId,
+                    organizationId: organization.id,
+                  },
+                })
+                await tx.pet.update({
+                  where: { id: request.petId },
+                  data: { status: 'ADOTADO' },
+                })
+              }
+            : undefined,
       })
-      if (!updated) {
-        return sendError(res, 409, 'A solicitação já foi alterada por outra operação')
-      }
-      res.json(await withReceivedRequest(updated, viewer.id))
+      res.json(await withReceivedRequest(row, viewer.id))
     } catch (error) {
       if (isUniqueViolation(error)) {
         return sendError(res, 409, 'Este pet já possui uma adoção')

@@ -6,7 +6,7 @@ Garante que só as partes conversam, que o conteúdo é seguro e que o chat fech
 
 ## Como ler
 
-Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest contra o Postgres de teste. O nome do teste no código começa com o ID entre colchetes, por exemplo `it('[CHAT-01] ...')`, para que este documento, a issue e o código se encontrem pelo mesmo identificador.
+Cada linha da tabela é um teste de `apps/api/src/chat.test.ts`, escrito com Vitest e supertest contra o Postgres de teste da nuvem — **sem Docker e sem serviço externo**. O nome do teste no código começa com o ID entre colchetes, por exemplo `it('[CHAT-01] ...')`, para que este documento, a issue e o código se encontrem pelo mesmo identificador.
 
 ## Testes
 
@@ -19,7 +19,7 @@ Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest c
 | `CHAT-05` | Funcional                      | Contagem de não lidas                                   | Disponível por solicitação e atualizada ao marcar como lidas.                          |
 | `CHAT-06` | Segurança · XSS                | HTML e script são texto puro                            | Uma mensagem com `<script>` é guardada e devolvida literalmente. Evita XSS armazenado. |
 | `CHAT-07` | Segurança · Exposição de dados | Contatos das partes não vazam                           | Nenhuma resposta do chat traz telefone ou e-mail do outro lado.                        |
-| `CHAT-08` | Segurança · Limite de uso      | Envio em excesso retorna 429                            | Evita flood de mensagens.                                                              |
+| `CHAT-08` | Segurança · Limite de uso      | Envio em excesso retorna 429                            | App com `CHAT_RATE_LIMIT_MAX=2`: terceiro envio é bloqueado e não grava no banco.      |
 | `CHAT-09` | Segurança · BOLA/IDOR          | Marcar como lido só na própria conversa                 | `PATCH .../read` de uma solicitação alheia retorna 403.                                |
 
 Voltar ao [índice dos testes](README.md).

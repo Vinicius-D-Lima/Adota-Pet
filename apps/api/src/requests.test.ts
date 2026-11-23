@@ -276,7 +276,7 @@ databaseSuite('criação e leitura de solicitações (#50)', () => {
 
     const stored = await prisma.adoptionRequest.findUnique({ where: { id: response.body.id } })
     expect(stored?.userId).toBe(user.id)
-    expect(stored?.status).toBe('Enviada')
+    expect(stored?.status).toBe('ENVIADA')
     expect(stored?.answers).toEqual(QUESTIONNAIRE)
   })
 
