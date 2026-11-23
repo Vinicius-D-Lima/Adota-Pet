@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { matchingScoreSchema } from './matchingSchema.js'
 import { requestPetSchema, requestStatuses } from './requestSchema.js'
+import { requestStatusCodeOf } from './requestStateMachine.js'
 
 const requiredChoice = (message: string) => z.string().min(1, message)
 
@@ -127,8 +128,14 @@ export type RequestStage = Exclude<OrganizationRequestStage, 'all'>
 type StageSource = { status: string; interview?: unknown }
 
 export function organizationRequestStageOf(request: StageSource): RequestStage {
-  if (request.status === 'Enviada') return 'new'
-  if (request.status === 'Em análise') {
+  const code = requestStatusCodeOf(request.status)
+  if (code === 'ENVIADA') return 'new'
+  if (
+    code === 'ANALISE_QUESTIONARIO' ||
+    code === 'ENTREVISTA' ||
+    code === 'VISITA_DOMICILIAR' ||
+    code === 'DECISAO_FINAL'
+  ) {
     const interview = request.interview
     const completed =
       typeof interview === 'object' &&
@@ -137,7 +144,7 @@ export function organizationRequestStageOf(request: StageSource): RequestStage {
       (interview as { completed?: unknown }).completed === true
     return completed ? 'interview-done' : 'interview'
   }
-  if (request.status === 'Aprovada') return 'approved'
+  if (code === 'APROVADA') return 'approved'
   return 'closed'
 }
 

@@ -1,31 +1,18 @@
+import {
+  notificationPreferencesUpdateSchema,
+  notificationsQuerySchema,
+  type NotificationPreferencesUpdate,
+  type NotificationsQuery,
+} from '@adotapet/shared'
 import { Router } from 'express'
 import { currentUser } from '../context.js'
 import { prisma } from '../db.js'
 import type { Notification, NotificationPreference } from '../generated/prisma/client.js'
-import type { FieldError } from '../http.js'
 import { sendError } from '../http.js'
-import { asRecord } from '../validation.js'
+import { preferencesFor } from '../notificationService.js'
+import { validate } from '../validate.js'
 
 export const notificationsRouter = Router()
-
-const NOTIFICATION_TYPES = [
-  'RequestStatusChanged',
-  'AppointmentProposed',
-  'AppointmentConfirmed',
-  'MessageReceived',
-  'CheckInDue',
-  'CheckInOverdue',
-  'CheckInReviewed',
-  'NewRequestForOrganization',
-  'NewMatchingPet',
-] as const
-
-const DEFAULT_EMAIL_NOTIFICATION_TYPES = [
-  'RequestStatusChanged',
-  'AppointmentConfirmed',
-  'CheckInOverdue',
-  'NewRequestForOrganization',
-]
 
 /** O contrato não expõe o dono da notificação. */
 const presentNotification = (notification: Notification) => ({
@@ -50,44 +37,36 @@ const myNotifications = (userId: string) =>
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   })
 
-/** Ordem de exibição: a mesma lista de tipos usada pelo frontend. */
-type NotificationType = (typeof NOTIFICATION_TYPES)[number]
-const indexOfType = (type: string) => NOTIFICATION_TYPES.indexOf(type as NotificationType)
-const byTypeOrder = <T extends { type: string }>(rows: T[]) =>
-  [...rows].sort((a, b) => indexOfType(a.type) - indexOfType(b.type))
+const PAGE_SIZE = 5
 
-notificationsRouter.get('/me/notifications', async (req, res) => {
-  const { id: userId } = await currentUser(req)
-  const unreadParam = req.query.unread
-  if (unreadParam !== undefined && !['true', 'false'].includes(String(unreadParam))) {
-    return sendError(res, 400, 'Parâmetro unread inválido', [
-      { field: 'unread', message: 'Use true ou false.' },
-    ])
-  }
+notificationsRouter.get(
+  '/me/notifications',
+  validate({ query: notificationsQuerySchema }),
+  async (req, res) => {
+    const { id: userId } = await currentUser(req)
+    const { cursor, unread } = req.query as unknown as NotificationsQuery
 
-  const all = await myNotifications(userId)
-  const unreadCount = all.filter((notification) => !notification.readAt).length
-  const matching = unreadParam === 'true' ? all.filter((notification) => !notification.readAt) : all
+    const all = await myNotifications(userId)
+    const unreadCount = all.filter((notification) => !notification.readAt).length
+    const matching = unread === 'true' ? all.filter((notification) => !notification.readAt) : all
 
-  const cursor = req.query.cursor
-  const cursorIndex =
-    cursor === undefined
-      ? -1
-      : matching.findIndex((notification) => notification.id === String(cursor))
-  if (cursor !== undefined && cursorIndex < 0) {
-    return sendError(res, 400, 'Cursor inválido', [
-      { field: 'cursor', message: 'O cursor não pertence a esta lista.' },
-    ])
-  }
+    const cursorIndex =
+      cursor === undefined ? -1 : matching.findIndex((notification) => notification.id === cursor)
+    if (cursor !== undefined && cursorIndex < 0) {
+      return sendError(res, 400, 'Cursor inválido', [
+        { field: 'cursor', message: 'O cursor não pertence a esta lista.' },
+      ])
+    }
 
-  const page = matching.slice(cursorIndex + 1, cursorIndex + 1 + 5)
-  const hasMore = cursorIndex + 1 + page.length < matching.length
-  res.json({
-    data: page.map(presentNotification),
-    unreadCount,
-    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
-  })
-})
+    const page = matching.slice(cursorIndex + 1, cursorIndex + 1 + PAGE_SIZE)
+    const hasMore = cursorIndex + 1 + page.length < matching.length
+    res.json({
+      data: page.map(presentNotification),
+      unreadCount,
+      nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    })
+  },
+)
 
 notificationsRouter.patch('/me/notifications/read-all', async (req, res) => {
   const { id: userId } = await currentUser(req)
@@ -101,7 +80,7 @@ notificationsRouter.patch('/me/notifications/read-all', async (req, res) => {
 notificationsRouter.patch('/me/notifications/:id/read', async (req, res) => {
   const { id: userId } = await currentUser(req)
   const notification = await prisma.notification.findFirst({
-    where: { id: req.params.id, userId },
+    where: { id: String(req.params.id), userId },
   })
   if (!notification) return sendError(res, 404, 'Notificação não encontrada')
 
@@ -112,76 +91,25 @@ notificationsRouter.patch('/me/notifications/:id/read', async (req, res) => {
   res.status(204).end()
 })
 
-/** Preferências do usuário; a primeira consulta cria os padrões. */
-async function myPreferences(userId: string) {
-  const saved = await prisma.notificationPreference.findMany({ where: { userId } })
-  if (saved.length) return byTypeOrder(saved)
-
-  const defaults = NOTIFICATION_TYPES.map((type) => ({
-    userId,
-    type,
-    inApp: true,
-    email: DEFAULT_EMAIL_NOTIFICATION_TYPES.includes(type),
-  }))
-  await prisma.notificationPreference.createMany({ data: defaults, skipDuplicates: true })
-  return byTypeOrder(await prisma.notificationPreference.findMany({ where: { userId } }))
-}
-
 notificationsRouter.get('/me/notification-preferences', async (req, res) => {
   const { id: userId } = await currentUser(req)
-  const preferences = await myPreferences(userId)
+  const preferences = await preferencesFor(userId)
   res.json({ data: preferences.map(presentPreference) })
 })
 
-notificationsRouter.put('/me/notification-preferences', async (req, res) => {
-  const body = asRecord(req.body)
-  const data = body?.data
-  if (!Array.isArray(data)) {
-    return sendError(res, 400, 'Corpo da requisição inválido', [
-      { field: 'data', message: 'Envie a lista completa de preferências.' },
+/** A lista completa é substituída de uma vez, garantindo um registro por tipo. */
+notificationsRouter.put(
+  '/me/notification-preferences',
+  validate({ body: notificationPreferencesUpdateSchema }),
+  async (req, res) => {
+    const { id: userId } = await currentUser(req)
+    const { data } = req.body as unknown as NotificationPreferencesUpdate
+    await prisma.$transaction([
+      prisma.notificationPreference.deleteMany({ where: { userId } }),
+      prisma.notificationPreference.createMany({
+        data: data.map((preference) => ({ userId, ...preference })),
+      }),
     ])
-  }
-
-  const details: FieldError[] = []
-  const seen = new Set<string>()
-  for (const [index, item] of data.entries()) {
-    const preference = asRecord(item)
-    if (
-      !preference ||
-      !NOTIFICATION_TYPES.includes(preference.type as NotificationType) ||
-      typeof preference.inApp !== 'boolean' ||
-      typeof preference.email !== 'boolean' ||
-      seen.has(String(preference.type))
-    ) {
-      details.push({
-        field: `data.${index}`,
-        message: 'Informe um tipo válido e os canais inApp/email sem duplicar tipos.',
-      })
-    } else {
-      seen.add(String(preference.type))
-    }
-  }
-  if (seen.size !== NOTIFICATION_TYPES.length) {
-    details.push({
-      field: 'data',
-      message: 'Inclua exatamente uma preferência para cada tipo de notificação.',
-    })
-  }
-  if (details.length) return sendError(res, 400, 'Validação falhou', details)
-
-  const { id: userId } = await currentUser(req)
-  const rows = data.map((item) => {
-    const preference = asRecord(item)
-    return {
-      userId,
-      type: String(preference?.type),
-      inApp: preference?.inApp === true,
-      email: preference?.email === true,
-    }
-  })
-  await prisma.$transaction([
-    prisma.notificationPreference.deleteMany({ where: { userId } }),
-    prisma.notificationPreference.createMany({ data: rows }),
-  ])
-  res.json({ data })
-})
+    res.json({ data })
+  },
+)

@@ -1,4 +1,5 @@
 import {
+  displayRequestStatus,
   permissionsForOrganizationRole,
   type OrganizationPermission,
   type OrganizationRole,
@@ -235,6 +236,9 @@ export const withPet = async (request: AdoptionRequest) => {
   const pet = await prisma.pet.findUnique({ where: { id: request.petId } })
   return {
     ...request,
+    // #20: o banco guarda códigos da FSM; o contrato público segue com os
+    // rótulos legados consumidos pelo frontend.
+    status: displayRequestStatus(request.status),
     // Campos que o mock só inclui quando gravados: `null` viraria chave presente
     // e o schema `optional()` do frontend rejeita null.
     answers: request.answers ?? undefined,

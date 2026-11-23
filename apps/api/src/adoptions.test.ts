@@ -115,11 +115,11 @@ async function makeRequest(id: string, userId: string, petId: string) {
       id,
       userId,
       petId,
-      status: 'Em análise',
+      status: 'ANALISE_QUESTIONARIO',
       date: new Date(),
       message: 'Solicitação em análise',
       answers: QUESTIONNAIRE,
-      interview: { completed: true },
+      interview: { completed: true, status: 'REALIZADA' },
     },
   })
 }
@@ -401,7 +401,7 @@ databaseSuite('adoções e planos de acompanhamento (#23)', () => {
     expect(failed.status).toBe(409)
     expect(
       (await prisma.adoptionRequest.findUniqueOrThrow({ where: { id: secondRequest.id } })).status,
-    ).toBe('Em análise')
+    ).toBe('ANALISE_QUESTIONARIO')
     expect((await prisma.pet.findUniqueOrThrow({ where: { id: rollbackPet.id } })).status).toBe(
       'DISPONIVEL',
     )

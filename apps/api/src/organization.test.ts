@@ -173,7 +173,7 @@ databaseSuite('área da instituição: RBAC, fila e compatibilidade (#26/#28)', 
       'SOL-RBAC-01',
       'pet-rbac-01',
       'adopter-rbac-01',
-      'Em análise',
+      'ANALISE_QUESTIONARIO',
       completedInterview,
     )
 
@@ -186,11 +186,22 @@ databaseSuite('área da instituição: RBAC, fila e compatibilidade (#26/#28)', 
     expect(response.status).toBe(403)
     expect(response.body).toMatchObject({ statusCode: 403, error: 'Forbidden' })
     const unchanged = await prisma.adoptionRequest.findUnique({ where: { id: 'SOL-RBAC-01' } })
-    expect(unchanged?.status).toBe('Em análise')
+    expect(unchanged?.status).toBe('ANALISE_QUESTIONARIO')
   })
 
   it('[RBAC-02] administrador aprova após entrevista realizada', async () => {
     const { headers } = await makeGuardian('org-rbac-02')
+    const organization = await prisma.organization.create({
+      data: { name: ORGANIZATION, initials: 'IP' },
+    })
+    await prisma.membership.create({
+      data: {
+        userId: 'org-rbac-02',
+        organizationId: organization.id,
+        role: 'ADMIN',
+        status: 'ATIVO',
+      },
+    })
     await makeAdopter('adopter-rbac-02')
     await makePet('pet-rbac-02')
     await makeRequest(

@@ -35,6 +35,9 @@ const envSchema = z.object({
     ),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+  /** #22/CHAT-08: teto específico de envio de mensagens, por cliente autenticado. */
+  CHAT_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
+  CHAT_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
   BODY_LIMIT: z.string().min(1).default('100kb'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DEMO_USER_ID: z.string().min(1).default('demo'),
@@ -82,6 +85,19 @@ const envSchema = z.object({
   STORAGE_SIGNED_URL_TTL_SECONDS: z.coerce.number().int().positive().default(60),
   /** Segredo das URLs assinadas da API; por padrão reusa JWT_SECRET. */
   STORAGE_URL_SECRET: optionalEnv,
+
+  // Notificações (#30). Sem SMTP_HOST o transporte é JSON (sem envio real),
+  // para que a API continue subindo em desenvolvimento e nos testes. O Mailpit
+  // roda como processo local/nativo na porta 1025 — não usamos Docker.
+  SMTP_HOST: optionalEnv,
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(1025),
+  SMTP_SECURE: z
+    .enum(['true', 'false'])
+    .default('false')
+    .transform((value) => value === 'true'),
+  SMTP_USER: optionalEnv,
+  SMTP_PASSWORD: optionalEnv,
+  SMTP_FROM: z.string().trim().min(1).default('AdotaPet <nao-resposta@adotapet.local>'),
 })
 
 export type ApiConfig = z.infer<typeof envSchema>

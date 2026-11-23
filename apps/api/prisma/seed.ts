@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hash } from '@node-rs/argon2'
+import { requestStatusCodeOf } from '@adotapet/shared'
 import { prisma } from '../src/db.js'
 
 /** Senha única das contas de demonstração (documentada no README da API). */
@@ -195,7 +196,7 @@ async function main() {
       ({ id, petId, status, date, message, userId, answers, interview, rejectionReason }) => ({
         id,
         petId,
-        status,
+        status: requestStatusCodeOf(status) ?? status,
         date: new Date(date),
         message,
         userId,
