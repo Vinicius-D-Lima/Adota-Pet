@@ -24,27 +24,31 @@ import {
 } from '../utils/organizationRequestStage'
 
 export function OrganizationRequestsPage() {
-  const requestsQuery = useReceivedRequests()
   const [params, setParams] = useSearchParams()
+  const stageFromUrl = params.get('estagio')
+  const stageKey = isOrganizationRequestStage(stageFromUrl) ? stageFromUrl : 'all'
+  const petFromUrl = params.get('pet') ?? ''
+  const requestsQuery = useReceivedRequests({ stage: stageKey, petId: petFromUrl || undefined })
 
   if (requestsQuery.isPending) return <Feedback>Carregando solicitações recebidas...</Feedback>
   if (requestsQuery.isError)
     return <Feedback error>Não foi possível carregar as solicitações recebidas.</Feedback>
 
-  const requests = requestsQuery.data
-  const stageFromUrl = params.get('estagio')
-  const stageKey = isOrganizationRequestStage(stageFromUrl) ? stageFromUrl : 'all'
+  const requests = requestsQuery.data.data
   const stage =
     ORGANIZATION_REQUEST_STAGES.find(({ key }) => key === stageKey) ??
     ORGANIZATION_REQUEST_STAGES[0]
-  const petFromUrl = params.get('pet') ?? ''
-  const counts = countByStage(requests)
-  const pets = Array.from(
-    new Map(
-      requests
-        .filter((request) => request.pet)
-        .map((request) => [request.petId, request.pet!] as const),
-    ).values(),
+  // API fornece contadores/catálogo da fila; o cálculo local cobre o mock legado.
+  const counts = requestsQuery.data.counters ?? countByStage(requests)
+  const pets = (
+    requestsQuery.data.pets ??
+    Array.from(
+      new Map(
+        requests
+          .filter((request) => request.pet)
+          .map((request) => [request.petId, request.pet!] as const),
+      ).values(),
+    )
   ).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
   const visible = requests
     .filter((request) => stage.matches(request))

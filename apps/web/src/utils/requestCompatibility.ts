@@ -30,6 +30,8 @@ export function toAdopterProfileDraft(adopter: ReceivedRequest['adopter']): Prof
 }
 
 export function calculateRequestCompatibility(request: ReceivedRequest) {
+  // A API calcula o score (#19); o cálculo local atende o mock e respostas antigas.
+  if (request.matching !== undefined) return request.matching
   if (!request.pet) return null
   return calculateCompatibility(request.pet, toAdopterProfileDraft(request.adopter))
 }

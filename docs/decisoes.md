@@ -63,7 +63,7 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 ## 12. A compatibilidade é calculada no cliente
 
 - **Decisão:** `calculateCompatibility` roda no navegador, com 7 critérios de peso igual.
-- **Consequência:** simples e testável, sem rota no mock. A área da organização reutiliza o mesmo cálculo para mostrar o score no detalhe da solicitação, com um adaptador para o perfil resumido que a API devolve. Quando existir o serviço de matching no backend (#19), as telas passam a consumir o resultado da API.
+- **Consequência:** simples e testável, sem rota no mock. A área da organização reutilizava o mesmo cálculo para mostrar o score no detalhe da solicitação. A decisão 34 moveu o cálculo para o backend; o cálculo local ficou apenas como fallback do modo demo/respostas antigas.
 
 ## 13. Sem Next.js
 
@@ -177,6 +177,12 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 
 - **Decisão:** `Favorite` usa par único `(userId, petId)` e `createdAt`; PUT é `upsert` e DELETE é `deleteMany`, ambos 204. `GET /me/favorites` aceita `page`/`limit` (padrão 1/12, máximo 100), devolve `{ data, total }` com `total` **global** e um resumo do pet (sem coordenadas/descrição) com `status` obrigatório, para que adotados/arquivados continuem visíveis e sinalizados. `GET /me/favorites/ids` continua sem paginação para o frontend marcar os corações sem baixar a lista.
 - **Consequência:** o frontend usa os mesmos schemas Zod de `@adotapet/shared` (fonte única do contrato), com `useInfiniteQuery` para "carregar mais". O mock-server espelha o mesmo contrato, então os modos demo e real não divergem. Os sete testes `FAV` rodam contra o Postgres de teste sem Docker.
+
+## 34. Área da instituição com autorização no servidor, fila filtrada e matching persistido (#19/#26/#28)
+
+- **Contexto:** as telas e os endpoints da instituição já existiam, mas a matriz de permissões era aplicada só no cliente: todo `GUARDIAN` com JWT recebia `ADMIN`, e o cabeçalho `X-Demo-Role: VOLUNTEER` era ignorado na API real. Filtros e contadores da fila eram calculados no navegador, e o score de compatibilidade também.
+- **Decisão:** `User.organizationRole` (`ADMIN`/`VOLUNTEER`, padrão `ADMIN`) persiste o papel na instituição — o modelo ainda não tem uma entidade `Organization` separada, então o papel é por usuário guardião. `requirePermission` aplica a matriz `requests:view|review|reject|approve` em **toda** rota de `/me/received-requests`; `X-Demo-Role` continua valendo apenas no mock, onde não há JWT. Moderadores da plataforma (`platformRole: MODERADOR`) seguem como ADMIN. `GET /me/received-requests` aceita `?stage=` e `?petId=` e devolve `counters` (calculados pets primeiro, etapa depois) e `pets` para o filtro. O score de compatibilidade de 7 critérios foi portado para `apps/api/src/matching.ts` e volta no campo `matching` do detalhe; o frontend prefere esse valor e cai no cálculo local quando ausente. `interviewApiSchema` e `rejectionFormSchema` passaram a validar também no servidor (tipo inválido deixou de cair silenciosamente em "Entrevista online").
+- **Consequência:** esconder o botão virou UX, não segurança: uma chamada direta de voluntário para aprovar retorna 403. `lat`/`lng` de pets passaram a ser opcionais e anuláveis no contrato compartilhado, porque pets legados voltam sem coordenadas e isso quebrava o parse da fila no modo real. Os testes `RBAC`, `ORG`, `AGD` e `MATCH` em `apps/api/src/organization.test.ts` rodam contra o Postgres de teste.
 
 ## Decisão pendente: acessibilidade
 

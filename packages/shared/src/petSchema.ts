@@ -30,8 +30,9 @@ export const petSchema = z.object({
   organizationRatingCount: z.number().int().nonnegative().optional(),
   /// #49/#50: ausente nos dados legados do mock; o backend assume DISPONIVEL.
   status: z.enum(['DISPONIVEL', 'ADOTADO', 'ARQUIVADO']).optional(),
-  lat: z.number(),
-  lng: z.number(),
+  /// Nem todo pet legado possui coordenadas; a API devolve `null` nesses casos.
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
   createdAt: z.string().min(1),
 })
 

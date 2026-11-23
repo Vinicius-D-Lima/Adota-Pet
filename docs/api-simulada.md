@@ -209,7 +209,9 @@ Exclusivas de contas com o papel `GUARDIAN` (instituição ou protetor). Qualque
 | `POST /me/received-requests/:id/interview/complete`     | Marca a entrevista/visita como realizada                                |
 | `POST /me/received-requests/:id/transitions`            | `{ "to": "EM_ANALISE" \| "APROVADA" \| "RECUSADA", "reason"?: string }` |
 
-`GET /me/permissions` usa o cabeçalho `X-Demo-Role` (ou `?role=`) para simular o papel:
+`GET /me/received-requests` aceita `?stage=` (`all`, `new`, `interview`, `interview-done`, `approved`, `closed`) e `?petId=`. A resposta é `{ data, total, counters, pets }`: `counters` contém a contagem por etapa **depois** do filtro de pet e `pets` é o catálogo da instituição para o seletor. O detalhe devolve `matching` com o score de 7 critérios calculado no backend.
+
+No backend real, o papel vem de `User.organizationRole` (`ADMIN`/`VOLUNTEER`, padrão `ADMIN`), gravado pela migration `organization_role`. As permissões são aplicadas no servidor em todas as rotas acima: um voluntário recebe **403** ao tentar aprovar, mesmo enviando `X-Demo-Role: ADMIN`. No mock (sem JWT), o cabeçalho abaixo continua simulando o papel:
 
 ```json
 {

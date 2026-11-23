@@ -6,6 +6,7 @@ import {
   receivedRequestsResponseSchema,
   type InterviewFormData,
   type OrganizationPetPayload,
+  type ReceivedRequestsQuery,
 } from '@adotapet/shared'
 
 export const organizationKeys = {
@@ -25,11 +26,27 @@ export function useOrganizationPets(enabled = true) {
   })
 }
 
-export function useReceivedRequests(enabled = true) {
+export type ReceivedRequestsOptions = Partial<ReceivedRequestsQuery> & { enabled?: boolean }
+
+/**
+ * A fila da instituição é filtrada no servidor (#ORG). O formato legado
+ * `useReceivedRequests(boolean)` continua valendo para os callers antigos.
+ */
+export function useReceivedRequests(options: ReceivedRequestsOptions | boolean = {}) {
+  const normalized: ReceivedRequestsOptions =
+    typeof options === 'boolean' ? { enabled: options } : options
+  const { stage, petId, enabled = true } = normalized
+  const params = new URLSearchParams()
+  if (stage && stage !== 'all') params.set('stage', stage)
+  if (petId) params.set('petId', petId)
+  const search = params.toString()
+
   return useQuery({
-    queryKey: organizationKeys.requests(),
+    queryKey: [...organizationKeys.requests(), { stage, petId }],
     queryFn: async () =>
-      receivedRequestsResponseSchema.parse(await api.get('/me/received-requests')).data,
+      receivedRequestsResponseSchema.parse(
+        await api.get(`/me/received-requests${search ? `?${search}` : ''}`),
+      ),
     enabled,
   })
 }

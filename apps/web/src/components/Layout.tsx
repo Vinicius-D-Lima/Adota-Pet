@@ -51,7 +51,7 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const favoriteCount = useFavoriteIds(account.status !== 'loading').data?.length ?? 0
   const receivedRequestCount =
-    useReceivedRequests(account.isAuthenticated && isGuardian).data?.filter((item) =>
+    useReceivedRequests(account.isAuthenticated && isGuardian).data?.data.filter((item) =>
       ['Enviada', 'Em análise'].includes(item.status),
     ).length ?? 0
   const savedName = profileName.trim()

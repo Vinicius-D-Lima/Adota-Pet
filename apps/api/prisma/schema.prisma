@@ -15,6 +15,13 @@ enum PlatformRole {
   MODERADOR
 }
 
+/// Papel da pessoa dentro da instituição (#26/#28). Guardiões novos começam
+/// como ADMIN para preservar o contrato atual; voluntários são explícitos.
+enum OrganizationRole {
+  ADMIN
+  VOLUNTEER
+}
+
 model User {
   id               String        @id
   name             String        @default("")
@@ -23,6 +30,7 @@ model User {
   /// Hash argon2id. Nulo só para usuários legados do mock que ainda não fizeram login.
   passwordHash     String?
   platformRole     PlatformRole  @default(USUARIO)
+  organizationRole OrganizationRole @default(ADMIN)
   createdAt        DateTime      @default(now())
   phone            String?
   cpf              String?

@@ -23,7 +23,7 @@ export function OrganizationDashboardPage() {
   }
 
   const pets = petsQuery.data
-  const requests = requestsQuery.data
+  const requests = requestsQuery.data.data
   const reviewing = requests.filter(
     ({ status }) => status === 'Enviada' || status === 'Em análise',
   ).length

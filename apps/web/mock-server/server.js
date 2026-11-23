@@ -846,14 +846,46 @@ export function createApp({
   server.get('/me/received-requests', (req, res) => {
     if (!requireGuardian(req, res)) return
     const userId = currentUserId(req)
-    const petIds = new Set(organizationPets(userId).map(({ id }) => id))
-    const requests = store
+    const ownedPets = organizationPets(userId)
+    const petIds = new Set(ownedPets.map(({ id }) => id))
+    const requestedPet = typeof req.query.petId === 'string' ? req.query.petId : ''
+    const requestedStage = typeof req.query.stage === 'string' ? req.query.stage : 'all'
+
+    const stageOf = (request) => {
+      if (request.status === 'Enviada') return 'new'
+      if (request.status === 'Em análise') {
+        return request.interview?.completed ? 'interview-done' : 'interview'
+      }
+      if (request.status === 'Aprovada') return 'approved'
+      return 'closed'
+    }
+
+    const scoped = store
       .get('requests')
       .value()
-      .filter(({ petId }) => petIds.has(petId))
+      .filter(({ petId }) => petIds.has(petId) && (!requestedPet || petId === requestedPet))
       .reverse()
-      .map((request) => withReceivedRequest(request, userId))
-    res.json(list(requests))
+    const counters = {
+      all: scoped.length,
+      new: 0,
+      interview: 0,
+      'interview-done': 0,
+      approved: 0,
+      closed: 0,
+    }
+    scoped.forEach((request) => {
+      counters[stageOf(request)] += 1
+    })
+    const selected =
+      requestedStage === 'all'
+        ? scoped
+        : scoped.filter((request) => stageOf(request) === requestedStage)
+    const requests = selected.map((request) => withReceivedRequest(request, userId))
+    res.json({
+      ...list(requests),
+      counters,
+      pets: ownedPets.map((pet) => ({ ...pet, distance: null, distanceKm: null })),
+    })
   })
 
   server.get('/me/received-requests/:id', (req, res) => {
