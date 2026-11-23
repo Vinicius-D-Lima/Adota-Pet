@@ -4,6 +4,12 @@
 
 Garante upload seguro de fotos, acesso restrito às partes e controle correto de prazos e estados.
 
+## Contrato de acesso
+
+- `POST /api/check-ins/:id/submit` recebe `multipart/form-data` com `report` e de 1 a 5 arquivos no campo `files`.
+- `POST /api/check-ins/:id/review` e `/request-more` recebem `reviewerComment`; pedir mais informações devolve o check-in para `PENDENTE`.
+- `POST /api/check-ins/:id/photos/:photoId/url` emite uma URL curta somente para o adotante ou membro ativo da organização. O arquivo permanece privado.
+
 ## Como ler
 
 Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest contra o Postgres de teste. O nome do teste no código começa com o ID entre colchetes, por exemplo `it('[CHK-01] ...')`, para que este documento, a issue e o código se encontrem pelo mesmo identificador.
