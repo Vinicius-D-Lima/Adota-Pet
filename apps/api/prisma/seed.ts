@@ -79,6 +79,11 @@ async function main() {
   await prisma.$transaction([
     prisma.refreshToken.deleteMany(),
     prisma.savedFilter.deleteMany(),
+    prisma.checkIn.deleteMany(),
+    prisma.followUpPlan.deleteMany(),
+    prisma.adoption.deleteMany(),
+    prisma.membership.deleteMany(),
+    prisma.organization.deleteMany(),
     prisma.notificationPreference.deleteMany(),
     prisma.notification.deleteMany(),
     prisma.chatMessage.deleteMany(),
@@ -127,6 +132,20 @@ async function main() {
     })),
   })
 
+  const organizations = new Map<string, string>()
+  for (const pet of seed.pets) {
+    const name = String(pet.organization ?? '').trim()
+    if (!name || organizations.has(name)) continue
+    organizations.set(name, String(pet.organizationInitials ?? '').trim())
+  }
+  await prisma.organization.createMany({
+    data: [...organizations].map(([name, initials]) => ({
+      name,
+      initials: initials || name.slice(0, 2).toUpperCase(),
+    })),
+    skipDuplicates: true,
+  })
+
   const { userId: adopterUserId, ...adopterFields } = seed.profile
   await prisma.adopterProfile.create({
     data: { ...adopterFields, userId: adopterUserId as string },
@@ -135,6 +154,32 @@ async function main() {
   const { userId: guardianUserId, ...guardianFields } = seed.guardianProfile
   await prisma.guardianProfile.create({
     data: { ...guardianFields, userId: guardianUserId as string },
+  })
+  const organizationName = String(guardianFields.displayName ?? guardianFields.legalName ?? '')
+  const organization = await prisma.organization.upsert({
+    where: { name: organizationName },
+    update: {},
+    create: {
+      name: organizationName,
+      initials: organizationName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0].toUpperCase())
+        .join(''),
+      description: String(guardianFields.description ?? ''),
+      city: String(guardianFields.city ?? ''),
+      contactEmail: String(guardianFields.email ?? ''),
+      phone: String(guardianFields.phone ?? ''),
+    },
+  })
+  await prisma.membership.create({
+    data: {
+      userId: guardianUserId as string,
+      organizationId: organization.id,
+      role: 'ADMIN',
+      status: 'ATIVO',
+    },
   })
 
   await prisma.favorite.createMany({
@@ -160,6 +205,34 @@ async function main() {
       }),
     ),
   })
+
+  for (const adoptionRequest of seed.requests.filter(
+    ({ status }) => status.toUpperCase() === 'APROVADA',
+  )) {
+    const pet = await prisma.pet.findUniqueOrThrow({
+      where: { id: adoptionRequest.petId },
+    })
+    const organization = await prisma.organization.findUnique({
+      where: { name: pet.organization },
+    })
+    if (!organization) {
+      throw new Error(`Organização não encontrada para o pet ${pet.id}`)
+    }
+
+    await prisma.adoption.create({
+      data: {
+        requestId: adoptionRequest.id,
+        petId: pet.id,
+        adopterId: adoptionRequest.userId,
+        organizationId: organization.id,
+        adoptedAt: new Date(adoptionRequest.date),
+      },
+    })
+    await prisma.pet.update({
+      where: { id: pet.id },
+      data: { status: 'ADOTADO' },
+    })
+  }
 
   await prisma.chatMessage.createMany({
     data: seed.chatMessages.map(({ id, requestId, authorId, body, createdAt, readAt }) => ({

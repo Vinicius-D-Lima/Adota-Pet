@@ -22,7 +22,7 @@ import {
   withReceivedRequest,
 } from '../context.js'
 import { prisma } from '../db.js'
-import type { Pet, Prisma } from '../generated/prisma/client.js'
+import { Prisma, type Pet } from '../generated/prisma/client.js'
 import { list, sendError, zodDetails } from '../http.js'
 import { deleteStorageObjectsForResource } from '../storage.js'
 import { validate } from '../validate.js'
@@ -35,6 +35,8 @@ const ORGANIZATION_REQUEST_TRANSITIONS: Record<string, string> = {
   APROVADA: 'Aprovada',
   RECUSADA: 'Recusada',
 }
+const isUniqueViolation = (error: unknown) =>
+  error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
 const presentOrganizationPet = (pet: Pet) => ({
   ...withGallery(pet),
   distance: null,
@@ -332,14 +334,69 @@ organizationRouter.post(
         ? `A instituição encerrou esta solicitação: ${reason}`
         : 'A instituição encerrou esta solicitação.',
     }
-    const updated = await prisma.adoptionRequest.update({
-      where: { id: request.id },
-      data: {
-        status,
-        message: messages[status],
-        ...(status === 'Recusada' && reason ? { rejectionReason: reason } : {}),
-      },
-    })
-    res.json(await withReceivedRequest(updated, viewer.id))
+    let approval: { organizationId: string } | null = null
+    if (status === 'Aprovada') {
+      const pet = await prisma.pet.findUnique({ where: { id: request.petId } })
+      if (!pet) return sendError(res, 404, 'Pet não encontrado')
+      if (pet.status !== 'DISPONIVEL') {
+        return sendError(res, 409, 'Este pet não está mais disponível para adoção')
+      }
+
+      const organization = await prisma.organization.findUnique({
+        where: { name: pet.organization },
+        select: { id: true },
+      })
+      if (!organization) {
+        return sendError(res, 409, 'A organização do pet ainda não foi cadastrada')
+      }
+      const membership = await prisma.membership.findFirst({
+        where: { userId: viewer.id, organizationId: organization.id, status: 'ATIVO' },
+      })
+      if (!membership) return sendError(res, 403, 'Você não é membro ativo desta organização')
+      if (membership.role !== 'ADMIN') {
+        return sendError(res, 403, 'Apenas administradores podem aprovar adoções')
+      }
+      approval = { organizationId: organization.id }
+    }
+
+    try {
+      const updated = await prisma.$transaction(async (tx) => {
+        const changed = await tx.adoptionRequest.updateMany({
+          where: { id: request.id, status: request.status },
+          data: {
+            status,
+            message: messages[status],
+            ...(status === 'Recusada' && reason ? { rejectionReason: reason } : {}),
+          },
+        })
+        if (changed.count !== 1) return null
+
+        if (approval) {
+          await tx.adoption.create({
+            data: {
+              requestId: request.id,
+              petId: request.petId,
+              adopterId: request.userId,
+              organizationId: approval.organizationId,
+            },
+          })
+          await tx.pet.update({
+            where: { id: request.petId },
+            data: { status: 'ADOTADO' },
+          })
+        }
+
+        return tx.adoptionRequest.findUniqueOrThrow({ where: { id: request.id } })
+      })
+      if (!updated) {
+        return sendError(res, 409, 'A solicitação já foi alterada por outra operação')
+      }
+      res.json(await withReceivedRequest(updated, viewer.id))
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return sendError(res, 409, 'Este pet já possui uma adoção')
+      }
+      throw error
+    }
   },
 )

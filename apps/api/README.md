@@ -35,6 +35,20 @@ O access token vai em `Authorization: Bearer <token>`. O refresh fica em cookie 
 
 `npm run db:seed` cria três contas com a senha `Senha@123`: `demo@adotapet.local` (adotante), `contato@institutopatinhas.org` (ONG) e `moderador@adotapet.local` (`platformRole=MODERADOR`).
 
+## Adoção e acompanhamento (#23)
+
+Uma solicitação aprovada cria uma adoção na mesma transação e muda o pet para `ADOTADO`. Pets adotados deixam de aparecer em `GET /api/pets`.
+
+| Método | Rota                                | Acesso                                                                              |
+| ------ | ----------------------------------- | ----------------------------------------------------------------------------------- |
+| `GET`  | `/api/me/adoptions`                 | Adotante autenticado; retorna apenas as próprias adoções                            |
+| `GET`  | `/api/me/matches`                   | Adotante autenticado com perfil completo; retorna pets ranqueados e exclui adotados |
+| `GET`  | `/api/organizations/:id/adoptions`  | Membro ativo da organização                                                         |
+| `POST` | `/api/adoptions/:id/follow-up-plan` | Membro ativo da organização                                                         |
+| `PUT`  | `/api/adoptions/:id/follow-up-plan` | Membro ativo da organização                                                         |
+
+O plano aceita duração de 1 a 3.650 dias e intervalo inteiro positivo menor ou igual à duração. Os check-ins são agendados a cada intervalo, a partir da data da adoção; um intervalo final incompleto não gera check-in. Ao editar o plano, check-ins enviados ou revisados são preservados. Os registros iniciais de `Organization` e `Membership` são migrados dos dados legados de pets e responsáveis.
+
 ## Configuração
 
 Todas as variáveis são validadas por Zod na inicialização (`src/config.ts`). `.env.example` está versionado; `.env` não.
