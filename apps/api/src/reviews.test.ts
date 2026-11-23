@@ -159,9 +159,7 @@ databaseSuite('avaliações e reputação (#25)', () => {
       .post(`/api/adoptions/${adoption.id}/reviews`)
       .set(member.headers)
       .send({ rating: 4, comment: 'Boa adoção' })
-    const adopterReputation = await request(app).get(
-      `/api/users/${adopter.user.id}/reputation`,
-    )
+    const adopterReputation = await request(app).get(`/api/users/${adopter.user.id}/reputation`)
 
     expect(first.status).toBe(201)
     expect(duplicate.status).toBe(409)
@@ -348,7 +346,9 @@ databaseSuite('avaliações e reputação (#25)', () => {
       .set(adopter.headers)
       .send({ rating: 5, reviewerId: forgedReviewer.user.id })
     const stored = await prisma.review.findUniqueOrThrow({
-      where: { adoptionId_direction: { adoptionId: adoption.id, direction: 'ADOPTER_TO_ORGANIZATION' } },
+      where: {
+        adoptionId_direction: { adoptionId: adoption.id, direction: 'ADOPTER_TO_ORGANIZATION' },
+      },
     })
 
     expect(response.status).toBe(201)

@@ -322,8 +322,7 @@ export function buildOpenApiDocument(app: Express) {
               }
             : {}),
         },
-        ...(method === 'POST' &&
-        (path.endsWith('/follow-up-plan') || createsReview)
+        ...(method === 'POST' && (path.endsWith('/follow-up-plan') || createsReview)
           ? {
               201: {
                 description: createsReview ? 'Avaliação criada' : 'Plano criado',

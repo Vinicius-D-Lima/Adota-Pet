@@ -56,8 +56,7 @@ export async function getReviewReputation(
     }),
   ])
   return {
-    average:
-      aggregate._count.rating >= MIN_REVIEWS_FOR_AVERAGE ? aggregate._avg.rating : null,
+    average: aggregate._count.rating >= MIN_REVIEWS_FOR_AVERAGE ? aggregate._avg.rating : null,
     count: aggregate._count.rating,
     reviews,
   }

@@ -120,56 +120,49 @@ reviewsRouter.post(
   },
 )
 
-reviewsRouter.put(
-  '/reviews/:id',
-  validate({ body: reviewBodySchema }),
-  async (req, res) => {
-    const reviewId = req.params.id
-    if (typeof reviewId !== 'string') {
-      return sendError(res, 400, 'Identificador da avaliação inválido')
-    }
-    const existing = await prisma.review.findUnique({
-      where: { id: reviewId },
-      select: {
-        id: true,
-        reviewerId: true,
-        revieweeOrganizationId: true,
-        hiddenAt: true,
-        createdAt: true,
+reviewsRouter.put('/reviews/:id', validate({ body: reviewBodySchema }), async (req, res) => {
+  const reviewId = req.params.id
+  if (typeof reviewId !== 'string') {
+    return sendError(res, 400, 'Identificador da avaliação inválido')
+  }
+  const existing = await prisma.review.findUnique({
+    where: { id: reviewId },
+    select: {
+      id: true,
+      reviewerId: true,
+      revieweeOrganizationId: true,
+      hiddenAt: true,
+      createdAt: true,
+    },
+  })
+  if (!existing) return sendError(res, 404, 'Avaliação não encontrada')
+
+  const { id: userId } = await currentUser(req)
+  if (existing.reviewerId !== userId) {
+    return sendError(res, 403, 'Somente quem enviou a avaliação pode editá-la')
+  }
+  if (existing.hiddenAt || Date.now() > existing.createdAt.getTime() + REVIEW_EDIT_WINDOW_MS) {
+    return sendError(res, 409, 'O prazo para editar esta avaliação expirou')
+  }
+
+  const review = await prisma.$transaction(async (tx) => {
+    const updated = await tx.review.updateMany({
+      where: {
+        id: existing.id,
+        reviewerId: userId,
+        hiddenAt: null,
+        createdAt: { gte: new Date(Date.now() - REVIEW_EDIT_WINDOW_MS) },
       },
+      data: { rating: req.body.rating, comment: req.body.comment },
     })
-    if (!existing) return sendError(res, 404, 'Avaliação não encontrada')
+    if (updated.count !== 1) return null
 
-    const { id: userId } = await currentUser(req)
-    if (existing.reviewerId !== userId) {
-      return sendError(res, 403, 'Somente quem enviou a avaliação pode editá-la')
+    const result = await tx.review.findUniqueOrThrow({ where: { id: existing.id } })
+    if (result.revieweeOrganizationId) {
+      await recalculateOrganizationReputation(tx, result.revieweeOrganizationId)
     }
-    if (
-      existing.hiddenAt ||
-      Date.now() > existing.createdAt.getTime() + REVIEW_EDIT_WINDOW_MS
-    ) {
-      return sendError(res, 409, 'O prazo para editar esta avaliação expirou')
-    }
-
-    const review = await prisma.$transaction(async (tx) => {
-      const updated = await tx.review.updateMany({
-        where: {
-          id: existing.id,
-          reviewerId: userId,
-          hiddenAt: null,
-          createdAt: { gte: new Date(Date.now() - REVIEW_EDIT_WINDOW_MS) },
-        },
-        data: { rating: req.body.rating, comment: req.body.comment },
-      })
-      if (updated.count !== 1) return null
-
-      const result = await tx.review.findUniqueOrThrow({ where: { id: existing.id } })
-      if (result.revieweeOrganizationId) {
-        await recalculateOrganizationReputation(tx, result.revieweeOrganizationId)
-      }
-      return result
-    })
-    if (!review) return sendError(res, 409, 'O prazo para editar esta avaliação expirou')
-    res.json(reviewView(review))
-  },
-)
+    return result
+  })
+  if (!review) return sendError(res, 409, 'O prazo para editar esta avaliação expirou')
+  res.json(reviewView(review))
+})
