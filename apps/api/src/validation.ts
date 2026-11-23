@@ -225,7 +225,7 @@ export function validateSavedFilter(body: unknown, partial = false): FieldError[
             })
           }
         } else if (SAVED_FILTER_ENUMS[key]) {
-          if (!SAVED_FILTER_ENUMS[key].includes(String(value))) {
+          if (typeof value !== 'string' || !SAVED_FILTER_ENUMS[key].includes(value)) {
             details.push({ field: `criteria.${key}`, message: `Valor inválido para ${key}` })
           }
         } else if (isBlank(value) || (key === 'city' && String(value).trim().length < 2)) {
