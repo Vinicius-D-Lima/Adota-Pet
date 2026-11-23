@@ -22,16 +22,40 @@ enum OrganizationRole {
   VOLUNTEER
 }
 
+enum ReportTargetType {
+  USUARIO
+  ORGANIZACAO
+  ADOCAO
+  PET
+  AVALIACAO
+}
+
+enum ReportCategory {
+  MAUS_TRATOS
+  ABANDONO
+  FRAUDE
+  CONTEUDO_IMPROPRIO
+  OUTRO
+}
+
+enum ReportStatus {
+  ABERTA
+  EM_ANALISE
+  PROCEDENTE
+  IMPROCEDENTE
+  ARQUIVADA
+}
+
 model User {
-  id               String        @id
-  name             String        @default("")
+  id               String           @id
+  name             String           @default("")
   /// Sempre normalizado em minúsculas; a unicidade também é garantida no banco.
-  email            String        @default("") @unique
+  email            String           @unique @default("")
   /// Hash argon2id. Nulo só para usuários legados do mock que ainda não fizeram login.
   passwordHash     String?
-  platformRole     PlatformRole  @default(USUARIO)
+  platformRole     PlatformRole     @default(USUARIO)
   organizationRole OrganizationRole @default(ADMIN)
-  createdAt        DateTime      @default(now())
+  createdAt        DateTime         @default(now())
   phone            String?
   cpf              String?
   birthDate        String?
@@ -42,8 +66,8 @@ model User {
   document         String?
   organizationName String?
   guardianType     String?
-  role             String   @default("ADOTANTE")
-  roles            String[] @default([])
+  role             String           @default("ADOTANTE")
+  roles            String[]         @default([])
   lat              Float?
   lng              Float?
 
@@ -55,6 +79,10 @@ model User {
   savedFilters     SavedFilter[]
   preferences      NotificationPreference[]
   refreshTokens    RefreshToken[]
+  reportsCreated   Report[]                 @relation("ReportReporter")
+  reportsModerated Report[]                 @relation("ReportModerator")
+  reviewsWritten   Review[]                 @relation("ReviewAuthor")
+  reviewsReceived  Review[]                 @relation("ReviewOrganization")
 }
 
 /// Refresh token fica no banco só como hash (#48): permite revogar e detectar reuso.
@@ -96,8 +124,8 @@ model AdopterProfile {
 }
 
 model GuardianProfile {
-  id           Int      @id @default(autoincrement())
-  userId       String   @unique
+  id           Int     @id @default(autoincrement())
+  userId       String  @unique
   guardianType String?
   displayName  String?
   legalName    String?
@@ -108,9 +136,53 @@ model GuardianProfile {
   address      String?
   city         String?
   description  String?
-  acceptsTerms Boolean  @default(false)
+  acceptsTerms Boolean @default(false)
+  reputation   Float?
+  reviewCount  Int     @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Base mínima da issue #25, necessária para a moderação ocultar uma avaliação
+/// procedente e recalcular a reputação sem apagar o histórico original.
+model Review {
+  id             String    @id @default(cuid())
+  adoptionId     String
+  reviewerId     String
+  organizationId String
+  rating         Int
+  comment        String    @default("")
+  hiddenAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  reviewer     User @relation("ReviewAuthor", fields: [reviewerId], references: [id], onDelete: Restrict)
+  organization User @relation("ReviewOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([adoptionId, reviewerId])
+  @@index([organizationId, hiddenAt])
+}
+
+model Report {
+  id          String           @id @default(cuid())
+  reporterId  String
+  targetType  ReportTargetType
+  targetId    String
+  category    ReportCategory
+  description String
+  status      ReportStatus     @default(ABERTA)
+  resolution  String?
+  moderatorId String?
+  resolvedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  reporter  User  @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  moderator User? @relation("ReportModerator", fields: [moderatorId], references: [id], onDelete: SetNull)
+
+  @@index([reporterId, createdAt])
+  @@index([status, category, createdAt])
+  @@index([targetType, targetId])
 }
 
 model Pet {
@@ -143,8 +215,8 @@ model Pet {
   /// #49/#50: só DISPONIVEL aceita solicitação; ADOTADO e ARQUIVADO não.
   status               String   @default("DISPONIVEL")
 
-  favorites            Favorite[]
-  requests             AdoptionRequest[]
+  favorites Favorite[]
+  requests  AdoptionRequest[]
 }
 
 model Favorite {
@@ -189,9 +261,9 @@ model EventOutbox {
 
 /// Idempotência dos consumidores de jobs (#95): uma linha por evento processado.
 model JobEffect {
-  eventId     String   @id
-  type        String
-  createdAt   DateTime @default(now())
+  eventId   String   @id
+  type      String
+  createdAt DateTime @default(now())
 }
 
 /// Armazenamento de arquivos (#94): metadados e vínculo com o registro dono.

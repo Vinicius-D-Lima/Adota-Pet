@@ -12,6 +12,8 @@ import {
   Select,
   Textarea,
 } from '../components/ui'
+import { useCreateReport } from '../hooks/useReports'
+import { ApiError } from '../lib/ApiError'
 import {
   reportCategories,
   reportSchema,
@@ -40,6 +42,7 @@ const readTargetType = (value: string | null): ReportFormData['targetType'] =>
   reportTargetTypes.find((type) => type === value) ?? 'PET'
 
 export function ReportPage() {
+  const createReport = useCreateReport()
   const [searchParams] = useSearchParams()
   const [form, setForm] = useState<{
     targetType: ReportFormData['targetType']
@@ -56,6 +59,7 @@ export function ReportPage() {
   const [attachmentError, setAttachmentError] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [validationMessage, setValidationMessage] = useState('')
+  const [submissionError, setSubmissionError] = useState('')
 
   const updateForm = (field: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [field]: value }))
@@ -65,6 +69,8 @@ export function ReportPage() {
       return next
     })
     setValidationMessage('')
+    setSubmissionError('')
+    createReport.reset()
   }
 
   const handleFiles = (event: ChangeEvent<HTMLInputElement>) => {
@@ -81,9 +87,10 @@ export function ReportPage() {
     setAttachmentError(validateReportAttachments(nextFiles))
   }
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     setValidationMessage('')
+    setSubmissionError('')
     const result = reportSchema.safeParse(form)
     const nextErrors: Record<string, string> = {}
 
@@ -97,10 +104,25 @@ export function ReportPage() {
     setErrors(nextErrors)
     const fileError = validateReportAttachments(files)
     setAttachmentError(fileError)
-    if (result.success && !fileError) {
+    if (!result.success || fileError) return
+
+    try {
+      const created = await createReport.mutateAsync({ report: result.data, files })
       setValidationMessage(
-        'Formulário validado. A denúncia não foi enviada porque a API de denúncias ainda não está disponível.',
+        created.officialGuidance
+          ? `Denúncia enviada com segurança. ${created.officialGuidance}`
+          : 'Denúncia enviada com segurança. Você pode acompanhar o status na sua conta.',
       )
+      setFiles([])
+      setForm((current) => ({ ...current, category: '', description: '' }))
+    } catch (error) {
+      if (error instanceof ApiError) {
+        const fieldErrors = error.toFieldErrors()
+        if (Object.keys(fieldErrors).length) setErrors(fieldErrors)
+        setSubmissionError(error.message)
+      } else {
+        setSubmissionError('Não foi possível enviar a denúncia. Tente novamente.')
+      }
     }
   }
 
@@ -120,8 +142,8 @@ export function ReportPage() {
           </p>
 
           <InfoNote large className="mb-6">
-            Este formulário ainda não envia dados: a API de denúncias não está pronta. O que você
-            preencher permanece apenas nesta página.
+            O denunciante fica registrado para auditoria, mas sua identidade não é exibida à pessoa
+            ou organização denunciada.
           </InfoNote>
 
           {needsOfficialChannels && (
@@ -223,8 +245,11 @@ export function ReportPage() {
                 {validationMessage}
               </Alert>
             )}
+            {submissionError && <Alert role="alert">{submissionError}</Alert>}
             <div>
-              <Button type="submit">Validar formulário</Button>
+              <Button type="submit" loading={createReport.isPending}>
+                Enviar denúncia
+              </Button>
             </div>
           </form>
 

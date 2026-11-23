@@ -78,6 +78,8 @@ async function main() {
   // Reset em ordem de dependência (FKs) dentro de uma transação: seed idempotente.
   await prisma.$transaction([
     prisma.refreshToken.deleteMany(),
+    prisma.report.deleteMany(),
+    prisma.review.deleteMany(),
     prisma.savedFilter.deleteMany(),
     prisma.notificationPreference.deleteMany(),
     prisma.notification.deleteMany(),

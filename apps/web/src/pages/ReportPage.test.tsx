@@ -1,6 +1,6 @@
 import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders } from '../test/renderWithProviders'
 import { ReportPage } from './ReportPage'
 
@@ -10,11 +10,42 @@ const setup = () =>
   })
 
 describe('ReportPage', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            id: 'report-1',
+            targetType: 'PET',
+            targetId: 'pet-123',
+            category: 'ABANDONO',
+            description: 'O animal está sem água e abrigo há vários dias.',
+            status: 'ABERTA',
+            resolution: null,
+            moderatorId: null,
+            resolvedAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            attachments: [],
+            officialGuidance:
+              'Acione também a delegacia, o Disque-Denúncia e o órgão ambiental local.',
+          }),
+          { status: 201, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   it('valida categoria e descrição antes de aceitar o formulário', async () => {
     const user = userEvent.setup()
     setup()
 
-    await user.click(screen.getByRole('button', { name: 'Validar formulário' }))
+    await user.click(screen.getByRole('button', { name: 'Enviar denúncia' }))
 
     expect(await screen.findByText('Selecione uma categoria.')).toBeInTheDocument()
     expect(screen.getByText('Descreva o que aconteceu.')).toBeInTheDocument()
@@ -31,10 +62,10 @@ describe('ReportPage', () => {
       screen.getByLabelText(/Descrição/),
       'O animal está sem água e abrigo há vários dias.',
     )
-    await user.click(screen.getByRole('button', { name: 'Validar formulário' }))
+    await user.click(screen.getByRole('button', { name: 'Enviar denúncia' }))
 
-    expect(await screen.findByText(/Formulário validado/)).toHaveTextContent(
-      'A denúncia não foi enviada',
+    expect(await screen.findByText(/Denúncia enviada com segurança/)).toHaveTextContent(
+      'Disque-Denúncia',
     )
   })
 
