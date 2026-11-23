@@ -1,4 +1,12 @@
-import { questionnaireSchema } from '@adotapet/shared'
+import {
+  isFinalRequestStatusCode,
+  questionnaireSchema,
+  requestChatCursorQuerySchema,
+  requestChatMessageBodySchema,
+  requestStatusCodeOf,
+  requestStatusHistoryResponseSchema,
+  requestTransitionSchema,
+} from '@adotapet/shared'
 import { Router } from 'express'
 import {
   currentUser,
@@ -9,8 +17,14 @@ import {
   unreadChatCount,
   withPet,
 } from '../context.js'
+import { applyTransition } from '../requestStatusMachine.js'
 import { prisma } from '../db.js'
-import { enqueueNewRequestForOrganization } from '../events.js'
+import {
+  MESSAGE_RECEIVED,
+  enqueueDomainEvent,
+  enqueueNewRequestForOrganization,
+} from '../events.js'
+import { organizationMemberIds } from '../notificationService.js'
 import { Prisma } from '../generated/prisma/client.js'
 import type { FieldError } from '../http.js'
 import { isBlank, list, sendError } from '../http.js'
@@ -18,10 +32,19 @@ import { asRecord } from '../validation.js'
 
 export const requestsRouter = Router()
 
-const ACTIVE_STATUSES = ['Enviada', 'Em análise', 'Aprovada']
-const CANCELLABLE_STATUSES = ['Enviada', 'Em análise']
-const FINAL_REQUEST_STATUSES = ['Aprovada', 'Recusada', 'Cancelada']
+const ACTIVE_STATUSES = [
+  'ENVIADA',
+  'ANALISE_QUESTIONARIO',
+  'ENTREVISTA',
+  'VISITA_DOMICILIAR',
+  'DECISAO_FINAL',
+  'APROVADA',
+]
 const AVAILABLE_PET_STATUS = 'DISPONIVEL'
+const isFinalStatus = (status: string) => {
+  const code = requestStatusCodeOf(status)
+  return code ? isFinalRequestStatusCode(code) : false
+}
 
 /** Próximo número de solicitação no padrão `SOL-0000`, gerado pelo banco (#50/REQ-08). */
 async function nextRequestId(tx: Prisma.TransactionClient): Promise<string> {
@@ -29,6 +52,14 @@ async function nextRequestId(tx: Prisma.TransactionClient): Promise<string> {
     SELECT nextval('adoption_request_id_seq') AS value
   `
   return `SOL-${String(Number(rows[0]?.value ?? 0)).padStart(4, '0')}`
+}
+
+/** #22: ID crescente de mensagem gerado pelo banco, sem corrida entre envios. */
+async function nextMessageId(tx: Prisma.TransactionClient): Promise<string> {
+  const rows = await tx.$queryRaw<Array<{ value: bigint | number }>>`
+    SELECT nextval('chat_message_id_seq') AS value
+  `
+  return `MSG-${String(Number(rows[0]?.value ?? 0)).padStart(4, '0')}`
 }
 
 const isUniqueViolation = (error: unknown) =>
@@ -91,7 +122,7 @@ requestsRouter.post('/requests', async (req, res) => {
           id: await nextRequestId(tx),
           userId,
           petId: pet.id,
-          status: 'Enviada',
+          status: 'ENVIADA',
           date,
           message: 'Sua solicitação foi enviada e aguarda o início da análise.',
           // REQ-06: somente as respostas known são gravadas; status/id/adopterId
@@ -145,32 +176,55 @@ requestsRouter.get('/requests/:id', async (req, res) => {
   res.json(await withPet(request))
 })
 
+/** #20: única entrada para avançar, recusar ou cancelar uma solicitação. */
 requestsRouter.post('/requests/:id/transitions', async (req, res) => {
-  const { id: userId } = await currentUser(req)
-  const request = await prisma.adoptionRequest.findFirst({
-    where: { id: req.params.id, userId },
-  })
-  if (!request) return sendError(res, 404, 'Solicitação não encontrada')
-
-  const body = asRecord(req.body)
-  const to = String(body?.to ?? '').toUpperCase()
-  if (to !== 'CANCELADA') {
-    return sendError(res, 400, 'Transição não suportada', [
-      { field: 'to', message: 'Apenas CANCELADA é permitida' },
-    ])
-  }
-  if (!CANCELLABLE_STATUSES.includes(request.status)) {
+  const parsed = requestTransitionSchema.safeParse(asRecord(req.body))
+  if (!parsed.success) {
     return sendError(
       res,
-      409,
-      `Não é possível cancelar uma solicitação com status "${request.status}"`,
+      400,
+      'Transição inválida',
+      parsed.error.issues.map((issue) => ({
+        field: issue.path.join('.') || 'body',
+        message: issue.message,
+      })),
     )
   }
-  const updated = await prisma.adoptionRequest.update({
-    where: { id: request.id },
-    data: { status: 'Cancelada', message: 'Solicitação cancelada por você.' },
+  const { row } = await applyTransition({
+    req,
+    requestId: req.params.id,
+    to: parsed.data.to,
+    reason: parsed.data.reason,
   })
-  res.json(await withPet(updated))
+  res.json(await withPet(row))
+})
+
+/** Linha do tempo auditável da solicitação (#20). */
+requestsRouter.get('/requests/:id/status-history', async (req, res) => {
+  const { id: userId } = await currentUser(req)
+  const request = await prisma.adoptionRequest.findUnique({ where: { id: req.params.id } })
+  if (!request) return sendError(res, 404, 'Solicitação não encontrada')
+  if (!(await isChatParticipant(request, userId))) {
+    return sendError(res, 403, 'Você não tem acesso a esta solicitação')
+  }
+  const history = await prisma.requestStatusHistory.findMany({
+    where: { requestId: request.id },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+  })
+  res.json(
+    requestStatusHistoryResponseSchema.parse({
+      data: history.map((entry) => ({
+        id: entry.id,
+        from: entry.fromStatus,
+        to: entry.toStatus,
+        actorId: entry.actorId,
+        actorRole: entry.actorRole,
+        reason: entry.reason,
+        createdAt: entry.createdAt.toISOString(),
+      })),
+      total: history.length,
+    }),
+  )
 })
 
 requestsRouter.get('/requests/:id/messages', async (req, res) => {
@@ -182,21 +236,23 @@ requestsRouter.get('/requests/:id/messages', async (req, res) => {
   if (!(await isChatParticipant(adoptionRequest, userId))) {
     return sendError(res, 403, 'Somente os participantes podem acessar esta conversa')
   }
-  if (Object.keys(req.query).some((key) => key !== 'cursor')) {
-    return sendError(res, 400, 'Parâmetro desconhecido', [
-      { field: 'query', message: 'Apenas cursor é aceito' },
-    ])
+  const query = requestChatCursorQuerySchema.safeParse(req.query)
+  if (!query.success) {
+    return sendError(
+      res,
+      400,
+      'Parâmetro inválido',
+      query.error.issues.map((issue) => ({
+        field: issue.path.join('.') || 'query',
+        message: issue.message,
+      })),
+    )
   }
 
   const allMessages = await messagesForRequest(adoptionRequest.id)
-  const cursor = req.query.cursor
+  const cursor = query.data.cursor
   let end = allMessages.length
   if (cursor !== undefined) {
-    if (typeof cursor !== 'string') {
-      return sendError(res, 400, 'Cursor inválido', [
-        { field: 'cursor', message: 'Informe um cursor válido' },
-      ])
-    }
     end = allMessages.findIndex(({ id }) => id === cursor)
     if (end < 0) {
       return sendError(res, 400, 'Cursor inválido', [
@@ -222,35 +278,52 @@ requestsRouter.post('/requests/:id/messages', async (req, res) => {
   if (!(await isChatParticipant(adoptionRequest, userId))) {
     return sendError(res, 403, 'Somente os participantes podem enviar mensagens')
   }
-  if (FINAL_REQUEST_STATUSES.includes(adoptionRequest.status)) {
+  if (isFinalStatus(adoptionRequest.status)) {
     return sendError(res, 409, 'O chat está bloqueado para solicitações encerradas')
   }
 
-  const body = asRecord(req.body)
-  if (
-    !body ||
-    Object.keys(body).some((key) => key !== 'body') ||
-    typeof body.body !== 'string' ||
-    !body.body.trim() ||
-    body.body.length > 2000
-  ) {
+  const parsedBody = requestChatMessageBodySchema.safeParse(asRecord(req.body))
+  if (!parsedBody.success) {
     return sendError(res, 400, 'Mensagem inválida', [
       { field: 'body', message: 'A mensagem deve ter entre 1 e 2000 caracteres' },
     ])
   }
 
-  const rows = await prisma.chatMessage.findMany({ select: { id: true } })
-  const nextNumber =
-    rows.reduce((max, message) => Math.max(max, Number(message.id.replace(/\D/g, '')) || 0), 0) + 1
-  const message = await prisma.chatMessage.create({
-    data: {
-      id: `MSG-${String(nextNumber).padStart(4, '0')}`,
-      requestId: adoptionRequest.id,
-      authorId: userId,
-      body: body.body,
-      createdAt: new Date(),
-      readAt: null,
-    },
+  const messageBody = parsedBody.data.body
+
+  // NOT: destinatário é sempre a outra ponta da conversa. Mensagem da instituição
+  // notifica o adotante; mensagem do adotante notifica os membros da organização.
+  const pet = await prisma.pet.findUnique({
+    where: { id: adoptionRequest.petId },
+    select: { organization: true },
+  })
+  const sender = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
+  const recipients =
+    adoptionRequest.userId === userId
+      ? await organizationMemberIds(pet?.organization ?? '', userId)
+      : [adoptionRequest.userId]
+
+  const message = await prisma.$transaction(async (tx) => {
+    const messageId = await nextMessageId(tx)
+    const row = await tx.chatMessage.create({
+      data: {
+        id: messageId,
+        requestId: adoptionRequest.id,
+        authorId: userId,
+        body: messageBody,
+        createdAt: new Date(),
+        readAt: null,
+      },
+    })
+    for (const recipientId of recipients) {
+      await enqueueDomainEvent(tx, MESSAGE_RECEIVED, {
+        requestId: adoptionRequest.id,
+        messageId,
+        recipientId,
+        senderName: sender?.name ?? 'Equipe da instituição',
+      })
+    }
+    return row
   })
   res.status(201).json(await presentChatMessage(message, userId))
 })

@@ -32,7 +32,8 @@ savedFiltersRouter.post('/me/saved-filters', async (req, res) => {
 
   const { id: userId } = await currentUser(req)
   const savedFilter = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(31, hashtext(${userId}))`
+    // `$executeRaw` não tenta desserializar o retorno `void` da função.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(31, hashtext(${userId}))`
     const count = await tx.savedFilter.count({ where: { userId } })
     if (count >= 10) return null
 

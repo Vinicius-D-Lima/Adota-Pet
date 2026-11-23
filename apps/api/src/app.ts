@@ -61,6 +61,25 @@ export function createApp(options: AppOptions = {}): Express {
   app.use(createHealthRouter(options.checkDatabase))
   app.use('/auth', authRouter)
   app.use('/api/auth', authRouter)
+  // #22/CHAT-08: limite dedicado de envio de mensagens. Registrado aqui (e não
+  // no router, que é singleton) para que cada instância da app tenha seu próprio
+  // contador — os testes criam uma app nova por caso. A chave é o cliente
+  // autenticado, não o IP compartilhado de uma rede.
+  app.post(
+    '/api/requests/:id/messages',
+    rateLimit({
+      windowMs: config.CHAT_RATE_LIMIT_WINDOW_MS,
+      limit: config.CHAT_RATE_LIMIT_MAX,
+      standardHeaders: 'draft-7',
+      legacyHeaders: false,
+      keyGenerator: (req) => req.get('Authorization') ?? req.ip ?? 'anon',
+      handler: (_req, res) => {
+        res.setHeader('Retry-After', String(Math.ceil(config.CHAT_RATE_LIMIT_WINDOW_MS / 1000)))
+        sendError(res, 429, 'Muitas mensagens enviadas. Tente novamente em instantes.')
+      },
+    }),
+  )
+
   app.use('/me', meRouter)
   app.use(fileRouter)
   app.use('/api', apiRouter)
