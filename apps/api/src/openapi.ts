@@ -44,6 +44,18 @@ const authResponseSchema = z.object({
   expiresIn: z.number().int(),
 })
 
+const idParamsSchema = z.object({ id: z.string().min(1) })
+const followUpPlanSchema = z
+  .object({
+    durationDays: z.number().int().min(1).max(3650),
+    intervalDays: z.number().int().min(1),
+  })
+  .strict()
+  .refine(({ durationDays, intervalDays }) => intervalDays <= durationDays, {
+    path: ['intervalDays'],
+    message: 'intervalDays deve ser menor ou igual a durationDays',
+  })
+
 const authDocs: Record<string, RouteSchemas> = Object.fromEntries(
   ['/auth', '/api/auth'].flatMap((base) => [
     [`POST ${base}/register`, { body: registerSchema, response: authResponseSchema }],
@@ -68,6 +80,7 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'GET /api/pets': { query: petsQuerySchema, response: petsResponseSchema },
   'GET /api/pets/{id}': { params: petIdParamsSchema, response: petSchema },
   'PUT /api/me/account': { body: createAccountSchema, response: profileSchema },
+  'GET /api/me/matches': {},
   'GET /api/me/permissions': { response: organizationPermissionsResponseSchema },
   'GET /api/me/received-requests': {
     query: receivedRequestsQuerySchema,
@@ -87,6 +100,16 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'GET /api/me/favorites': { query: favoritesQuerySchema, response: favoritesResponseSchema },
   'PUT /api/me/favorites/{petId}': { params: favoritePetIdParamsSchema },
   'DELETE /api/me/favorites/{petId}': { params: favoritePetIdParamsSchema },
+  'GET /api/me/adoptions': {},
+  'GET /api/organizations/{id}/adoptions': { params: idParamsSchema },
+  'POST /api/adoptions/{id}/follow-up-plan': {
+    params: idParamsSchema,
+    body: followUpPlanSchema,
+  },
+  'PUT /api/adoptions/{id}/follow-up-plan': {
+    params: idParamsSchema,
+    body: followUpPlanSchema,
+  },
 }
 
 export interface ApiRoute {
@@ -169,6 +192,9 @@ const isPrivatePath = (path: string) =>
   path === '/me' ||
   path.startsWith('/me/') ||
   path.startsWith('/api/me/') ||
+  path.startsWith('/api/requests/') ||
+  path.startsWith('/api/adoptions/') ||
+  path.startsWith('/api/organizations/') ||
   path.endsWith('/auth/me')
 
 const errorResponse = {
@@ -198,10 +224,15 @@ export function buildOpenApiDocument(app: Express) {
               }
             : {}),
         },
+        ...(method === 'POST' && path.endsWith('/follow-up-plan')
+          ? { 201: { description: 'Plano criado' } }
+          : {}),
         ...(method === 'GET' ? { 503: errorResponse } : {}),
         400: errorResponse,
         ...(isPrivatePath(path) || path.includes('/auth/') ? { 401: errorResponse } : {}),
-        ...(path.includes('/auth/') ? { 409: errorResponse } : {}),
+        403: errorResponse,
+        404: errorResponse,
+        409: errorResponse,
         413: errorResponse,
         429: errorResponse,
         500: errorResponse,

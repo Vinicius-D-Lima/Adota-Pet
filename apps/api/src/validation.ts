@@ -1,6 +1,7 @@
 import { profileSchema as sharedProfileSchema } from '@adotapet/shared'
 import type { FieldError } from './http.js'
 import { isBlank } from './http.js'
+import { MAX_FOLLOW_UP_DURATION_DAYS } from './adoptions.js'
 
 export const PROFILE_ENUMS: Record<string, string[]> = {
   housing: ['Apartamento', 'Casa', 'Chácara ou sítio'],
@@ -245,6 +246,48 @@ export function validateSavedFilter(body: unknown, partial = false): FieldError[
   if (partial && Object.keys(record).length === 0) {
     details.push({ field: 'body', message: 'Informe ao menos um campo para atualizar' })
   }
+  return details
+}
+
+export function validateFollowUpPlan(body: unknown): FieldError[] {
+  const record = asRecord(body)
+  if (!record) return [{ field: 'body', message: 'Envie um objeto JSON' }]
+
+  const details: FieldError[] = []
+  for (const key of Object.keys(record)) {
+    if (!['durationDays', 'intervalDays'].includes(key)) {
+      details.push({ field: key, message: 'Campo desconhecido' })
+    }
+  }
+
+  const durationDays = record.durationDays
+  if (
+    typeof durationDays !== 'number' ||
+    !Number.isSafeInteger(durationDays) ||
+    durationDays < 1 ||
+    durationDays > MAX_FOLLOW_UP_DURATION_DAYS
+  ) {
+    details.push({
+      field: 'durationDays',
+      message: `durationDays deve ser um inteiro entre 1 e ${MAX_FOLLOW_UP_DURATION_DAYS}`,
+    })
+  }
+
+  const intervalDays = record.intervalDays
+  if (
+    typeof intervalDays !== 'number' ||
+    !Number.isSafeInteger(intervalDays) ||
+    intervalDays < 1 ||
+    (typeof durationDays === 'number' &&
+      Number.isSafeInteger(durationDays) &&
+      intervalDays > durationDays)
+  ) {
+    details.push({
+      field: 'intervalDays',
+      message: 'intervalDays deve ser um inteiro positivo até durationDays',
+    })
+  }
+
   return details
 }
 

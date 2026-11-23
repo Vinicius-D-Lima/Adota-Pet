@@ -22,16 +22,28 @@ enum OrganizationRole {
   VOLUNTEER
 }
 
+enum MembershipStatus {
+  ATIVO
+  REMOVIDO
+}
+
+enum CheckInStatus {
+  PENDENTE
+  ENVIADO
+  ATRASADO
+  REVISADO
+}
+
 model User {
-  id               String        @id
-  name             String        @default("")
+  id               String           @id
+  name             String           @default("")
   /// Sempre normalizado em minúsculas; a unicidade também é garantida no banco.
-  email            String        @default("") @unique
+  email            String           @unique @default("")
   /// Hash argon2id. Nulo só para usuários legados do mock que ainda não fizeram login.
   passwordHash     String?
-  platformRole     PlatformRole  @default(USUARIO)
+  platformRole     PlatformRole     @default(USUARIO)
   organizationRole OrganizationRole @default(ADMIN)
-  createdAt        DateTime      @default(now())
+  createdAt        DateTime         @default(now())
   phone            String?
   cpf              String?
   birthDate        String?
@@ -42,19 +54,22 @@ model User {
   document         String?
   organizationName String?
   guardianType     String?
-  role             String   @default("ADOTANTE")
-  roles            String[] @default([])
+  role             String           @default("ADOTANTE")
+  roles            String[]         @default([])
   lat              Float?
   lng              Float?
 
-  adopterProfile   AdopterProfile?
-  guardianProfile  GuardianProfile?
-  favorites        Favorite[]
-  requests         AdoptionRequest[]
-  notifications    Notification[]
-  savedFilters     SavedFilter[]
-  preferences      NotificationPreference[]
-  refreshTokens    RefreshToken[]
+  adopterProfile       AdopterProfile?
+  guardianProfile      GuardianProfile?
+  favorites            Favorite[]
+  requests             AdoptionRequest[]
+  notifications        Notification[]
+  savedFilters         SavedFilter[]
+  preferences          NotificationPreference[]
+  refreshTokens        RefreshToken[]
+  memberships          Membership[]
+  adoptionsAsAdopter   Adoption[]               @relation("Adopter")
+  createdFollowUpPlans FollowUpPlan[]           @relation("FollowUpPlanCreator")
 }
 
 /// Refresh token fica no banco só como hash (#48): permite revogar e detectar reuso.
@@ -96,8 +111,8 @@ model AdopterProfile {
 }
 
 model GuardianProfile {
-  id           Int      @id @default(autoincrement())
-  userId       String   @unique
+  id           Int     @id @default(autoincrement())
+  userId       String  @unique
   guardianType String?
   displayName  String?
   legalName    String?
@@ -108,9 +123,39 @@ model GuardianProfile {
   address      String?
   city         String?
   description  String?
-  acceptsTerms Boolean  @default(false)
+  acceptsTerms Boolean @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Organization {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  initials     String
+  description  String  @default("")
+  city         String  @default("")
+  contactEmail String  @default("")
+  phone        String  @default("")
+  logoUrl      String?
+  cnpj         String?
+
+  memberships Membership[]
+  adoptions   Adoption[]
+}
+
+model Membership {
+  id             String           @id @default(cuid())
+  userId         String
+  organizationId String
+  role           OrganizationRole @default(VOLUNTEER)
+  status         MembershipStatus @default(ATIVO)
+  joinedAt       DateTime         @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, status, role])
 }
 
 model Pet {
@@ -143,8 +188,9 @@ model Pet {
   /// #49/#50: só DISPONIVEL aceita solicitação; ADOTADO e ARQUIVADO não.
   status               String   @default("DISPONIVEL")
 
-  favorites            Favorite[]
-  requests             AdoptionRequest[]
+  favorites Favorite[]
+  requests  AdoptionRequest[]
+  adoption  Adoption?
 }
 
 model Favorite {
@@ -173,6 +219,57 @@ model AdoptionRequest {
   user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   pet      Pet           @relation(fields: [petId], references: [id], onDelete: Restrict)
   messages ChatMessage[]
+  adoption Adoption?
+}
+
+model Adoption {
+  id             String   @id @default(cuid())
+  requestId      String   @unique
+  petId          String   @unique
+  adopterId      String
+  organizationId String
+  adoptedAt      DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  request      AdoptionRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  pet          Pet             @relation(fields: [petId], references: [id], onDelete: Restrict)
+  adopter      User            @relation("Adopter", fields: [adopterId], references: [id], onDelete: Restrict)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  plan         FollowUpPlan?
+  checkIns     CheckIn[]
+
+  @@index([adopterId, adoptedAt])
+  @@index([organizationId, adoptedAt])
+}
+
+model FollowUpPlan {
+  id           String    @id @default(cuid())
+  adoptionId   String    @unique
+  durationDays Int
+  intervalDays Int
+  createdBy    String
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  adoption Adoption @relation(fields: [adoptionId], references: [id], onDelete: Cascade)
+  creator  User     @relation("FollowUpPlanCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+}
+
+model CheckIn {
+  id              String        @id @default(cuid())
+  adoptionId      String
+  dueDate         DateTime
+  status          CheckInStatus @default(PENDENTE)
+  submittedAt     DateTime?
+  report          String?
+  photos          String[]      @default([])
+  reviewerComment String?
+  reviewedAt      DateTime?
+  createdAt       DateTime      @default(now())
+
+  adoption Adoption @relation(fields: [adoptionId], references: [id], onDelete: Cascade)
+
+  @@index([adoptionId, dueDate])
 }
 
 /// Outbox de eventos de domínio (#50): o evento entra na mesma transação da
@@ -189,9 +286,9 @@ model EventOutbox {
 
 /// Idempotência dos consumidores de jobs (#95): uma linha por evento processado.
 model JobEffect {
-  eventId     String   @id
-  type        String
-  createdAt   DateTime @default(now())
+  eventId   String   @id
+  type      String
+  createdAt DateTime @default(now())
 }
 
 /// Armazenamento de arquivos (#94): metadados e vínculo com o registro dono.
