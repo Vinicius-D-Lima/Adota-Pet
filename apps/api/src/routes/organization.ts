@@ -12,6 +12,7 @@ import { prisma } from '../db.js'
 import type { Pet, Prisma } from '../generated/prisma/client.js'
 import type { FieldError } from '../http.js'
 import { isBlank, list, sendError } from '../http.js'
+import { deleteStorageObjectsForResource } from '../storage.js'
 import { ORGANIZATION_PET_FIELDS, asRecord, validateOrganizationPet } from '../validation.js'
 
 export const organizationRouter = Router()
@@ -140,7 +141,9 @@ organizationRouter.delete('/me/organization-pets/:id', async (req, res) => {
   if (requests > 0)
     return sendError(res, 409, 'Não é possível remover um pet que possui solicitações')
 
-  // Favoritos caem em cascata (onDelete: Cascade no schema).
+  // Favoritos caem em cascata (onDelete: Cascade no schema). A limpeza de
+  // arquivos é explícita (#94/STO-08) para não deixar órfãos no bucket.
+  await deleteStorageObjectsForResource('PET', existing.id)
   await prisma.pet.delete({ where: { id: existing.id } })
   res.status(204).end()
 })

@@ -6,10 +6,33 @@ import type { Pet } from '../types'
 import { HealthBadges } from './HealthBadges'
 import { Card, TextLink, cx } from './ui'
 
+/** O card precisa apenas destes campos: aceita tanto um Pet cheio quanto o resumo de favoritos. */
+type PetCardPet = Pick<
+  Pet,
+  | 'id'
+  | 'name'
+  | 'breed'
+  | 'image'
+  | 'sex'
+  | 'ageLabel'
+  | 'size'
+  | 'summary'
+  | 'traits'
+  | 'vaccinated'
+  | 'neutered'
+  | 'distance'
+  | 'status'
+>
+
 interface PetCardProps {
-  pet: Pet
+  pet: PetCardPet
   compatibilityScore?: number
   compatibilityLevel?: 'Alta' | 'Média' | 'Baixa'
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  ADOTADO: 'Adotado',
+  ARQUIVADO: 'Arquivado',
 }
 
 export function TraitList({ traits, large = false }: { traits: string[]; large?: boolean }) {
@@ -60,6 +83,11 @@ export function PetCard({ pet, compatibilityScore, compatibilityLevel }: PetCard
           height={500}
           loading="lazy"
         />
+        {pet.status && pet.status !== 'DISPONIVEL' && (
+          <span className="absolute left-3.5 top-3.5 rounded-lg bg-forest-800/90 px-[9px] py-1.5 text-[11px] font-bold text-white">
+            {STATUS_LABEL[pet.status] ?? pet.status}
+          </span>
+        )}
         <button
           className={cx(
             'absolute right-3.5 top-3.5 grid size-[39px] cursor-pointer place-items-center rounded-full border-0 bg-white/90',

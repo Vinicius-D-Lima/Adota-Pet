@@ -3,6 +3,10 @@ import swaggerUi from 'swagger-ui-express'
 import {
   authLoginSchema,
   createAccountSchema,
+  favoriteIdsResponseSchema,
+  favoritePetIdParamsSchema,
+  favoritesQuerySchema,
+  favoritesResponseSchema,
   petIdParamsSchema,
   petsQuerySchema,
   petsResponseSchema,
@@ -58,6 +62,10 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'GET /api/pets': { query: petsQuerySchema, response: petsResponseSchema },
   'GET /api/pets/{id}': { params: petIdParamsSchema, response: petSchema },
   'PUT /api/me/account': { body: createAccountSchema, response: profileSchema },
+  'GET /api/me/favorites/ids': { response: favoriteIdsResponseSchema },
+  'GET /api/me/favorites': { query: favoritesQuerySchema, response: favoritesResponseSchema },
+  'PUT /api/me/favorites/{petId}': { params: favoritePetIdParamsSchema },
+  'DELETE /api/me/favorites/{petId}': { params: favoritePetIdParamsSchema },
 }
 
 export interface ApiRoute {
@@ -135,6 +143,13 @@ function parametersFrom(schema: ZodType | undefined, location: 'query' | 'path')
   }))
 }
 
+/** Espelha os prefixos privados de `routes/index.ts` (#47). */
+const isPrivatePath = (path: string) =>
+  path === '/me' ||
+  path.startsWith('/me/') ||
+  path.startsWith('/api/me/') ||
+  path.endsWith('/auth/me')
+
 const errorResponse = {
   description: 'Erro no formato padrão da API',
   content: {
@@ -164,14 +179,15 @@ export function buildOpenApiDocument(app: Express) {
         },
         ...(method === 'GET' ? { 503: errorResponse } : {}),
         400: errorResponse,
-        ...(path.includes('/auth/') ? { 401: errorResponse, 409: errorResponse } : {}),
+        ...(isPrivatePath(path) || path.includes('/auth/') ? { 401: errorResponse } : {}),
+        ...(path.includes('/auth/') ? { 409: errorResponse } : {}),
         413: errorResponse,
         429: errorResponse,
         500: errorResponse,
       },
     }
 
-    if (path === '/me' || path.endsWith('/auth/me')) {
+    if (isPrivatePath(path)) {
       operation.security = [{ bearerAuth: [] }]
     }
 

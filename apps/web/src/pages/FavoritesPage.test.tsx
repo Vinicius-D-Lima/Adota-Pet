@@ -32,15 +32,19 @@ describe('FavoritesPage', () => {
   })
 
   it('desfavoritar tira o pet da lista na hora', async () => {
-    const server = fakeFavoritesApi(mocks, { initial: ['luna'], writeDelayMs: 200 })
+    // Escrita travada: a lista some pela atualização otimista, antes da resposta.
+    const server = fakeFavoritesApi(mocks, { initial: ['luna'], deferWrites: true })
     renderWithProviders(<FavoritesPage />, { route: '/favoritos' })
     const user = userEvent.setup()
 
     await user.click(await screen.findByRole('button', { name: /remover luna/i }))
 
-    expect(screen.queryByRole('heading', { name: 'Luna' })).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: 'Luna' })).not.toBeInTheDocument(),
+    )
     expect(await screen.findByText('Você ainda não favoritou nenhum pet')).toBeInTheDocument()
     expect(server.ids.has('luna')).toBe(true)
+    server.releaseWrites()
     await waitFor(() => expect(server.ids.has('luna')).toBe(false))
   })
 

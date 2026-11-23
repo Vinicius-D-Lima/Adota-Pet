@@ -10,6 +10,7 @@ import { mountDocs } from './openapi.js'
 import { createAuthRouter, meRouter } from './routes/auth.js'
 import { createHealthRouter } from './routes/health.js'
 import { apiRouter } from './routes/index.js'
+import { fileRouter } from './routes/storage.js'
 
 export interface AppOptions {
   /** Sobrescreve valores validados (usado nos testes). */
@@ -61,6 +62,7 @@ export function createApp(options: AppOptions = {}): Express {
   app.use('/auth', authRouter)
   app.use('/api/auth', authRouter)
   app.use('/me', meRouter)
+  app.use(fileRouter)
   app.use('/api', apiRouter)
   mountDocs(app)
 

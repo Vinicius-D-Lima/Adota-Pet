@@ -179,6 +179,30 @@ model EventOutbox {
   @@index([type, createdAt])
 }
 
+/// Idempotência dos consumidores de jobs (#95): uma linha por evento processado.
+model JobEffect {
+  eventId     String   @id
+  type        String
+  createdAt   DateTime @default(now())
+}
+
+/// Armazenamento de arquivos (#94): metadados e vínculo com o registro dono.
+/// A chave `key` é sempre gerada pelo servidor; o nome enviado pelo cliente
+/// nunca é persistido nem usado como caminho do objeto.
+model StorageObject {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  contentType  String
+  sizeBytes    Int
+  resourceType String
+  resourceId   String
+  ownerId      String
+  createdAt    DateTime @default(now())
+
+  @@index([resourceType, resourceId])
+  @@index([ownerId])
+}
+
 model ChatMessage {
   id        String    @id
   requestId String

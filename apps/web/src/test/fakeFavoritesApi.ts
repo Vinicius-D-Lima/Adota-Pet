@@ -14,15 +14,38 @@ interface FakeFavoritesApi {
   writes: string[]
   /** Quando true, PUT e DELETE falham como falha de rede. */
   failWrites: boolean
+  /** Com `deferWrites`, libera as escritas pendentes sem depender de timer. */
+  releaseWrites: () => void
+}
+
+interface FakeOptions {
+  initial?: string[]
+  writeDelayMs?: number
+  /** Mantém PUT/DELETE pendentes até `releaseWrites()` (testes de UI otimista). */
+  deferWrites?: boolean
 }
 
 /** Simula os endpoints de favoritos do mock sobre um `api` mockado. */
 export function fakeFavoritesApi(
   api: ApiMocks,
-  { initial = [], writeDelayMs = 0 }: { initial?: string[]; writeDelayMs?: number } = {},
+  { initial = [], writeDelayMs = 0, deferWrites = false }: FakeOptions = {},
 ): FakeFavoritesApi {
-  const server: FakeFavoritesApi = { ids: new Set(initial), writes: [], failWrites: false }
-  const delay = () => new Promise((resolve) => setTimeout(resolve, writeDelayMs))
+  let gateOpen = !deferWrites
+  let releaseGate: (() => void) | undefined
+  const server: FakeFavoritesApi = {
+    ids: new Set(initial),
+    writes: [],
+    failWrites: false,
+    releaseWrites: () => {
+      gateOpen = true
+      releaseGate?.()
+      releaseGate = undefined
+    },
+  }
+  const delay = async () => {
+    if (writeDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, writeDelayMs))
+    if (!gateOpen) await new Promise<void>((resolve) => (releaseGate = resolve))
+  }
   const petId = (path: string) => decodeURIComponent(path.split('/').pop() as string)
 
   api.get.mockImplementation((path: string) => {

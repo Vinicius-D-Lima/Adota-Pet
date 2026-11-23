@@ -66,31 +66,32 @@ O seed inclui pets e solicitações em diferentes estados para exercitar os flux
 
 ## Rotas
 
-| Rota                                                       | O que faz                                                   |
-| ---------------------------------------------------------- | ----------------------------------------------------------- |
-| `GET /pets`                                                | Lista pets com filtros, ordenação e paginação               |
-| `GET /pets/:id`                                            | Um pet (404 se não existir)                                 |
-| `GET /me`                                                  | Usuário de demonstração                                     |
-| `GET /me/adopter-profile`                                  | Perfil com `isComplete` e `missingFields`                   |
-| `PUT /me/adopter-profile`                                  | Atualização parcial do perfil                               |
-| `POST /requests`                                           | Cria uma solicitação de adoção                              |
-| `GET /me/requests`                                         | Solicitações do usuário (a mais recente primeiro)           |
-| `GET /requests/:id`                                        | Uma solicitação do usuário                                  |
-| `POST /requests/:id/transitions`                           | Muda o status (hoje só `{ "to": "CANCELADA" }`)             |
-| `GET /requests/:id/messages?cursor=`                       | Mensagens da solicitação com paginação por cursor           |
-| `POST /requests/:id/messages`                              | Envia uma mensagem de texto puro (máximo 2.000 caracteres)  |
-| `PATCH /requests/:id/messages/read`                        | Marca mensagens recebidas da conversa como lidas (204)      |
-| `GET /me/favorites` · `GET /me/favorites/ids`              | Favoritos (pets completos / só os IDs)                      |
-| `PUT /me/favorites/:petId` · `DELETE /me/favorites/:petId` | Adiciona / remove favorito (204, idempotentes)              |
-| `GET /me/saved-filters`                                    | Lista as buscas salvas da conta atual                       |
-| `POST /me/saved-filters`                                   | Cria uma busca (máximo de 10 por conta; 409 no limite)      |
-| `PATCH /me/saved-filters/:id`                              | Atualiza nome ou estado do alerta                           |
-| `DELETE /me/saved-filters/:id`                             | Exclui uma busca da conta atual (204)                       |
-| `GET /me/notifications?cursor=&unread=`                    | Notificações paginadas e contador global de não lidas       |
-| `PATCH /me/notifications/:id/read`                         | Marca como lida uma notificação da conta atual (204)        |
-| `PATCH /me/notifications/read-all`                         | Marca como lidas todas as notificações da conta atual (204) |
-| `GET /me/notification-preferences`                         | Preferências de canal por tipo de notificação               |
-| `PUT /me/notification-preferences`                         | Substitui as preferências com `{ "data": [...] }`           |
+| Rota                                                       | O que faz                                                    |
+| ---------------------------------------------------------- | ------------------------------------------------------------ |
+| `GET /pets`                                                | Lista pets com filtros, ordenação e paginação                |
+| `GET /pets/:id`                                            | Um pet (404 se não existir)                                  |
+| `GET /me`                                                  | Usuário de demonstração                                      |
+| `GET /me/adopter-profile`                                  | Perfil com `isComplete` e `missingFields`                    |
+| `PUT /me/adopter-profile`                                  | Atualização parcial do perfil                                |
+| `POST /requests`                                           | Cria uma solicitação de adoção                               |
+| `GET /me/requests`                                         | Solicitações do usuário (a mais recente primeiro)            |
+| `GET /requests/:id`                                        | Uma solicitação do usuário                                   |
+| `POST /requests/:id/transitions`                           | Muda o status (hoje só `{ "to": "CANCELADA" }`)              |
+| `GET /requests/:id/messages?cursor=`                       | Mensagens da solicitação com paginação por cursor            |
+| `POST /requests/:id/messages`                              | Envia uma mensagem de texto puro (máximo 2.000 caracteres)   |
+| `PATCH /requests/:id/messages/read`                        | Marca mensagens recebidas da conversa como lidas (204)       |
+| `GET /me/favorites?page=&limit=`                           | Favoritos paginados (`{ data, total }`), resumo com `status` |
+| `GET /me/favorites/ids`                                    | Só os IDs da conta (sem paginação), para os cards            |
+| `PUT /me/favorites/:petId` · `DELETE /me/favorites/:petId` | Adiciona / remove favorito (204, idempotentes)               |
+| `GET /me/saved-filters`                                    | Lista as buscas salvas da conta atual                        |
+| `POST /me/saved-filters`                                   | Cria uma busca (máximo de 10 por conta; 409 no limite)       |
+| `PATCH /me/saved-filters/:id`                              | Atualiza nome ou estado do alerta                            |
+| `DELETE /me/saved-filters/:id`                             | Exclui uma busca da conta atual (204)                        |
+| `GET /me/notifications?cursor=&unread=`                    | Notificações paginadas e contador global de não lidas        |
+| `PATCH /me/notifications/:id/read`                         | Marca como lida uma notificação da conta atual (204)         |
+| `PATCH /me/notifications/read-all`                         | Marca como lidas todas as notificações da conta atual (204)  |
+| `GET /me/notification-preferences`                         | Preferências de canal por tipo de notificação                |
+| `PUT /me/notification-preferences`                         | Substitui as preferências com `{ "data": [...] }`            |
 
 ### Buscas salvas
 

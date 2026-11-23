@@ -8,6 +8,7 @@ import { petsRouter } from './pets.js'
 import { profileRouter } from './profile.js'
 import { requestsRouter } from './requests.js'
 import { savedFiltersRouter } from './savedFilters.js'
+import { storageRouter } from './storage.js'
 
 /** API do Adota-Pet: mesmo contrato do mock-server, persistida no PostgreSQL. */
 export const apiRouter = Router()
@@ -32,6 +33,7 @@ apiRouter.use(requestsRouter)
 apiRouter.use(favoritesRouter)
 apiRouter.use(savedFiltersRouter)
 apiRouter.use(notificationsRouter)
+apiRouter.use(storageRouter)
 
 // Rotas desconhecidas respondem no formato do contrato (#47).
 // Erros (Zod, parser, exceções) são tratados pelo middleware global em app.ts.

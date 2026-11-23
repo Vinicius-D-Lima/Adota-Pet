@@ -704,6 +704,23 @@ describe('favoritos', () => {
   it('retorna 404 ao favoritar pet inexistente', async () => {
     expectError(await request(app).put('/me/favorites/fantasma'), 404, 'Not Found')
   })
+
+  it('pagina e devolve o resumo dos favoritos com status', async () => {
+    expect((await request(app).put('/me/favorites/bento')).status).toBe(204)
+
+    const first = await request(app).get('/me/favorites?page=1&limit=1')
+    expect(first.body.total).toBe(2)
+    expect(first.body.data.map((pet) => pet.id)).toEqual(['luna'])
+    expect(first.body.data[0].status).toBe('DISPONIVEL')
+    expect(first.body.data[0]).not.toHaveProperty('description')
+    expect(first.body.data[0]).not.toHaveProperty('lat')
+
+    const second = await request(app).get('/me/favorites?page=2&limit=1')
+    expect(second.body.total).toBe(2)
+    expect(second.body.data.map((pet) => pet.id)).toEqual(['bento'])
+
+    expectError(await request(app).get('/me/favorites?sort=recent'), 400, 'Bad Request')
+  })
 })
 
 describe('notificações', () => {
