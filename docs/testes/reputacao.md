@@ -17,7 +17,7 @@ Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest c
 | `REV-03` | Funcional                          | Nota e comentário validados              | Nota fora de 1 a 5 ou comentário com mais de 1.000 caracteres retorna 400.         |
 | `REV-04` | Funcional                          | Média e contagem corretas                | Ignoram avaliações ocultadas.                                                      |
 | `REV-05` | Funcional                          | Média só a partir de 3 avaliações        | Antes disso a média não é exposta.                                                 |
-| `REV-06` | Funcional                          | Liberada 7 dias depois da adoção         | Antes disso retorna 403 ou 409; no sétimo dia, aceita (relógio simulado).          |
+| `REV-06` | Funcional                          | Liberada 7 dias depois da adoção         | Participante recebe 409 antes do prazo; com `adoptedAt` após sete dias, aceita.    |
 | `REV-07` | Funcional                          | Edição só até 7 dias                     | Depois da janela a edição é recusada.                                              |
 | `REV-08` | Segurança · XSS                    | Comentário tratado como texto puro       | Um `<script>` é guardado e devolvido literalmente.                                 |
 | `REV-09` | Segurança · Mass assignment        | `reviewerId` do corpo é ignorado         | O avaliador é sempre o usuário autenticado. Evita avaliar em nome de outra pessoa. |

@@ -50,6 +50,9 @@ async function makeOrganization(id: string) {
       reviewCount: 0,
     },
   })
+  await prisma.organization.create({
+    data: { id, name: user.name, initials: 'DO' },
+  })
   return user
 }
 
@@ -79,6 +82,28 @@ async function makePet(id: string) {
       organization: 'Instituição Patinhas',
       organizationInitials: 'IP',
       createdAt: new Date(),
+    },
+  })
+}
+
+async function makeReviewAdoption(id: string, adopterId: string, organizationId: string) {
+  const pet = await makePet(`${id}-pet`)
+  const adoptionRequest = await prisma.adoptionRequest.create({
+    data: {
+      id: `${id}-request`,
+      userId: adopterId,
+      petId: pet.id,
+      status: 'APROVADA',
+      date: new Date(),
+      message: 'Adoção para teste de avaliação',
+    },
+  })
+  return prisma.adoption.create({
+    data: {
+      requestId: adoptionRequest.id,
+      petId: pet.id,
+      adopterId,
+      organizationId,
     },
   })
 }
@@ -210,21 +235,23 @@ databaseSuite('denúncias e moderação (#26)', () => {
       makeUser('den-04-author-c'),
     ])
     const reviews = await Promise.all(
-      [5, 3, 1].map((rating, index) =>
-        prisma.review.create({
+      [5, 3, 1].map(async (rating, index) => {
+        const adoption = await makeReviewAdoption(
+          `den-04-adoption-${index}`,
+          authors[index].user.id,
+          organization.id,
+        )
+        return prisma.review.create({
           data: {
-            adoptionId: `den-04-adoption-${index}`,
+            adoptionId: adoption.id,
             reviewerId: authors[index].user.id,
-            organizationId: organization.id,
+            direction: 'ADOPTER_TO_ORGANIZATION',
+            revieweeOrganizationId: organization.id,
             rating,
           },
-        }),
-      ),
+        })
+      }),
     )
-    await prisma.guardianProfile.update({
-      where: { userId: organization.id },
-      data: { reputation: 3, reviewCount: 3 },
-    })
     const reporter = await makeUser('den-04-reporter')
     const moderator = await makeUser('den-04-moderator', 'MODERADOR')
     const created = await createReport(app, reporter.headers, reviews[2].id, {
@@ -240,11 +267,11 @@ databaseSuite('denúncias e moderação (#26)', () => {
     expect(
       (await prisma.review.findUniqueOrThrow({ where: { id: reviews[2].id } })).hiddenAt,
     ).toBeInstanceOf(Date)
-    const profile = await prisma.guardianProfile.findUniqueOrThrow({
-      where: { userId: organization.id },
+    const updatedOrganization = await prisma.organization.findUniqueOrThrow({
+      where: { id: organization.id },
     })
-    expect(profile.reviewCount).toBe(2)
-    expect(profile.reputation).toBe(4)
+    expect(updatedOrganization.reviewCount).toBe(2)
+    expect(updatedOrganization.reputation).toBe(4)
   })
 
   it('[DEN-05] sexta denúncia em 24 horas retorna 429', async () => {
