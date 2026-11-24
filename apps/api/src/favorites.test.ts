@@ -4,6 +4,7 @@ import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { hasTestDatabase } from '../test/database.js'
 import { resetTestDatabase } from '../test/reset.js'
+import { ensureTestOrganization } from '../test/organization.js'
 import { createApp } from './app.js'
 import { signAccessToken } from './auth.js'
 import { prisma } from './db.js'
@@ -27,6 +28,7 @@ async function makeUser(id: string) {
 }
 
 async function makePet(id: string, status = 'DISPONIVEL') {
+  const organization = await ensureTestOrganization('Instituição Patinhas', 'IP')
   return prisma.pet.create({
     data: {
       id,
@@ -49,8 +51,7 @@ async function makePet(id: string, status = 'DISPONIVEL') {
       specialCare: false,
       vaccinated: true,
       neutered: true,
-      organization: 'Instituição Patinhas',
-      organizationInitials: 'IP',
+      organizationId: organization.id,
       createdAt: new Date(),
       status,
     },

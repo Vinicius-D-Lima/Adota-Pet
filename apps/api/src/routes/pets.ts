@@ -49,6 +49,7 @@ petsRouter.get('/me/matches', async (req, res) => {
 
   const pets = await prisma.pet.findMany({
     where: { status: { not: 'ADOTADO' } },
+    include: { organizationEntity: true },
   })
   const data = pets
     .map((pet) => ({
@@ -83,7 +84,7 @@ petsRouter.get('/pets', validate({ query: petsQuerySchema }), async (req, res) =
     Object.assign(where, { [key]: { in: values } })
   }
 
-  let pets = await prisma.pet.findMany({ where })
+  let pets = await prisma.pet.findMany({ where, include: { organizationEntity: true } })
   const term = Array.isArray(search)
     ? String(search[0] ?? '').toLowerCase()
     : typeof search === 'string'
@@ -115,7 +116,10 @@ petsRouter.get('/pets', validate({ query: petsQuerySchema }), async (req, res) =
 })
 
 petsRouter.get('/pets/:id', validate({ params: petIdParamsSchema }), async (req, res) => {
-  const pet = await prisma.pet.findUnique({ where: { id: String(req.params.id) } })
+  const pet = await prisma.pet.findUnique({
+    where: { id: String(req.params.id) },
+    include: { organizationEntity: true },
+  })
   if (!pet) return sendError(res, 404, 'Pet não encontrado')
   res.json(presentPet(pet, await referenceUser()))
 })

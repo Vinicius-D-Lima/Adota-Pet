@@ -9,7 +9,7 @@ import {
   type RequestTransitionRule,
 } from '@adotapet/shared'
 import type { Request } from 'express'
-import { currentUser, demoRole, organizationIdentity, permissionsForRole } from './context.js'
+import { currentUser, permissionsForRole } from './context.js'
 import { prisma } from './db.js'
 import { REQUEST_STATUS_CHANGED, enqueueDomainEvent } from './events.js'
 import type { AdoptionRequest, Prisma } from './generated/prisma/client.js'
@@ -51,13 +51,15 @@ export async function resolveTransitionActor(req: Request, request: AdoptionRequ
 
   const pet = await prisma.pet.findUnique({
     where: { id: request.petId },
-    select: { organization: true },
+    select: { organizationId: true },
   })
   if (!pet) return null
-  const { name } = await organizationIdentity(id)
-  if (pet.organization !== name) return null
+  const membership = await prisma.membership.findUnique({
+    where: { userId_organizationId: { userId: id, organizationId: pet.organizationId } },
+  })
+  if (!membership || membership.status !== 'ATIVO') return null
 
-  const role = demoRole(req)
+  const role = membership.role
   return {
     kind: 'ORGANIZATION' as const,
     id,

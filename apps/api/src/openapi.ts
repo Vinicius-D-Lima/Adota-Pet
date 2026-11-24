@@ -14,6 +14,14 @@ import {
   notificationPreferencesUpdateSchema,
   notificationsQuerySchema,
   organizationPermissionsResponseSchema,
+  organizationCreateResponseSchema,
+  organizationCreateSchema,
+  organizationIdParamsSchema,
+  organizationInvitationCreateSchema,
+  organizationInvitationParamsSchema,
+  organizationInvitationResponseSchema,
+  organizationMemberParamsSchema,
+  organizationMemberRoleSchema,
   organizationTransitionSchema,
   petIdParamsSchema,
   petsQuerySchema,
@@ -33,6 +41,7 @@ import {
   requestTransitionSchema,
 } from '@adotapet/shared'
 import { z, type ZodType } from 'zod'
+import { checkInReviewBodySchema, checkInSubmitBodySchema } from './routes/checkIns.js'
 
 /** Documentação viva (#47 / INF-10): gerada a partir dos schemas Zod compartilhados. */
 const healthResponseSchema = z.object({
@@ -112,6 +121,7 @@ interface RouteSchemas {
   query?: ZodType
   params?: ZodType
   body?: ZodType
+  bodyContentType?: string
   response?: ZodType
 }
 
@@ -124,6 +134,28 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'PUT /api/me/account': { body: createAccountSchema, response: profileSchema },
   'GET /api/me/matches': {},
   'GET /api/me/permissions': { response: organizationPermissionsResponseSchema },
+  'POST /api/organizations': {
+    body: organizationCreateSchema,
+    response: organizationCreateResponseSchema,
+  },
+  'GET /api/organizations/{organizationId}': { params: organizationIdParamsSchema },
+  'GET /api/organizations/{organizationId}/members': { params: organizationIdParamsSchema },
+  'POST /api/organizations/{organizationId}/invitations': {
+    params: organizationIdParamsSchema,
+    body: organizationInvitationCreateSchema,
+    response: organizationInvitationResponseSchema,
+  },
+  'DELETE /api/organizations/{organizationId}/invitations/{invitationId}': {
+    params: organizationInvitationParamsSchema,
+  },
+  'PATCH /api/organizations/{organizationId}/members/{userId}': {
+    params: organizationMemberParamsSchema,
+    body: organizationMemberRoleSchema,
+  },
+  'DELETE /api/organizations/{organizationId}/members/{userId}': {
+    params: organizationMemberParamsSchema,
+  },
+  'POST /api/invitations/{token}/accept': {},
   'GET /api/me/received-requests': {
     query: receivedRequestsQuerySchema,
     response: receivedRequestsResponseSchema,
@@ -170,6 +202,22 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'PUT /api/adoptions/{id}/follow-up-plan': {
     params: idParamsSchema,
     body: followUpPlanSchema,
+  },
+  'POST /api/check-ins/{id}/submit': {
+    params: idParamsSchema,
+    body: checkInSubmitBodySchema,
+    bodyContentType: 'multipart/form-data',
+  },
+  'POST /api/check-ins/{id}/review': {
+    params: idParamsSchema,
+    body: checkInReviewBodySchema,
+  },
+  'POST /api/check-ins/{id}/request-more': {
+    params: idParamsSchema,
+    body: checkInReviewBodySchema,
+  },
+  'POST /api/check-ins/{id}/photos/{photoId}/url': {
+    params: z.strictObject({ id: z.string().min(1), photoId: z.string().min(1) }),
   },
   // Notificações (#30): contrato idêntico ao consumido pelo frontend.
   'GET /api/me/notifications': {
@@ -293,6 +341,16 @@ const isPrivatePath = (path: string) =>
     path.startsWith('/api/organizations/') ||
     path.startsWith('/api/reviews/') ||
     path.endsWith('/auth/me'))
+  path === '/me' ||
+  path.startsWith('/me/') ||
+  path.startsWith('/api/me/') ||
+  path.startsWith('/api/requests/') ||
+  path.startsWith('/api/adoptions/') ||
+  path === '/api/organizations' ||
+  path.startsWith('/api/check-ins/') ||
+  path.startsWith('/api/organizations/') ||
+  path.startsWith('/api/invitations/') ||
+  path.endsWith('/auth/me')
 
 const errorResponse = {
   description: 'Erro no formato padrão da API',
@@ -358,9 +416,23 @@ export function buildOpenApiDocument(app: Express) {
     ]
     if (parameters.length) operation.parameters = parameters
     if (schemas.body) {
+      const bodySchema = toOpenApiSchema(schemas.body)
+      if (schemas.bodyContentType === 'multipart/form-data') {
+        const properties = bodySchema.properties as Record<string, unknown>
+        properties.files = {
+          type: 'array',
+          minItems: 1,
+          maxItems: 5,
+          items: { type: 'string', format: 'binary' },
+        }
+        const required = Array.isArray(bodySchema.required) ? bodySchema.required : []
+        bodySchema.required = [...required, 'files']
+      }
       operation.requestBody = {
         required: true,
-        content: { 'application/json': { schema: toOpenApiSchema(schemas.body) } },
+        content: {
+          [schemas.bodyContentType ?? 'application/json']: { schema: bodySchema },
+        },
       }
     }
     if (schemas.response) delete operation.summary

@@ -2,7 +2,10 @@ import { createApp } from './app.js'
 import { ConfigError, loadConfig } from './config.js'
 import { logger } from './logger.js'
 import { prisma } from './db.js'
-import { startJobs, stopJobs } from './jobs.js'
+import { processCheckInDeadlines } from './checkIns.js'
+import { QUEUES, registerJobHandler, startJobs, stopJobs } from './jobs.js'
+
+registerJobHandler(QUEUES.checkInOverdue, () => processCheckInDeadlines())
 
 async function main() {
   // INF-01: sem variável obrigatória, morre aqui — antes de abrir a porta.

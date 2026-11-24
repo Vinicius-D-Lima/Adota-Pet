@@ -6,7 +6,12 @@ import {
 } from '@adotapet/shared'
 import type { Request, Response } from 'express'
 import { prisma } from './db.js'
-import type { AdoptionRequest, ChatMessage, Pet, User } from './generated/prisma/client.js'
+import {
+  Prisma,
+  type AdoptionRequest,
+  type ChatMessage,
+  type User,
+} from './generated/prisma/client.js'
 import { haversineKm, isBlank, sendError } from './http.js'
 import { calculateRequestMatching } from './matching.js'
 import {
@@ -124,6 +129,11 @@ export async function getGuardianProfile(userId: string): Promise<ProfileView> {
 export async function requireGuardian(req: Request, res: Response): Promise<{ id: string } | null> {
   const { id, user } = await currentUser(req)
   if (user?.roles?.includes('GUARDIAN')) return { id }
+  const membership = await prisma.membership.findFirst({
+    where: { userId: id, status: 'ATIVO' },
+    select: { id: true },
+  })
+  if (membership) return { id }
   sendError(res, 403, 'Esta área é exclusiva para instituições e protetores')
   return null
 }
@@ -131,6 +141,19 @@ export async function requireGuardian(req: Request, res: Response): Promise<{ id
 /** Nome/iniciais da instituição dona dos pets (perfil > usuário > fallback). */
 export async function organizationIdentity(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } })
+  const membership = await prisma.membership.findFirst({
+    where: { userId, status: 'ATIVO' },
+    orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
+    include: { organization: true },
+  })
+  if (membership) {
+    return {
+      organizationId: membership.organizationId,
+      name: membership.organization.name,
+      initials: membership.organization.initials,
+      user,
+    }
+  }
   const profile = await getGuardianProfile(userId)
   const name =
     str(profile.displayName) ||
@@ -144,14 +167,16 @@ export async function organizationIdentity(userId: string) {
     .slice(0, 2)
     .map((part) => part[0].toUpperCase())
     .join('')
-  return { name, initials: initials || 'IN', user }
+  return { organizationId: null, name, initials: initials || 'IN', user }
 }
 
 export const organizationPets = async (userId: string) => {
-  const { name } = await organizationIdentity(userId)
+  const { organizationId } = await organizationIdentity(userId)
+  if (!organizationId) return []
   return prisma.pet.findMany({
-    where: { organization: name },
+    where: { organizationId },
     orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+    include: { organizationEntity: true },
   })
 }
 
@@ -194,8 +219,17 @@ export const isChatParticipant = async (
   userId: string,
 ) => {
   if (request.userId === userId) return true
-  const { name } = await organizationIdentity(userId)
-  const count = await prisma.pet.count({ where: { organization: name, id: request.petId } })
+  await organizationIdentity(userId)
+  const memberships = await prisma.membership.findMany({
+    where: { userId, status: 'ATIVO' },
+    select: { organizationId: true },
+  })
+  const count = await prisma.pet.count({
+    where: {
+      id: request.petId,
+      organizationId: { in: memberships.map(({ organizationId }) => organizationId) },
+    },
+  })
   return count > 0
 }
 
@@ -233,7 +267,10 @@ export async function presentChatMessage(message: ChatMessage, userId: string) {
 }
 
 export const withPet = async (request: AdoptionRequest) => {
-  const pet = await prisma.pet.findUnique({ where: { id: request.petId } })
+  const pet = await prisma.pet.findUnique({
+    where: { id: request.petId },
+    include: { organizationEntity: true },
+  })
   return {
     ...request,
     // #20: o banco guarda códigos da FSM; o contrato público segue com os
@@ -244,13 +281,26 @@ export const withPet = async (request: AdoptionRequest) => {
     answers: request.answers ?? undefined,
     interview: request.interview ?? undefined,
     rejectionReason: request.rejectionReason ?? undefined,
-    pet: pet ? withGallery(pet) : null,
+    pet: pet ? publicPet(pet) : null,
   }
 }
 
+export const petWithOrganization = { organizationEntity: true } as const
+export type PetWithOrganization = Prisma.PetGetPayload<{ include: typeof petWithOrganization }>
+
+/** Mantém o contrato antigo do frontend enquanto a origem vira uma FK real. */
+export function publicPet(pet: PetWithOrganization) {
+  const { organizationEntity, organizationId: _organizationId, ...row } = pet
+  return withGallery({
+    ...row,
+    organization: organizationEntity.name,
+    organizationInitials: organizationEntity.initials,
+  })
+}
+
 /** Pet com distância calculada a partir do usuário demo padrão. */
-export function presentPet(pet: Pet, refUser: User | null) {
-  const row = withGallery(pet)
+export function presentPet(pet: PetWithOrganization, refUser: User | null) {
+  const row = publicPet(pet)
   const refLat = refUser?.lat
   const refLng = refUser?.lng
   if (
