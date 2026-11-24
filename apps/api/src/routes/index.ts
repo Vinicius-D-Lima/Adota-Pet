@@ -11,11 +11,15 @@ import { petsRouter } from './pets.js'
 import { profileRouter } from './profile.js'
 import { requestsRouter } from './requests.js'
 import { reportsRouter } from './reports.js'
+import { reputationRouter, reviewsRouter } from './reviews.js'
 import { savedFiltersRouter } from './savedFilters.js'
 import { storageRouter } from './storage.js'
 
 /** API do Adota-Pet: mesmo contrato do mock-server, persistida no PostgreSQL. */
 export const apiRouter = Router()
+
+// A reputação é pública; monte antes da autenticação de /organizations.
+apiRouter.use(reputationRouter)
 
 // Os routers são montados na raiz de /api, então um `router.use(requireAuth)`
 // dentro deles também protegeria /api/pets (público). Em vez disso, exigimos JWT
@@ -26,6 +30,7 @@ const PRIVATE_PREFIXES = [
   '/requests',
   '/adoptions',
   '/organizations',
+  '/reviews',
   '/invitations',
   '/reports',
   '/moderation',
@@ -42,6 +47,7 @@ apiRouter.use(checkInsRouter)
 apiRouter.use(organizationsRouter)
 apiRouter.use(profileRouter)
 apiRouter.use(adoptionsRouter)
+apiRouter.use(reviewsRouter)
 apiRouter.use(organizationsRouter)
 apiRouter.use(organizationRouter)
 apiRouter.use(petsRouter)

@@ -12,6 +12,7 @@ import {
 import { loadConfig } from '../config.js'
 import { prisma } from '../db.js'
 import { HttpError, list, sendError } from '../http.js'
+import { recalculateOrganizationReputation } from '../reviews.js'
 import {
   getStorageProvider,
   isStorageConfigured,
@@ -21,7 +22,6 @@ import {
 } from '../storage.js'
 import { validate } from '../validate.js'
 import type {
-  Prisma,
   Report,
   ReportCategory,
   ReportStatus,
@@ -135,21 +135,6 @@ async function reportView(report: Report) {
     attachments,
     ...(needsOfficialGuidance(report.category) ? { officialGuidance: OFFICIAL_GUIDANCE } : {}),
   }
-}
-
-async function recalculateReputation(tx: Prisma.TransactionClient, organizationId: string) {
-  const aggregate = await tx.review.aggregate({
-    where: { organizationId, hiddenAt: null },
-    _avg: { rating: true },
-    _count: { rating: true },
-  })
-  await tx.guardianProfile.updateMany({
-    where: { userId: organizationId },
-    data: {
-      reputation: aggregate._avg.rating,
-      reviewCount: aggregate._count.rating,
-    },
-  })
 }
 
 function isUniqueViolation(error: unknown): boolean {
@@ -287,7 +272,9 @@ reportsRouter.post(
         const review = await tx.review.findUnique({ where: { id: existing.targetId } })
         if (review && !review.hiddenAt) {
           await tx.review.update({ where: { id: review.id }, data: { hiddenAt: resolvedAt } })
-          await recalculateReputation(tx, review.organizationId)
+          if (review.revieweeOrganizationId) {
+            await recalculateOrganizationReputation(tx, review.revieweeOrganizationId)
+          }
         }
       }
 

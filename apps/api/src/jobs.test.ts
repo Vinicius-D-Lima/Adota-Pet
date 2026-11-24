@@ -172,10 +172,18 @@ databaseSuite('fila de jobs (pg-boss)', () => {
 
     await clockRunner.start()
     try {
-      const spy = clockRunner.boss.getSpy(QUEUES.checkInOverdue)
       await clock.setTime(base.getTime() + 15_000)
       await clock.tick(31_000)
-      await spy.waitForJob(() => true, 'completed')
+      await vi.waitFor(
+        async () => {
+          const jobs = await prisma.$queryRawUnsafe<Array<{ state: string }>>(
+            'SELECT state FROM "pgboss_clock_test".job WHERE name = $1',
+            QUEUES.checkInOverdue,
+          )
+          expect(jobs.some((job) => job.state === 'completed')).toBe(true)
+        },
+        { timeout: 10_000 },
+      )
       expect(fired).toBe(1)
     } finally {
       await clockRunner.stop()
