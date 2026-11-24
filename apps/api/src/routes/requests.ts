@@ -87,7 +87,10 @@ requestsRouter.post('/requests', async (req, res) => {
     return sendError(res, 400, 'Validação falhou', details)
   }
 
-  const pet = await prisma.pet.findUnique({ where: { id: String(body?.petId) } })
+  const pet = await prisma.pet.findUnique({
+    where: { id: String(body?.petId) },
+    include: { organizationEntity: true },
+  })
   if (!pet) return sendError(res, 404, 'Pet não encontrado')
   // REQ-03: adotado/arquivado não recebe nova solicitação.
   if (pet.status !== AVAILABLE_PET_STATUS) {
@@ -135,7 +138,7 @@ requestsRouter.post('/requests', async (req, res) => {
         requestId: created.id,
         petId: pet.id,
         adopterId: userId,
-        organization: pet.organization,
+        organization: pet.organizationEntity.name,
         createdAt: date.toISOString(),
       })
       return created
@@ -295,12 +298,12 @@ requestsRouter.post('/requests/:id/messages', async (req, res) => {
   // notifica o adotante; mensagem do adotante notifica os membros da organização.
   const pet = await prisma.pet.findUnique({
     where: { id: adoptionRequest.petId },
-    select: { organization: true },
+    include: { organizationEntity: { select: { name: true } } },
   })
   const sender = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } })
   const recipients =
     adoptionRequest.userId === userId
-      ? await organizationMemberIds(pet?.organization ?? '', userId)
+      ? await organizationMemberIds(pet?.organizationEntity.name ?? '', userId)
       : [adoptionRequest.userId]
 
   const message = await prisma.$transaction(async (tx) => {

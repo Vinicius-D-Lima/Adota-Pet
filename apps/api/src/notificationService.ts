@@ -159,22 +159,30 @@ async function deliver(draft: Draft, enqueueEmail?: EnqueueEmail): Promise<Deliv
 }
 
 export async function organizationMemberIds(organization: string, adopterId: string) {
-  const rows = await prisma.user.findMany({
+  const rows = await prisma.membership.findMany({
     where: {
-      AND: [
-        { id: { not: adopterId } },
-        {
-          OR: [
-            { organizationName: organization },
-            { guardianProfile: { displayName: organization } },
-            { guardianProfile: { legalName: organization } },
-          ],
-        },
+      userId: { not: adopterId },
+      status: 'ATIVO',
+      organization: { name: organization },
+    },
+    select: { userId: true },
+  })
+  if (rows.length) return rows.map((row) => row.userId)
+
+  // Contas legadas ganham Membership no primeiro acesso; até lá, preservamos
+  // as notificações usando os campos antigos do perfil.
+  const legacy = await prisma.user.findMany({
+    where: {
+      id: { not: adopterId },
+      OR: [
+        { organizationName: organization },
+        { guardianProfile: { displayName: organization } },
+        { guardianProfile: { legalName: organization } },
       ],
     },
     select: { id: true },
   })
-  return rows.map((row) => row.id)
+  return legacy.map((row) => row.id)
 }
 
 type Handler<T extends DomainEventType> = (

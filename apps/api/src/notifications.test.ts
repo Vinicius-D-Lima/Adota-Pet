@@ -5,6 +5,7 @@ import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { hasTestDatabase } from '../test/database.js'
 import { resetTestDatabase } from '../test/reset.js'
+import { ensureTestOrganization } from '../test/organization.js'
 import { createApp } from './app.js'
 import { signAccessToken } from './auth.js'
 import { prisma } from './db.js'
@@ -63,10 +64,15 @@ async function makeGuardian(id: string) {
       acceptsTerms: true,
     },
   })
+  const organization = await ensureTestOrganization(ORGANIZATION, 'IN')
+  await prisma.membership.create({
+    data: { userId: id, organizationId: organization.id, role: 'ADMIN', status: 'ATIVO' },
+  })
   return auth
 }
 
 async function makePet(id: string) {
+  const organization = await ensureTestOrganization(ORGANIZATION, 'IN')
   return prisma.pet.create({
     data: {
       id,
@@ -89,8 +95,7 @@ async function makePet(id: string) {
       specialCare: false,
       vaccinated: true,
       neutered: true,
-      organization: ORGANIZATION,
-      organizationInitials: 'IN',
+      organizationId: organization.id,
       createdAt: new Date(),
       status: 'DISPONIVEL',
     },

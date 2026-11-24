@@ -17,14 +17,15 @@ import {
   organizationIdentity,
   organizationPets,
   permissionsForRole,
+  publicPet,
   requireGuardian,
   requirePermission,
-  withGallery,
   withReceivedRequest,
+  type PetWithOrganization,
 } from '../context.js'
 import { prisma } from '../db.js'
 import { APPOINTMENT_CONFIRMED, APPOINTMENT_PROPOSED, enqueueDomainEvent } from '../events.js'
-import { Prisma, type Pet } from '../generated/prisma/client.js'
+import { Prisma } from '../generated/prisma/client.js'
 import { HttpError, list, sendError } from '../http.js'
 import { applyTransition } from '../requestStatusMachine.js'
 import { deleteStorageObjectsForResource } from '../storage.js'
@@ -41,8 +42,8 @@ const ORGANIZATION_REQUEST_TRANSITIONS: Record<string, RequestStatusCode> = {
 }
 const isUniqueViolation = (error: unknown) =>
   error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
-const presentOrganizationPet = (pet: Pet) => ({
-  ...withGallery(pet),
+const presentOrganizationPet = (pet: PetWithOrganization) => ({
+  ...publicPet(pet),
   distance: null,
   distanceKm: null,
 })
@@ -78,11 +79,8 @@ organizationRouter.post('/me/organization-pets', async (req, res) => {
       { field: 'body', message: 'Envie um objeto JSON' },
     ])
 
-  const {
-    name: organization,
-    initials: organizationInitials,
-    user,
-  } = await organizationIdentity(viewer.id)
+  const { organizationId, user } = await organizationIdentity(viewer.id)
+  if (!organizationId) return sendError(res, 409, 'Crie uma organização antes de cadastrar pets')
   const baseId =
     String(body.name)
       .toLowerCase()
@@ -98,8 +96,7 @@ organizationRouter.post('/me/organization-pets', async (req, res) => {
     id,
     ageLabel: `${body.age} ${body.age === 1 ? 'ano' : 'anos'}`,
     gallery: [String(body.image)],
-    organization,
-    organizationInitials,
+    organizationId,
     lat: typeof user?.lat === 'number' ? user.lat : -23.5505,
     lng: typeof user?.lng === 'number' ? user.lng : -46.6333,
     createdAt: new Date(),
@@ -107,7 +104,10 @@ organizationRouter.post('/me/organization-pets', async (req, res) => {
   // Campos validados por ORGANIZATION_PET_FIELDS (o Prisma exige todos de uma vez).
   for (const key of ORGANIZATION_PET_FIELDS) Object.assign(data, { [key]: body[key] })
 
-  const pet = await prisma.pet.create({ data: data as Prisma.PetUncheckedCreateInput })
+  const pet = await prisma.pet.create({
+    data: data as Prisma.PetUncheckedCreateInput,
+    include: { organizationEntity: true },
+  })
   res.status(201).json(presentOrganizationPet(pet))
 })
 
@@ -115,8 +115,10 @@ organizationRouter.put('/me/organization-pets/:id', async (req, res) => {
   const viewer = await requireGuardian(req, res)
   if (!viewer) return
   const identity = await organizationIdentity(viewer.id)
+  if (!identity.organizationId) return sendError(res, 404, 'Organização não encontrada')
   const existing = await prisma.pet.findFirst({
-    where: { id: req.params.id, organization: identity.name },
+    where: { id: req.params.id, organizationId: identity.organizationId },
+    include: { organizationEntity: true },
   })
   if (!existing) return sendError(res, 404, 'Pet não encontrado entre os cadastros da instituição')
 
@@ -138,7 +140,11 @@ organizationRouter.put('/me/organization-pets/:id', async (req, res) => {
   }
   for (const key of ORGANIZATION_PET_FIELDS) Object.assign(data, { [key]: body[key] })
 
-  const updated = await prisma.pet.update({ where: { id: existing.id }, data })
+  const updated = await prisma.pet.update({
+    where: { id: existing.id },
+    data,
+    include: { organizationEntity: true },
+  })
   res.json(presentOrganizationPet(updated))
 })
 
@@ -146,8 +152,9 @@ organizationRouter.delete('/me/organization-pets/:id', async (req, res) => {
   const viewer = await requireGuardian(req, res)
   if (!viewer) return
   const identity = await organizationIdentity(viewer.id)
+  if (!identity.organizationId) return sendError(res, 404, 'Organização não encontrada')
   const existing = await prisma.pet.findFirst({
-    where: { id: req.params.id, organization: identity.name },
+    where: { id: req.params.id, organizationId: identity.organizationId },
   })
   if (!existing) return sendError(res, 404, 'Pet não encontrado entre os cadastros da instituição')
 
@@ -172,7 +179,11 @@ organizationRouter.get('/me/permissions', async (req, res) => {
     role,
     canApprove: role === 'ADMIN',
     permissions: permissionsForRole(role),
-    organization: { id: viewer.id, name: identity.name, initials: identity.initials },
+    organization: {
+      id: identity.organizationId ?? viewer.id,
+      name: identity.name,
+      initials: identity.initials,
+    },
   })
 })
 
@@ -346,15 +357,8 @@ organizationRouter.post(
                   throw new HttpError(409, 'Este pet não está mais disponível para adoção')
                 }
 
-                const organization = await tx.organization.findUnique({
-                  where: { name: pet.organization },
-                  select: { id: true },
-                })
-                if (!organization) {
-                  throw new HttpError(409, 'A organização do pet ainda não foi cadastrada')
-                }
                 const membership = await tx.membership.findFirst({
-                  where: { userId: viewer.id, organizationId: organization.id, status: 'ATIVO' },
+                  where: { userId: viewer.id, organizationId: pet.organizationId, status: 'ATIVO' },
                 })
                 if (!membership) {
                   throw new HttpError(403, 'Você não é membro ativo desta organização')
@@ -368,7 +372,7 @@ organizationRouter.post(
                     requestId: request.id,
                     petId: request.petId,
                     adopterId: request.userId,
-                    organizationId: organization.id,
+                    organizationId: pet.organizationId,
                   },
                 })
                 await tx.pet.update({

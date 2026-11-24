@@ -83,14 +83,15 @@ async function main() {
     prisma.checkIn.deleteMany(),
     prisma.followUpPlan.deleteMany(),
     prisma.adoption.deleteMany(),
-    prisma.membership.deleteMany(),
-    prisma.organization.deleteMany(),
+    prisma.invitation.deleteMany(),
     prisma.notificationPreference.deleteMany(),
     prisma.notification.deleteMany(),
     prisma.chatMessage.deleteMany(),
     prisma.adoptionRequest.deleteMany(),
     prisma.favorite.deleteMany(),
     prisma.pet.deleteMany(),
+    prisma.membership.deleteMany(),
+    prisma.organization.deleteMany(),
     prisma.adopterProfile.deleteMany(),
     prisma.guardianProfile.deleteMany(),
     prisma.user.deleteMany(),
@@ -123,21 +124,19 @@ async function main() {
     },
   })
 
-  await prisma.pet.createMany({
-    data: seed.pets.map((pet) => ({
-      ...pet,
-      gallery: (pet.gallery as string[] | undefined) ?? [],
-      lat: (pet.lat as number | null) ?? null,
-      lng: (pet.lng as number | null) ?? null,
-      createdAt: new Date(pet.createdAt as string),
-    })),
-  })
-
   const organizations = new Map<string, string>()
   for (const pet of seed.pets) {
     const name = String(pet.organization ?? '').trim()
     if (!name || organizations.has(name)) continue
     organizations.set(name, String(pet.organizationInitials ?? '').trim())
+  }
+  for (const [name, initials] of [
+    ['Instituto Patinhas', 'IP'],
+    ['Lar Animal', 'LA'],
+    ['Gatinhos da Vila', 'GV'],
+    ['Amigos de Quatro Patas', 'AQ'],
+  ] as const) {
+    if (!organizations.has(name)) organizations.set(name, initials)
   }
   await prisma.organization.createMany({
     data: [...organizations].map(([name, initials]) => ({
@@ -145,6 +144,34 @@ async function main() {
       initials: initials || name.slice(0, 2).toUpperCase(),
     })),
     skipDuplicates: true,
+  })
+  const persistedOrganizations = await prisma.organization.findMany({
+    select: { id: true, name: true },
+  })
+  const organizationIds = new Map(
+    persistedOrganizations.map((organization) => [organization.name, organization.id]),
+  )
+
+  await prisma.pet.createMany({
+    data: seed.pets.map((pet) => {
+      const {
+        organization: organizationName,
+        organizationInitials: _organizationInitials,
+        ...fields
+      } = pet
+      const organizationId = organizationIds.get(String(organizationName ?? '').trim())
+      if (!organizationId) {
+        throw new Error(`Organização não encontrada para o pet ${pet.id}`)
+      }
+      return {
+        ...fields,
+        organizationId,
+        gallery: (pet.gallery as string[] | undefined) ?? [],
+        lat: (pet.lat as number | null) ?? null,
+        lng: (pet.lng as number | null) ?? null,
+        createdAt: new Date(pet.createdAt as string),
+      }
+    }),
   })
 
   const { userId: adopterUserId, ...adopterFields } = seed.profile
@@ -213,9 +240,7 @@ async function main() {
     const pet = await prisma.pet.findUniqueOrThrow({
       where: { id: adoptionRequest.petId },
     })
-    const organization = await prisma.organization.findUnique({
-      where: { name: pet.organization },
-    })
+    const organization = await prisma.organization.findUnique({ where: { id: pet.organizationId } })
     if (!organization) {
       throw new Error(`Organização não encontrada para o pet ${pet.id}`)
     }

@@ -3,6 +3,7 @@ import request from 'supertest'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { hasTestDatabase } from '../test/database.js'
 import { resetTestDatabase } from '../test/reset.js'
+import { ensureTestOrganization } from '../test/organization.js'
 import { createApp } from './app.js'
 import { signAccessToken } from './auth.js'
 import { loadConfig } from './config.js'
@@ -212,6 +213,7 @@ databaseSuite('integração com o banco de teste na nuvem (#47)', () => {
   })
 
   it('[INF-12] teste de integração de exemplo com banco de teste', async () => {
+    const organization = await ensureTestOrganization('Instituição de teste', 'IT')
     await prisma.pet.create({
       data: {
         id: 'inf-12-pet',
@@ -234,8 +236,7 @@ databaseSuite('integração com o banco de teste na nuvem (#47)', () => {
         specialCare: false,
         vaccinated: true,
         neutered: true,
-        organization: 'Instituição de teste',
-        organizationInitials: 'IT',
+        organizationId: organization.id,
         createdAt: new Date(),
       },
     })

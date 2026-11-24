@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { completeFollowUpPlanIfReviewed, generateFollowUpDueDates } from './adoptions.js'
 import { hasTestDatabase } from '../test/database.js'
 import { resetTestDatabase } from '../test/reset.js'
+import { ensureTestOrganization } from '../test/organization.js'
 import { createApp } from './app.js'
 import { signAccessToken } from './auth.js'
 import { prisma } from './db.js'
@@ -79,6 +80,7 @@ async function addMembership(
 }
 
 async function makePet(id: string, organization: string, status = 'DISPONIVEL') {
+  const organizationRow = await ensureTestOrganization(organization)
   return prisma.pet.create({
     data: {
       id,
@@ -101,8 +103,7 @@ async function makePet(id: string, organization: string, status = 'DISPONIVEL') 
       specialCare: false,
       vaccinated: true,
       neutered: true,
-      organization,
-      organizationInitials: organization.slice(0, 2).toUpperCase(),
+      organizationId: organizationRow.id,
       createdAt: new Date(),
       status,
     },

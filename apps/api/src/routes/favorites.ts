@@ -7,7 +7,8 @@ import {
 } from '@adotapet/shared'
 import { currentUser, presentPet, referenceUser } from '../context.js'
 import { prisma } from '../db.js'
-import type { Pet, User } from '../generated/prisma/client.js'
+import type { User } from '../generated/prisma/client.js'
+import type { PetWithOrganization } from '../context.js'
 import { list, sendError } from '../http.js'
 import { validate } from '../validate.js'
 
@@ -18,8 +19,9 @@ export const favoritesRouter = Router()
  * `status` é obrigatório e normalizado para que pets adotados/arquivados
  * continuem na lista com sinalização explícita.
  */
-function presentFavoritePet(pet: Pet, refUser: User | null): FavoritePetSummary {
-  const { distanceKm, distance } = presentPet(pet, refUser)
+function presentFavoritePet(pet: PetWithOrganization, refUser: User | null): FavoritePetSummary {
+  const presented = presentPet(pet, refUser)
+  const { distanceKm, distance } = presented
   const status: FavoritePetSummary['status'] =
     pet.status === 'ADOTADO' || pet.status === 'ARQUIVADO' ? pet.status : 'DISPONIVEL'
 
@@ -38,7 +40,7 @@ function presentFavoritePet(pet: Pet, refUser: User | null): FavoritePetSummary 
     traits: pet.traits,
     vaccinated: pet.vaccinated,
     neutered: pet.neutered,
-    organization: pet.organization,
+    organization: presented.organization,
     status,
     distanceKm,
     distance,
@@ -69,7 +71,7 @@ favoritesRouter.get(
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
-        include: { pet: true },
+        include: { pet: { include: { organizationEntity: true } } },
       }),
       prisma.favorite.count({ where }),
     ])
