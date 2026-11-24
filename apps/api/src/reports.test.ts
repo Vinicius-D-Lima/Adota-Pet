@@ -2,6 +2,7 @@ import type { Express } from 'express'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { hasTestDatabase } from '../test/database.js'
+import { ensureTestOrganization } from '../test/organization.js'
 import { resetTestDatabase } from '../test/reset.js'
 import { startTestStorage, type TestStorage } from '../test/storage-server.js'
 import { createApp } from './app.js'
@@ -54,6 +55,7 @@ async function makeOrganization(id: string) {
 }
 
 async function makePet(id: string) {
+  const organization = await ensureTestOrganization('Instituição Patinhas', 'IP')
   return prisma.pet.create({
     data: {
       id,
@@ -76,8 +78,7 @@ async function makePet(id: string) {
       specialCare: false,
       vaccinated: true,
       neutered: true,
-      organization: 'Instituição Patinhas',
-      organizationInitials: 'IP',
+      organizationId: organization.id,
       createdAt: new Date(),
     },
   })
