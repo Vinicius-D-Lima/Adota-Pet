@@ -338,19 +338,14 @@ const isPrivatePath = (path: string) =>
     path.startsWith('/api/me/') ||
     path.startsWith('/api/requests/') ||
     path.startsWith('/api/adoptions/') ||
+    path === '/api/organizations' ||
     path.startsWith('/api/organizations/') ||
     path.startsWith('/api/reviews/') ||
+    path.startsWith('/api/invitations/') ||
+    path.startsWith('/api/reports/') ||
+    path.startsWith('/api/moderation/') ||
+    path.startsWith('/api/check-ins/') ||
     path.endsWith('/auth/me'))
-  path === '/me' ||
-  path.startsWith('/me/') ||
-  path.startsWith('/api/me/') ||
-  path.startsWith('/api/requests/') ||
-  path.startsWith('/api/adoptions/') ||
-  path === '/api/organizations' ||
-  path.startsWith('/api/check-ins/') ||
-  path.startsWith('/api/organizations/') ||
-  path.startsWith('/api/invitations/') ||
-  path.endsWith('/auth/me')
 
 const errorResponse = {
   description: 'Erro no formato padrão da API',

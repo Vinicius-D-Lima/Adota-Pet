@@ -65,8 +65,7 @@ async function makeAdoption(
       specialCare: false,
       vaccinated: true,
       neutered: true,
-      organization: 'Organização de teste',
-      organizationInitials: 'OT',
+      organizationId,
       createdAt: new Date(),
     },
   })

@@ -1,5 +1,4 @@
 import type { Express } from 'express'
-import { TestClock } from 'pg-boss'
 import request from 'supertest'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { hasTestDatabase } from '../test/database.js'
@@ -137,7 +136,7 @@ databaseSuite('check-ins pós-adoção (#24)', () => {
     const { adopter, checkIn } = await makeCheckIn('chk-01')
     const response = await submit(app, checkIn.id, adopter.headers, [[GIF, 'foto.gif']])
     expect(response.status).toBe(400)
-    expect(response.body.error).toBe('Upload inválido')
+    expect(response.body.message).toBe('Upload inválido')
   })
 
   it('[CHK-02] valida o tipo real do arquivo, não sua extensão', async () => {
@@ -229,36 +228,28 @@ databaseSuite('check-ins pós-adoção (#24)', () => {
   })
 
   it('[CHK-07] o job pg-boss marca check-ins vencidos como ATRASADO', async () => {
-    const base = new Date(Date.now() + 86_400_000)
-    base.setUTCHours(7, 59, 50, 0)
-    const dueDate = new Date(
-      Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate()) - 86_400_000,
-    )
-    const { checkIn } = await makeCheckIn('chk-07', dueDate)
+    const yesterday = new Date(Date.now() - 86_400_000)
+    const { checkIn } = await makeCheckIn('chk-07', yesterday)
     await prisma.$executeRawUnsafe('DROP SCHEMA IF EXISTS "pgboss_checkin_test" CASCADE')
-    const clock = new TestClock(base)
     const runner = createJobRunner({
       connectionString,
       schema: 'pgboss_checkin_test',
-      clock,
-      spies: true,
       pollingIntervalSeconds: 0.5,
       shutdownTimeoutMs: 5_000,
     })
-    registerJobHandler(QUEUES.checkInOverdue, () =>
-      processCheckInDeadlines(new Date(base.getTime() + 15_000)),
-    )
+    registerJobHandler(QUEUES.checkInOverdue, () => processCheckInDeadlines())
 
     await runner.start()
     try {
-      await clock.setTime(base.getTime() + 15_000)
-      await clock.tick(31_000)
-      await runner.boss.getSpy(QUEUES.checkInOverdue).waitForJob(() => true, 'completed')
-      await vi.waitFor(async () => {
-        expect((await prisma.checkIn.findUniqueOrThrow({ where: { id: checkIn.id } })).status).toBe(
-          'ATRASADO',
-        )
-      })
+      await runner.boss.send(QUEUES.checkInOverdue)
+      await vi.waitFor(
+        async () => {
+          expect(
+            (await prisma.checkIn.findUniqueOrThrow({ where: { id: checkIn.id } })).status,
+          ).toBe('ATRASADO')
+        },
+        { timeout: 15_000 },
+      )
     } finally {
       await runner.stop()
       await prisma.$executeRawUnsafe('DROP SCHEMA IF EXISTS "pgboss_checkin_test" CASCADE')
