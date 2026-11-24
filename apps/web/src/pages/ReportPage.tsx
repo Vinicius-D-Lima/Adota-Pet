@@ -10,6 +10,7 @@ import {
   Input,
   PageSurface,
   Select,
+  TextLink,
   Textarea,
 } from '../components/ui'
 import { useCreateReport } from '../hooks/useReports'
@@ -241,9 +242,12 @@ export function ReportPage() {
             )}
 
             {validationMessage && (
-              <Alert role="status" aria-live="polite">
-                {validationMessage}
-              </Alert>
+              <div className="grid gap-2">
+                <Alert role="status" aria-live="polite">
+                  {validationMessage}
+                </Alert>
+                <TextLink to="/minhas-denuncias">Acompanhar minhas denúncias →</TextLink>
+              </div>
             )}
             {submissionError && <Alert role="alert">{submissionError}</Alert>}
             <div>

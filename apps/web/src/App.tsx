@@ -29,6 +29,7 @@ const NotificationPreferencesPage = named(
   'NotificationPreferencesPage',
 )
 const ReportPage = named(() => import('./pages/ReportPage'), 'ReportPage')
+const MyReportsPage = named(() => import('./pages/MyReportsPage'), 'MyReportsPage')
 const OrganizationDashboardPage = named(
   () => import('./pages/OrganizationDashboardPage'),
   'OrganizationDashboardPage',
@@ -235,6 +236,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <ReportPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/minhas-denuncias"
+              element={
+                <ProtectedRoute>
+                  <MyReportsPage />
                 </ProtectedRoute>
               }
             />

@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { reportResponseSchema, reportsResponseSchema, type ReportFormData } from '@adotapet/shared'
 import { api } from '../lib/api'
 
@@ -12,6 +12,7 @@ export const reportKeys = {
 }
 
 export function useCreateReport() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ report, files }: CreateReportInput) => {
       const form = new FormData()
@@ -22,6 +23,7 @@ export function useCreateReport() {
       for (const file of files) form.append('files', file)
       return reportResponseSchema.parse(await api.post<unknown>('/reports', form))
     },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: reportKeys.mine }),
   })
 }
 
