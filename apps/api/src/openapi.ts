@@ -40,6 +40,7 @@ import {
   requestTransitionSchema,
 } from '@adotapet/shared'
 import { z, type ZodType } from 'zod'
+import { checkInReviewBodySchema, checkInSubmitBodySchema } from './routes/checkIns.js'
 
 /** Documentação viva (#47 / INF-10): gerada a partir dos schemas Zod compartilhados. */
 const healthResponseSchema = z.object({
@@ -96,6 +97,7 @@ interface RouteSchemas {
   query?: ZodType
   params?: ZodType
   body?: ZodType
+  bodyContentType?: string
   response?: ZodType
 }
 
@@ -158,6 +160,22 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'PUT /api/adoptions/{id}/follow-up-plan': {
     params: idParamsSchema,
     body: followUpPlanSchema,
+  },
+  'POST /api/check-ins/{id}/submit': {
+    params: idParamsSchema,
+    body: checkInSubmitBodySchema,
+    bodyContentType: 'multipart/form-data',
+  },
+  'POST /api/check-ins/{id}/review': {
+    params: idParamsSchema,
+    body: checkInReviewBodySchema,
+  },
+  'POST /api/check-ins/{id}/request-more': {
+    params: idParamsSchema,
+    body: checkInReviewBodySchema,
+  },
+  'POST /api/check-ins/{id}/photos/{photoId}/url': {
+    params: z.strictObject({ id: z.string().min(1), photoId: z.string().min(1) }),
   },
   // Notificações (#30): contrato idêntico ao consumido pelo frontend.
   'GET /api/me/notifications': {
@@ -278,6 +296,7 @@ const isPrivatePath = (path: string) =>
   path.startsWith('/api/requests/') ||
   path.startsWith('/api/adoptions/') ||
   path === '/api/organizations' ||
+  path.startsWith('/api/check-ins/') ||
   path.startsWith('/api/organizations/') ||
   path.startsWith('/api/invitations/') ||
   path.endsWith('/auth/me')
@@ -334,9 +353,23 @@ export function buildOpenApiDocument(app: Express) {
     ]
     if (parameters.length) operation.parameters = parameters
     if (schemas.body) {
+      const bodySchema = toOpenApiSchema(schemas.body)
+      if (schemas.bodyContentType === 'multipart/form-data') {
+        const properties = bodySchema.properties as Record<string, unknown>
+        properties.files = {
+          type: 'array',
+          minItems: 1,
+          maxItems: 5,
+          items: { type: 'string', format: 'binary' },
+        }
+        const required = Array.isArray(bodySchema.required) ? bodySchema.required : []
+        bodySchema.required = [...required, 'files']
+      }
       operation.requestBody = {
         required: true,
-        content: { 'application/json': { schema: toOpenApiSchema(schemas.body) } },
+        content: {
+          [schemas.bodyContentType ?? 'application/json']: { schema: bodySchema },
+        },
       }
     }
     if (schemas.response) delete operation.summary

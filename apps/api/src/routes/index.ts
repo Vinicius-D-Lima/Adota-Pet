@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requireAuth } from '../auth.js'
 import { sendError } from '../http.js'
 import { adoptionsRouter } from './adoptions.js'
+import { checkInsRouter } from './checkIns.js'
 import { favoritesRouter } from './favorites.js'
 import { notificationsRouter } from './notifications.js'
 import { organizationRouter } from './organization.js'
@@ -9,6 +10,7 @@ import { organizationsRouter } from './organizations.js'
 import { petsRouter } from './pets.js'
 import { profileRouter } from './profile.js'
 import { requestsRouter } from './requests.js'
+import { reportsRouter } from './reports.js'
 import { savedFiltersRouter } from './savedFilters.js'
 import { storageRouter } from './storage.js'
 
@@ -25,6 +27,9 @@ const PRIVATE_PREFIXES = [
   '/adoptions',
   '/organizations',
   '/invitations',
+  '/reports',
+  '/moderation',
+  '/check-ins',
 ] as const
 apiRouter.use((req, res, next) => {
   const isPrivate = PRIVATE_PREFIXES.some(
@@ -33,13 +38,15 @@ apiRouter.use((req, res, next) => {
   if (isPrivate) return requireAuth(req, res, next)
   return next()
 })
-
+apiRouter.use(checkInsRouter)
+apiRouter.use(organizationsRouter)
 apiRouter.use(profileRouter)
 apiRouter.use(adoptionsRouter)
 apiRouter.use(organizationsRouter)
 apiRouter.use(organizationRouter)
 apiRouter.use(petsRouter)
 apiRouter.use(requestsRouter)
+apiRouter.use(reportsRouter)
 apiRouter.use(favoritesRouter)
 apiRouter.use(savedFiltersRouter)
 apiRouter.use(notificationsRouter)

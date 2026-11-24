@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Heart, LogOut, Menu, PawPrint, UserRound, X } from 'lucide-react'
+import { ChevronDown, Heart, LogOut, Menu, PawPrint, ShieldAlert, UserRound, X } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAdoptionRequests } from '../hooks/useAdoptionRequests'
@@ -166,13 +166,22 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
               </div>
             )}
             {account.isAuthenticated && (
-              <button
-                className="flex border-0 bg-transparent px-3 py-[15px] text-left text-sm font-semibold text-[#52625a] md:hidden"
-                type="button"
-                onClick={logout}
-              >
-                Sair
-              </button>
+              <div className="grid border-t border-line pt-2 md:hidden">
+                <Link
+                  className="flex items-center gap-2 rounded-[9px] px-3 py-[15px] text-sm font-semibold text-[#52625a] hover:bg-forest-50 hover:text-forest-800"
+                  to="/minhas-denuncias"
+                  onClick={() => setOpen(false)}
+                >
+                  <ShieldAlert size={17} /> Minhas denúncias
+                </Link>
+                <button
+                  className="flex border-0 bg-transparent px-3 py-[15px] text-left text-sm font-semibold text-[#52625a]"
+                  type="button"
+                  onClick={logout}
+                >
+                  Sair
+                </button>
+              </div>
             )}
           </nav>
 
@@ -216,6 +225,14 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
                   >
                     <UserRound size={17} />{' '}
                     {isGuardian ? 'Perfil da instituição' : 'Visualizar meu perfil'}
+                  </Link>
+                  <Link
+                    className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-semibold text-forest-800 hover:bg-forest-50"
+                    to="/minhas-denuncias"
+                    role="menuitem"
+                    onClick={() => setAccountMenuOpen(false)}
+                  >
+                    <ShieldAlert size={17} /> Minhas denúncias
                   </Link>
                   <button
                     className="flex items-center gap-2 rounded-lg border-0 bg-transparent px-3 py-2.5 text-left text-sm font-semibold text-[#a33f2d] hover:bg-coral-pale"
