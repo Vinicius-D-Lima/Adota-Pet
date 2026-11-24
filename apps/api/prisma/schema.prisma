@@ -22,6 +22,30 @@ enum OrganizationRole {
   VOLUNTEER
 }
 
+enum ReportTargetType {
+  USUARIO
+  ORGANIZACAO
+  ADOCAO
+  PET
+  AVALIACAO
+}
+
+enum ReportCategory {
+  MAUS_TRATOS
+  ABANDONO
+  FRAUDE
+  CONTEUDO_IMPROPRIO
+  OUTRO
+}
+
+enum ReportStatus {
+  ABERTA
+  EM_ANALISE
+  PROCEDENTE
+  IMPROCEDENTE
+  ARQUIVADA
+}
+
 enum MembershipStatus {
   ATIVO
   REMOVIDO
@@ -59,14 +83,18 @@ model User {
   lat              Float?
   lng              Float?
 
-  adopterProfile       AdopterProfile?
-  guardianProfile      GuardianProfile?
-  favorites            Favorite[]
-  requests             AdoptionRequest[]
-  notifications        Notification[]
-  savedFilters         SavedFilter[]
-  preferences          NotificationPreference[]
-  refreshTokens        RefreshToken[]
+  adopterProfile   AdopterProfile?
+  guardianProfile  GuardianProfile?
+  favorites        Favorite[]
+  requests         AdoptionRequest[]
+  notifications    Notification[]
+  savedFilters     SavedFilter[]
+  preferences      NotificationPreference[]
+  refreshTokens    RefreshToken[]
+  reportsCreated   Report[]                 @relation("ReportReporter")
+  reportsModerated Report[]                 @relation("ReportModerator")
+  reviewsWritten   Review[]                 @relation("ReviewAuthor")
+  reviewsReceived  Review[]                 @relation("ReviewOrganization")
   memberships          Membership[]
   adoptionsAsAdopter   Adoption[]               @relation("Adopter")
   createdFollowUpPlans FollowUpPlan[]           @relation("FollowUpPlanCreator")
@@ -124,6 +152,8 @@ model GuardianProfile {
   city         String?
   description  String?
   acceptsTerms Boolean @default(false)
+  reputation   Float?
+  reviewCount  Int     @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -156,6 +186,48 @@ model Membership {
 
   @@unique([userId, organizationId])
   @@index([organizationId, status, role])
+}
+
+/// Base mínima da issue #25, necessária para a moderação ocultar uma avaliação
+/// procedente e recalcular a reputação sem apagar o histórico original.
+model Review {
+  id             String    @id @default(cuid())
+  adoptionId     String
+  reviewerId     String
+  organizationId String
+  rating         Int
+  comment        String    @default("")
+  hiddenAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  reviewer     User @relation("ReviewAuthor", fields: [reviewerId], references: [id], onDelete: Restrict)
+  organization User @relation("ReviewOrganization", fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([adoptionId, reviewerId])
+  @@index([organizationId, hiddenAt])
+}
+
+model Report {
+  id          String           @id @default(cuid())
+  reporterId  String
+  targetType  ReportTargetType
+  targetId    String
+  category    ReportCategory
+  description String
+  status      ReportStatus     @default(ABERTA)
+  resolution  String?
+  moderatorId String?
+  resolvedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  reporter  User  @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  moderator User? @relation("ReportModerator", fields: [moderatorId], references: [id], onDelete: SetNull)
+
+  @@index([reporterId, createdAt])
+  @@index([status, category, createdAt])
+  @@index([targetType, targetId])
 }
 
 model Pet {
