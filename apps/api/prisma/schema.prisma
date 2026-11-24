@@ -51,6 +51,13 @@ enum MembershipStatus {
   REMOVIDO
 }
 
+enum InvitationStatus {
+  PENDENTE
+  ACEITO
+  EXPIRADO
+  REVOGADO
+}
+
 enum CheckInStatus {
   PENDENTE
   ENVIADO
@@ -167,10 +174,31 @@ model Organization {
   contactEmail String  @default("")
   phone        String  @default("")
   logoUrl      String?
-  cnpj         String?
+  cnpj         String? @unique
 
   memberships Membership[]
+  invitations Invitation[]
+  pets        Pet[]
   adoptions   Adoption[]
+}
+
+/// Convite de acesso à organização. O token original nunca é persistido:
+/// somente seu SHA-256 fica em `tokenHash` (#27/ORG-05).
+model Invitation {
+  id             String           @id @default(cuid())
+  organizationId String
+  email          String
+  role           OrganizationRole
+  tokenHash      String           @unique
+  expiresAt      DateTime
+  status         InvitationStatus @default(PENDENTE)
+  createdAt      DateTime         @default(now())
+  acceptedAt     DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([email, status])
 }
 
 model Membership {
@@ -231,38 +259,40 @@ model Report {
 }
 
 model Pet {
-  id                   String   @id
-  name                 String
-  species              String
-  breed                String
-  age                  Int
-  ageLabel             String
-  size                 String
-  sex                  String
-  city                 String
-  image                String
-  gallery              String[] @default([])
-  summary              String
-  description          String
-  traits               String[]
-  energy               String
-  space                String
-  children             Boolean
-  otherPets            Boolean
-  specialCare          Boolean
-  vaccinated           Boolean
-  neutered             Boolean
-  organization         String
-  organizationInitials String
-  lat                  Float?
-  lng                  Float?
-  createdAt            DateTime
+  id             String   @id
+  name           String
+  species        String
+  breed          String
+  age            Int
+  ageLabel       String
+  size           String
+  sex            String
+  city           String
+  image          String
+  gallery        String[] @default([])
+  summary        String
+  description    String
+  traits         String[]
+  energy         String
+  space          String
+  children       Boolean
+  otherPets      Boolean
+  specialCare    Boolean
+  vaccinated     Boolean
+  neutered       Boolean
+  organizationId String
+  lat            Float?
+  lng            Float?
+  createdAt      DateTime
   /// #49/#50: só DISPONIVEL aceita solicitação; ADOTADO e ARQUIVADO não.
-  status               String   @default("DISPONIVEL")
+  status         String   @default("DISPONIVEL")
 
-  favorites Favorite[]
-  requests  AdoptionRequest[]
-  adoption  Adoption?
+  favorites          Favorite[]
+  requests           AdoptionRequest[]
+  adoption           Adoption?
+  organizationEntity Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
 }
 
 model Favorite {

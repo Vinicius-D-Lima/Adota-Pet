@@ -4,6 +4,7 @@ import request from 'supertest'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { hasTestDatabase } from '../test/database.js'
 import { resetTestDatabase } from '../test/reset.js'
+import { ensureTestOrganization } from '../test/organization.js'
 import { createApp } from './app.js'
 import { signAccessToken } from './auth.js'
 import { prisma } from './db.js'
@@ -85,6 +86,15 @@ async function makeGuardian(id: string, organizationRole: OrganizationRole = 'AD
       acceptsTerms: true,
     },
   })
+  const organization = await ensureTestOrganization(ORGANIZATION, 'IP')
+  await prisma.membership.create({
+    data: {
+      userId: id,
+      organizationId: organization.id,
+      role: organizationRole,
+      status: 'ATIVO',
+    },
+  })
   const { token } = await signAccessToken(user)
   return { headers: bearer(token) }
 }
@@ -93,6 +103,7 @@ async function makePet(
   id: string,
   overrides: Partial<{ organization: string; energy: string; space: string }> = {},
 ) {
+  const organization = await ensureTestOrganization(overrides.organization ?? ORGANIZATION, 'IP')
   return prisma.pet.create({
     data: {
       id,
@@ -115,8 +126,7 @@ async function makePet(
       specialCare: false,
       vaccinated: true,
       neutered: true,
-      organization: overrides.organization ?? ORGANIZATION,
-      organizationInitials: 'IP',
+      organizationId: organization.id,
       createdAt: new Date(),
       status: 'DISPONIVEL',
     },
@@ -191,17 +201,6 @@ databaseSuite('área da instituição: RBAC, fila e compatibilidade (#26/#28)', 
 
   it('[RBAC-02] administrador aprova após entrevista realizada', async () => {
     const { headers } = await makeGuardian('org-rbac-02')
-    const organization = await prisma.organization.create({
-      data: { name: ORGANIZATION, initials: 'IP' },
-    })
-    await prisma.membership.create({
-      data: {
-        userId: 'org-rbac-02',
-        organizationId: organization.id,
-        role: 'ADMIN',
-        status: 'ATIVO',
-      },
-    })
     await makeAdopter('adopter-rbac-02')
     await makePet('pet-rbac-02')
     await makeRequest(
@@ -258,7 +257,7 @@ databaseSuite('área da instituição: RBAC, fila e compatibilidade (#26/#28)', 
     expect(reject.body).toMatchObject({ status: 'Recusada' })
   })
 
-  it('[ORG-01] filtra por etapa e pet no servidor e devolve contadores da fila filtrada', async () => {
+  it('[ORGQ-01] filtra por etapa e pet no servidor e devolve contadores da fila filtrada', async () => {
     const { headers } = await makeGuardian('org-org-01')
     await makeAdopter('adopter-org-a1')
     await makeAdopter('adopter-org-a2')
@@ -291,7 +290,7 @@ databaseSuite('área da instituição: RBAC, fila e compatibilidade (#26/#28)', 
     expect(byPetAndStage.body.data.map((item: { id: string }) => item.id)).toEqual(['SOL-ORG-A2'])
   })
 
-  it('[ORG-02] petId de outra instituição não revela solicitações', async () => {
+  it('[ORGQ-02] petId de outra instituição não revela solicitações', async () => {
     const { headers } = await makeGuardian('org-org-02')
     await makeAdopter('adopter-org-02')
     await makePet('pet-org-02-other', { organization: 'Outra Instituição' })

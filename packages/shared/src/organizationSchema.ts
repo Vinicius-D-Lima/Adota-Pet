@@ -90,6 +90,76 @@ export const organizationRoles = ['ADMIN', 'VOLUNTEER'] as const
 export const organizationRoleSchema = z.enum(organizationRoles)
 export type OrganizationRole = z.infer<typeof organizationRoleSchema>
 
+export const organizationCreateSchema = z
+  .object({
+    name: z.string().trim().min(2).max(160),
+    initials: z.string().trim().min(1).max(10),
+    description: z.string().trim().min(1).max(2_000),
+    city: z.string().trim().min(2).max(160),
+    contactEmail: z.email().trim().toLowerCase(),
+    phone: z.string().trim().min(8).max(30),
+    logoUrl: z.url().optional(),
+    cnpj: z.string().trim().min(14).max(18).optional(),
+  })
+  .strict()
+
+export const organizationIdParamsSchema = z.object({ organizationId: z.string().min(1) }).strict()
+export const organizationMemberParamsSchema = organizationIdParamsSchema.extend({
+  userId: z.string().min(1),
+})
+export const organizationInvitationParamsSchema = organizationIdParamsSchema.extend({
+  invitationId: z.string().min(1),
+})
+export const invitationTokenParamsSchema = z.object({ token: z.string().min(20) }).strict()
+
+export const organizationInvitationCreateSchema = z
+  .object({
+    email: z.email().trim().toLowerCase(),
+    role: organizationRoleSchema,
+  })
+  .strict()
+
+export const organizationMemberRoleSchema = z.object({ role: organizationRoleSchema }).strict()
+
+export const organizationSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  initials: z.string(),
+  description: z.string(),
+  city: z.string(),
+  contactEmail: z.string(),
+  phone: z.string(),
+  logoUrl: z.string().nullable(),
+  cnpj: z.string().nullable(),
+})
+
+export const organizationMembershipSchema = z.object({
+  userId: z.string(),
+  organizationId: z.string(),
+  role: organizationRoleSchema,
+  status: z.enum(['ATIVO', 'REMOVIDO']),
+  joinedAt: z.string(),
+  user: z.object({ id: z.string(), name: z.string(), email: z.string() }).optional(),
+})
+
+export const organizationInvitationResponseSchema = z.object({
+  id: z.string(),
+  organizationId: z.string(),
+  email: z.string(),
+  role: organizationRoleSchema,
+  expiresAt: z.string(),
+  status: z.enum(['PENDENTE', 'ACEITO', 'EXPIRADO', 'REVOGADO']),
+  acceptUrl: z.string(),
+})
+
+export const organizationCreateResponseSchema = organizationSchema.extend({
+  membership: organizationMembershipSchema,
+})
+
+export type OrganizationCreatePayload = z.infer<typeof organizationCreateSchema>
+export type OrganizationInvitationCreatePayload = z.infer<typeof organizationInvitationCreateSchema>
+export type OrganizationMemberRolePayload = z.infer<typeof organizationMemberRoleSchema>
+
 export const organizationPermissions = [
   'requests:view',
   'requests:review',

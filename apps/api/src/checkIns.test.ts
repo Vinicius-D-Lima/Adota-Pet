@@ -65,8 +65,7 @@ async function makeCheckIn(id: string, dueDate = new Date(Date.now() + 86_400_00
       specialCare: false,
       vaccinated: true,
       neutered: true,
-      organization: organization.name,
-      organizationInitials: organization.initials,
+      organizationId: organization.id,
       createdAt: new Date(),
     },
   })

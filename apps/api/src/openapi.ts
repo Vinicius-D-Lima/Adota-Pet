@@ -14,6 +14,14 @@ import {
   notificationPreferencesUpdateSchema,
   notificationsQuerySchema,
   organizationPermissionsResponseSchema,
+  organizationCreateResponseSchema,
+  organizationCreateSchema,
+  organizationIdParamsSchema,
+  organizationInvitationCreateSchema,
+  organizationInvitationParamsSchema,
+  organizationInvitationResponseSchema,
+  organizationMemberParamsSchema,
+  organizationMemberRoleSchema,
   organizationTransitionSchema,
   petIdParamsSchema,
   petsQuerySchema,
@@ -102,6 +110,28 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'PUT /api/me/account': { body: createAccountSchema, response: profileSchema },
   'GET /api/me/matches': {},
   'GET /api/me/permissions': { response: organizationPermissionsResponseSchema },
+  'POST /api/organizations': {
+    body: organizationCreateSchema,
+    response: organizationCreateResponseSchema,
+  },
+  'GET /api/organizations/{organizationId}': { params: organizationIdParamsSchema },
+  'GET /api/organizations/{organizationId}/members': { params: organizationIdParamsSchema },
+  'POST /api/organizations/{organizationId}/invitations': {
+    params: organizationIdParamsSchema,
+    body: organizationInvitationCreateSchema,
+    response: organizationInvitationResponseSchema,
+  },
+  'DELETE /api/organizations/{organizationId}/invitations/{invitationId}': {
+    params: organizationInvitationParamsSchema,
+  },
+  'PATCH /api/organizations/{organizationId}/members/{userId}': {
+    params: organizationMemberParamsSchema,
+    body: organizationMemberRoleSchema,
+  },
+  'DELETE /api/organizations/{organizationId}/members/{userId}': {
+    params: organizationMemberParamsSchema,
+  },
+  'POST /api/invitations/{token}/accept': {},
   'GET /api/me/received-requests': {
     query: receivedRequestsQuerySchema,
     response: receivedRequestsResponseSchema,
@@ -265,8 +295,10 @@ const isPrivatePath = (path: string) =>
   path.startsWith('/api/me/') ||
   path.startsWith('/api/requests/') ||
   path.startsWith('/api/adoptions/') ||
+  path === '/api/organizations' ||
   path.startsWith('/api/check-ins/') ||
   path.startsWith('/api/organizations/') ||
+  path.startsWith('/api/invitations/') ||
   path.endsWith('/auth/me')
 
 const errorResponse = {

@@ -6,6 +6,7 @@ import { checkInsRouter } from './checkIns.js'
 import { favoritesRouter } from './favorites.js'
 import { notificationsRouter } from './notifications.js'
 import { organizationRouter } from './organization.js'
+import { organizationsRouter } from './organizations.js'
 import { petsRouter } from './pets.js'
 import { profileRouter } from './profile.js'
 import { requestsRouter } from './requests.js'
@@ -20,12 +21,12 @@ export const apiRouter = Router()
 // dentro deles também protegeria /api/pets (público). Em vez disso, exigimos JWT
 // apenas nos prefixos privados conhecidos (#4/#5). Paths desconhecidos seguem
 // para o 404 abaixo, e /api/auth/* já é montado antes de /api em app.ts.
-
 const PRIVATE_PREFIXES = [
   '/me',
   '/requests',
   '/adoptions',
   '/organizations',
+  '/invitations',
   '/reports',
   '/moderation',
   '/check-ins',
@@ -37,10 +38,11 @@ apiRouter.use((req, res, next) => {
   if (isPrivate) return requireAuth(req, res, next)
   return next()
 })
-
+apiRouter.use(checkInsRouter)
+apiRouter.use(organizationsRouter)
 apiRouter.use(profileRouter)
 apiRouter.use(adoptionsRouter)
-apiRouter.use(checkInsRouter)
+apiRouter.use(organizationsRouter)
 apiRouter.use(organizationRouter)
 apiRouter.use(petsRouter)
 apiRouter.use(requestsRouter)
