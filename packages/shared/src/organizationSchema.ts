@@ -21,9 +21,6 @@ export const organizationPetFormSchema = z.object({
   space: z.string().trim().min(2, 'Informe o espaço recomendado.'),
   children: requiredChoice('Informe a convivência com crianças.'),
   otherPets: requiredChoice('Informe a convivência com outros pets.'),
-  specialCare: requiredChoice('Informe se exige cuidados especiais.'),
-  vaccinated: requiredChoice('Informe se está vacinado.'),
-  neutered: requiredChoice('Informe se está castrado.'),
 })
 
 export const organizationPetPayloadSchema = organizationPetFormSchema.transform((data) => ({
@@ -35,9 +32,6 @@ export const organizationPetPayloadSchema = organizationPetFormSchema.transform(
     .filter(Boolean),
   children: data.children === 'true',
   otherPets: data.otherPets === 'true',
-  specialCare: data.specialCare === 'true',
-  vaccinated: data.vaccinated === 'true',
-  neutered: data.neutered === 'true',
 }))
 
 export const interviewStatuses = ['AGENDADA', 'REALIZADA'] as const

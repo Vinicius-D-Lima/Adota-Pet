@@ -209,7 +209,7 @@ export const STORAGE_SCOPES = {
   medicalExam: {
     prefix: 'medical-exams',
     allowedMimeTypes: [...IMAGE_MIME_TYPES, 'application/pdf'],
-    maxFiles: 5,
+    maxFiles: 1,
     maxBytesPerFile: 10 * 1024 * 1024,
   },
 } as const satisfies Record<string, UploadLimits>

@@ -25,6 +25,7 @@ import {
   enqueueNewRequestForOrganization,
 } from '../events.js'
 import { organizationMemberIds } from '../notificationService.js'
+import { petMedicalInclude } from '../medicalRecords.js'
 import { Prisma } from '../generated/prisma/client.js'
 import type { FieldError } from '../http.js'
 import { isBlank, list, sendError } from '../http.js'
@@ -89,7 +90,7 @@ requestsRouter.post('/requests', async (req, res) => {
 
   const pet = await prisma.pet.findUnique({
     where: { id: String(body?.petId) },
-    include: { organizationEntity: true },
+    include: petMedicalInclude,
   })
   if (!pet) return sendError(res, 404, 'Pet não encontrado')
   // REQ-03: adotado/arquivado não recebe nova solicitação.

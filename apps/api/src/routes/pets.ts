@@ -3,6 +3,7 @@ import { Router } from 'express'
 import { calculateRequestMatching, type MatchingAdopter } from '../matching.js'
 import { currentUser, getProfile, presentPet, referenceUser } from '../context.js'
 import { prisma } from '../db.js'
+import { petMedicalInclude } from '../medicalRecords.js'
 import { positiveInt, sendError } from '../http.js'
 import { validate } from '../validate.js'
 
@@ -49,13 +50,13 @@ petsRouter.get('/me/matches', async (req, res) => {
 
   const pets = await prisma.pet.findMany({
     where: { status: { not: 'ADOTADO' } },
-    include: { organizationEntity: true },
+    include: petMedicalInclude,
   })
   const data = pets
-    .map((pet) => ({
-      ...presentPet(pet, user),
-      matching: calculateRequestMatching(pet, adopterProfile),
-    }))
+    .map((pet) => {
+      const presented = presentPet(pet, user)
+      return { ...presented, matching: calculateRequestMatching(presented, adopterProfile) }
+    })
     .sort((a, b) => (b.matching?.score ?? 0) - (a.matching?.score ?? 0) || byCodeUnit(a.id, b.id))
 
   res.json({ data, total: data.length })
@@ -84,7 +85,7 @@ petsRouter.get('/pets', validate({ query: petsQuerySchema }), async (req, res) =
     Object.assign(where, { [key]: { in: values } })
   }
 
-  let pets = await prisma.pet.findMany({ where, include: { organizationEntity: true } })
+  let pets = await prisma.pet.findMany({ where, include: petMedicalInclude })
   const term = Array.isArray(search)
     ? String(search[0] ?? '').toLowerCase()
     : typeof search === 'string'
@@ -118,7 +119,7 @@ petsRouter.get('/pets', validate({ query: petsQuerySchema }), async (req, res) =
 petsRouter.get('/pets/:id', validate({ params: petIdParamsSchema }), async (req, res) => {
   const pet = await prisma.pet.findUnique({
     where: { id: String(req.params.id) },
-    include: { organizationEntity: true },
+    include: petMedicalInclude,
   })
   if (!pet) return sendError(res, 404, 'Pet não encontrado')
   res.json(presentPet(pet, await referenceUser()))

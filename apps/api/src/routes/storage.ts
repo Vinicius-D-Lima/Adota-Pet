@@ -11,6 +11,7 @@ import { loadConfig } from '../config.js'
 import { prisma } from '../db.js'
 import { HttpError, list, sendError } from '../http.js'
 import { logger } from '../logger.js'
+import { canManageMedicalExam, canViewMedicalExam } from '../medicalRecords.js'
 import {
   getStorageProvider,
   isStorageConfigured,
@@ -61,6 +62,11 @@ storageRouter.post(
     if (!isStorageConfigured(config)) return serviceUnavailable(res)
 
     const { scope, resourceType, resourceId } = req.body as StorageUploadBody
+    if (resourceType === 'MEDICAL_EXAM') {
+      if (scope !== 'medicalExam' || !(await canManageMedicalExam(resourceId, req.user!.id))) {
+        return sendError(res, 403, 'Sem permissão para anexar arquivos a este exame')
+      }
+    }
     const files = (req.files as Express.Multer.File[] | undefined) ?? []
     const prepared = await validateUploadFiles(files, STORAGE_SCOPES[scope])
     const provider = getStorageProvider(config)
@@ -80,6 +86,9 @@ storageRouter.post(
             ownerId: req.auth!.userId,
           },
         })
+        if (resourceType === 'MEDICAL_EXAM') {
+          await prisma.exam.update({ where: { id: resourceId }, data: { attachment: record.id } })
+        }
         const signed = await signObjectUrl(
           record.id,
           config.STORAGE_SIGNED_URL_TTL_SECONDS,
@@ -109,7 +118,11 @@ storageRouter.post(
     const { id } = req.params as { id: string }
     const object = await prisma.storageObject.findUnique({ where: { id } })
     if (!object) return sendError(res, 404, 'Arquivo não encontrado')
-    if (object.ownerId !== req.auth!.userId) return sendError(res, 403, 'Sem acesso a este arquivo')
+    const mayReadMedicalExam =
+      object.resourceType === 'MEDICAL_EXAM' &&
+      (await canViewMedicalExam(object.resourceId, req.auth!.userId))
+    if (object.ownerId !== req.auth!.userId && !mayReadMedicalExam)
+      return sendError(res, 403, 'Sem acesso a este arquivo')
 
     const config = loadConfig()
     const signed = await signObjectUrl(
@@ -129,7 +142,11 @@ storageRouter.delete(
     const { id } = req.params as { id: string }
     const object = await prisma.storageObject.findUnique({ where: { id } })
     if (!object) return sendError(res, 404, 'Arquivo não encontrado')
-    if (object.ownerId !== req.auth!.userId) return sendError(res, 403, 'Sem acesso a este arquivo')
+    const mayManageMedicalExam =
+      object.resourceType === 'MEDICAL_EXAM' &&
+      (await canManageMedicalExam(object.resourceId, req.auth!.userId))
+    if (object.ownerId !== req.auth!.userId && !mayManageMedicalExam)
+      return sendError(res, 403, 'Sem acesso a este arquivo')
 
     const config = loadConfig()
     if (!isStorageConfigured(config)) return serviceUnavailable(res)
@@ -140,6 +157,9 @@ storageRouter.delete(
       return sendError(res, 503, 'Armazenamento indisponível')
     }
     await prisma.storageObject.delete({ where: { id: object.id } })
+    if (object.resourceType === 'MEDICAL_EXAM') {
+      await prisma.exam.updateMany({ where: { id: object.resourceId }, data: { attachment: null } })
+    }
     res.status(204).end()
   },
 )

@@ -41,6 +41,12 @@ enum CheckInStatus {
   REVISADO
 }
 
+enum HealthConditionType {
+  CRONICA
+  EM_TRATAMENTO
+  TRATADA
+}
+
 model User {
   id               String           @id
   name             String           @default("")
@@ -205,9 +211,6 @@ model Pet {
   space          String
   children       Boolean
   otherPets      Boolean
-  specialCare    Boolean
-  vaccinated     Boolean
-  neutered       Boolean
   organizationId String
   lat            Float?
   lng            Float?
@@ -218,9 +221,93 @@ model Pet {
   favorites          Favorite[]
   requests           AdoptionRequest[]
   adoption           Adoption?
+  medicalRecord      MedicalRecord?
   organizationEntity Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
 
   @@index([organizationId])
+}
+
+/// Prontuário único do pet (#29). Os indicadores públicos de saúde são
+/// calculados a partir das relações abaixo e não são colunas editáveis em Pet.
+model MedicalRecord {
+  id          String   @id @default(cuid())
+  petId       String   @unique
+  createdAt   DateTime @default(now())
+  createdById String   @default("SYSTEM")
+  updatedAt   DateTime @updatedAt
+  updatedById String   @default("SYSTEM")
+
+  pet              Pet               @relation(fields: [petId], references: [id], onDelete: Cascade)
+  vaccinations     Vaccination[]
+  neutering        Neutering?
+  healthConditions HealthCondition[]
+  exams            Exam[]
+}
+
+model Vaccination {
+  id              String    @id @default(cuid())
+  medicalRecordId String
+  name            String
+  appliedAt       DateTime
+  nextDoseAt      DateTime?
+  batch           String?
+  veterinarian    String?
+  createdAt       DateTime  @default(now())
+  createdById     String
+  updatedAt       DateTime  @updatedAt
+  updatedById     String
+
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+
+  @@index([medicalRecordId, appliedAt])
+}
+
+model Neutering {
+  id              String    @id @default(cuid())
+  medicalRecordId String    @unique
+  done            Boolean   @default(false)
+  date            DateTime?
+  createdAt       DateTime  @default(now())
+  createdById     String
+  updatedAt       DateTime  @updatedAt
+  updatedById     String
+
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+}
+
+model HealthCondition {
+  id              String              @id @default(cuid())
+  medicalRecordId String
+  name            String
+  type            HealthConditionType
+  notes           String              @default("")
+  careRequired    Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  createdById     String
+  updatedAt       DateTime            @updatedAt
+  updatedById     String
+
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+
+  @@index([medicalRecordId, type])
+}
+
+model Exam {
+  id              String   @id @default(cuid())
+  medicalRecordId String
+  type            String
+  date            DateTime
+  result          String
+  /// ID do StorageObject. A resposta completa converte-o em URL assinada.
+  attachment      String?
+  createdAt       DateTime @default(now())
+  createdById     String
+  updatedAt       DateTime @updatedAt
+  updatedById     String
+
+  medicalRecord MedicalRecord @relation(fields: [medicalRecordId], references: [id], onDelete: Cascade)
+
+  @@index([medicalRecordId, date])
 }
 
 model Favorite {

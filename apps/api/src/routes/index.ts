@@ -3,6 +3,7 @@ import { requireAuth } from '../auth.js'
 import { sendError } from '../http.js'
 import { adoptionsRouter } from './adoptions.js'
 import { favoritesRouter } from './favorites.js'
+import { medicalRecordsRouter } from './medicalRecords.js'
 import { notificationsRouter } from './notifications.js'
 import { organizationRouter } from './organization.js'
 import { organizationsRouter } from './organizations.js'
@@ -39,6 +40,7 @@ apiRouter.use(adoptionsRouter)
 apiRouter.use(organizationsRouter)
 apiRouter.use(organizationRouter)
 apiRouter.use(petsRouter)
+apiRouter.use(medicalRecordsRouter)
 apiRouter.use(requestsRouter)
 apiRouter.use(favoritesRouter)
 apiRouter.use(savedFiltersRouter)

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { hash } from '@node-rs/argon2'
 import { requestStatusCodeOf } from '@adotapet/shared'
 import { prisma } from '../src/db.js'
+import { medicalRecordDataFromLegacyPet } from '../src/medicalSeed.js'
 
 /** Senha única das contas de demonstração (documentada no README da API). */
 const DEMO_PASSWORD = 'Senha@123'
@@ -80,6 +81,11 @@ async function main() {
   await prisma.$transaction([
     prisma.refreshToken.deleteMany(),
     prisma.savedFilter.deleteMany(),
+    prisma.exam.deleteMany(),
+    prisma.healthCondition.deleteMany(),
+    prisma.neutering.deleteMany(),
+    prisma.vaccination.deleteMany(),
+    prisma.medicalRecord.deleteMany(),
     prisma.checkIn.deleteMany(),
     prisma.followUpPlan.deleteMany(),
     prisma.adoption.deleteMany(),
@@ -157,6 +163,9 @@ async function main() {
       const {
         organization: organizationName,
         organizationInitials: _organizationInitials,
+        specialCare: _specialCare,
+        vaccinated: _vaccinated,
+        neutered: _neutered,
         ...fields
       } = pet
       const organizationId = organizationIds.get(String(organizationName ?? '').trim())
@@ -173,6 +182,50 @@ async function main() {
       }
     }),
   })
+
+  // Converte os indicadores legados do mock em prontuários coerentes. A partir
+  // daqui os três valores públicos são sempre derivados destas relações.
+  for (const pet of seed.pets) {
+    const medical = medicalRecordDataFromLegacyPet({
+      id: pet.id,
+      createdAt: String(pet.createdAt),
+      vaccinated: pet.vaccinated,
+      neutered: pet.neutered,
+      specialCare: pet.specialCare,
+    })
+    await prisma.medicalRecord.create({
+      data: {
+        petId: pet.id,
+        createdById: 'SYSTEM',
+        updatedById: 'SYSTEM',
+        vaccinations: medical.vaccinations.length
+          ? {
+              create: medical.vaccinations.map((vaccination) => ({
+                ...vaccination,
+                createdById: 'SYSTEM',
+                updatedById: 'SYSTEM',
+              })),
+            }
+          : undefined,
+        neutering: {
+          create: {
+            ...medical.neutering,
+            createdById: 'SYSTEM',
+            updatedById: 'SYSTEM',
+          },
+        },
+        healthConditions: medical.healthConditions.length
+          ? {
+              create: medical.healthConditions.map((condition) => ({
+                ...condition,
+                createdById: 'SYSTEM',
+                updatedById: 'SYSTEM',
+              })),
+            }
+          : undefined,
+      },
+    })
+  }
 
   const { userId: adopterUserId, ...adopterFields } = seed.profile
   await prisma.adopterProfile.create({
