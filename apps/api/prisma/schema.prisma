@@ -69,6 +69,8 @@ enum HealthConditionType {
   CRONICA
   EM_TRATAMENTO
   TRATADA
+}
+
 enum ReviewDirection {
   ADOPTER_TO_ORGANIZATION
   ORGANIZATION_TO_ADOPTER

@@ -173,7 +173,13 @@ databaseSuite('fila de jobs (pg-boss)', () => {
     await clockRunner.start()
     try {
       await clock.setTime(base.getTime() + 15_000)
-      await clock.tick(31_000)
+      // O timekeeper avalia o cron em passos de até 30s e os workers só
+      // consultam a fila quando o relógio avança. Ticks curtos cobrem a
+      // passagem das 08:00 mesmo se uma avaliação anterior ainda estava em
+      // voo, além de darem ao worker a chance de consumir o job disparado.
+      for (let step = 0; step < 12; step += 1) {
+        await clock.tick(5_000)
+      }
       await vi.waitFor(
         async () => {
           const jobs = await prisma.$queryRawUnsafe<Array<{ state: string }>>(
@@ -189,7 +195,7 @@ databaseSuite('fila de jobs (pg-boss)', () => {
       await clockRunner.stop()
       await prisma.$executeRawUnsafe('DROP SCHEMA IF EXISTS "pgboss_clock_test" CASCADE')
     }
-  })
+  }, 60_000)
 
   it('[JOB-06] payload sem dados sensíveis e validado com Zod', async () => {
     const safe = {
