@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requireAuth } from '../auth.js'
 import { sendError } from '../http.js'
 import { adoptionsRouter } from './adoptions.js'
+import { checkInsRouter } from './checkIns.js'
 import { favoritesRouter } from './favorites.js'
 import { medicalRecordsRouter } from './medicalRecords.js'
 import { notificationsRouter } from './notifications.js'
@@ -10,11 +11,16 @@ import { organizationsRouter } from './organizations.js'
 import { petsRouter } from './pets.js'
 import { profileRouter } from './profile.js'
 import { requestsRouter } from './requests.js'
+import { reportsRouter } from './reports.js'
+import { reputationRouter, reviewsRouter } from './reviews.js'
 import { savedFiltersRouter } from './savedFilters.js'
 import { storageRouter } from './storage.js'
 
 /** API do Adota-Pet: mesmo contrato do mock-server, persistida no PostgreSQL. */
 export const apiRouter = Router()
+
+// A reputação é pública; monte antes da autenticação de /organizations.
+apiRouter.use(reputationRouter)
 
 // Os routers são montados na raiz de /api, então um `router.use(requireAuth)`
 // dentro deles também protegeria /api/pets (público). Em vez disso, exigimos JWT
@@ -25,7 +31,11 @@ const PRIVATE_PREFIXES = [
   '/requests',
   '/adoptions',
   '/organizations',
+  '/reviews',
   '/invitations',
+  '/reports',
+  '/moderation',
+  '/check-ins',
 ] as const
 apiRouter.use((req, res, next) => {
   const isPrivate = PRIVATE_PREFIXES.some(
@@ -34,14 +44,17 @@ apiRouter.use((req, res, next) => {
   if (isPrivate) return requireAuth(req, res, next)
   return next()
 })
-
+apiRouter.use(checkInsRouter)
+apiRouter.use(organizationsRouter)
 apiRouter.use(profileRouter)
 apiRouter.use(adoptionsRouter)
+apiRouter.use(reviewsRouter)
 apiRouter.use(organizationsRouter)
 apiRouter.use(organizationRouter)
 apiRouter.use(petsRouter)
 apiRouter.use(medicalRecordsRouter)
 apiRouter.use(requestsRouter)
+apiRouter.use(reportsRouter)
 apiRouter.use(favoritesRouter)
 apiRouter.use(savedFiltersRouter)
 apiRouter.use(notificationsRouter)

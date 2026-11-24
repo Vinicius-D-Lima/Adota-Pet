@@ -37,6 +37,7 @@ import {
   receivedRequestsQuerySchema,
   receivedRequestsResponseSchema,
   registerSchema,
+  reviewBodySchema,
   requestChatCursorQuerySchema,
   requestChatMessageBodySchema,
   requestChatMessageSchema,
@@ -46,6 +47,7 @@ import {
   vaccinationInputSchema,
 } from '@adotapet/shared'
 import { z, type ZodType } from 'zod'
+import { checkInReviewBodySchema, checkInSubmitBodySchema } from './routes/checkIns.js'
 
 /** Documentação viva (#47 / INF-10): gerada a partir dos schemas Zod compartilhados. */
 const healthResponseSchema = z.object({
@@ -67,6 +69,29 @@ const authResponseSchema = z.object({
   user: authUserSchema,
   accessToken: z.string(),
   expiresIn: z.number().int(),
+})
+
+const reviewResponseSchema = z.object({
+  id: z.string(),
+  adoptionId: z.string(),
+  direction: z.enum(['ADOPTER_TO_ORGANIZATION', 'ORGANIZATION_TO_ADOPTER']),
+  rating: z.number().int(),
+  comment: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+const reputationResponseSchema = z.object({
+  average: z.number().nullable(),
+  count: z.number().int().nonnegative(),
+  reviews: z.array(
+    z.object({
+      id: z.string(),
+      direction: z.enum(['ADOPTER_TO_ORGANIZATION', 'ORGANIZATION_TO_ADOPTER']),
+      rating: z.number().int(),
+      comment: z.string(),
+      createdAt: z.string(),
+    }),
+  ),
 })
 
 /** Parâmetro das rotas de adoção (#23). */
@@ -102,6 +127,7 @@ interface RouteSchemas {
   query?: ZodType
   params?: ZodType
   body?: ZodType
+  bodyContentType?: string
   response?: ZodType
 }
 
@@ -199,9 +225,43 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
     params: idParamsSchema,
     body: followUpPlanSchema,
   },
+  'POST /api/adoptions/{id}/reviews': {
+    params: idParamsSchema,
+    body: reviewBodySchema,
+    response: reviewResponseSchema,
+  },
+  'PUT /api/reviews/{id}': {
+    params: idParamsSchema,
+    body: reviewBodySchema,
+    response: reviewResponseSchema,
+  },
+  'GET /api/users/{id}/reputation': {
+    params: idParamsSchema,
+    response: reputationResponseSchema,
+  },
+  'GET /api/organizations/{id}/reputation': {
+    params: idParamsSchema,
+    response: reputationResponseSchema,
+  },
   'PUT /api/adoptions/{id}/follow-up-plan': {
     params: idParamsSchema,
     body: followUpPlanSchema,
+  },
+  'POST /api/check-ins/{id}/submit': {
+    params: idParamsSchema,
+    body: checkInSubmitBodySchema,
+    bodyContentType: 'multipart/form-data',
+  },
+  'POST /api/check-ins/{id}/review': {
+    params: idParamsSchema,
+    body: checkInReviewBodySchema,
+  },
+  'POST /api/check-ins/{id}/request-more': {
+    params: idParamsSchema,
+    body: checkInReviewBodySchema,
+  },
+  'POST /api/check-ins/{id}/photos/{photoId}/url': {
+    params: z.strictObject({ id: z.string().min(1), photoId: z.string().min(1) }),
   },
   // Notificações (#30): contrato idêntico ao consumido pelo frontend.
   'GET /api/me/notifications': {
@@ -316,15 +376,20 @@ function parametersFrom(schema: ZodType | undefined, location: 'query' | 'path')
 
 /** Espelha os prefixos privados de `routes/index.ts` (#47). */
 const isPrivatePath = (path: string) =>
-  path === '/me' ||
-  path.startsWith('/me/') ||
-  path.startsWith('/api/me/') ||
-  path.startsWith('/api/requests/') ||
-  path.startsWith('/api/adoptions/') ||
-  path === '/api/organizations' ||
-  path.startsWith('/api/organizations/') ||
-  path.startsWith('/api/invitations/') ||
-  path.endsWith('/auth/me')
+  !/^\/api\/(users|organizations)\/[^/]+\/reputation$/.test(path) &&
+  (path === '/me' ||
+    path.startsWith('/me/') ||
+    path.startsWith('/api/me/') ||
+    path.startsWith('/api/requests/') ||
+    path.startsWith('/api/adoptions/') ||
+    path === '/api/organizations' ||
+    path.startsWith('/api/organizations/') ||
+    path.startsWith('/api/reviews/') ||
+    path.startsWith('/api/invitations/') ||
+    path.startsWith('/api/reports/') ||
+    path.startsWith('/api/moderation/') ||
+    path.startsWith('/api/check-ins/') ||
+    path.endsWith('/auth/me'))
 
 const errorResponse = {
   description: 'Erro no formato padrão da API',
@@ -338,6 +403,7 @@ export function buildOpenApiDocument(app: Express) {
 
   for (const { method, path } of listRoutes(app)) {
     const schemas = DOCUMENTED[`${method} ${path}`] ?? {}
+    const createsReview = method === 'POST' && path.endsWith('/reviews')
     const operation: Record<string, unknown> = {
       operationId: `${method.toLowerCase()}${path.replace(/[^a-zA-Z0-9]+/g, '_')}`,
       summary: schemas.response ? undefined : `${method} ${path}`,
@@ -345,7 +411,7 @@ export function buildOpenApiDocument(app: Express) {
       responses: {
         200: {
           description: 'Sucesso',
-          ...(schemas.response
+          ...(schemas.response && !createsReview
             ? {
                 content: {
                   'application/json': { schema: toOpenApiSchema(schemas.response) },
@@ -353,8 +419,19 @@ export function buildOpenApiDocument(app: Express) {
               }
             : {}),
         },
-        ...(method === 'POST' && path.endsWith('/follow-up-plan')
-          ? { 201: { description: 'Plano criado' } }
+        ...(method === 'POST' && (path.endsWith('/follow-up-plan') || createsReview)
+          ? {
+              201: {
+                description: createsReview ? 'Avaliação criada' : 'Plano criado',
+                ...(createsReview && schemas.response
+                  ? {
+                      content: {
+                        'application/json': { schema: toOpenApiSchema(schemas.response) },
+                      },
+                    }
+                  : {}),
+              },
+            }
           : {}),
         ...(method === 'GET' ? { 503: errorResponse } : {}),
         400: errorResponse,
@@ -378,9 +455,23 @@ export function buildOpenApiDocument(app: Express) {
     ]
     if (parameters.length) operation.parameters = parameters
     if (schemas.body) {
+      const bodySchema = toOpenApiSchema(schemas.body)
+      if (schemas.bodyContentType === 'multipart/form-data') {
+        const properties = bodySchema.properties as Record<string, unknown>
+        properties.files = {
+          type: 'array',
+          minItems: 1,
+          maxItems: 5,
+          items: { type: 'string', format: 'binary' },
+        }
+        const required = Array.isArray(bodySchema.required) ? bodySchema.required : []
+        bodySchema.required = [...required, 'files']
+      }
       operation.requestBody = {
         required: true,
-        content: { 'application/json': { schema: toOpenApiSchema(schemas.body) } },
+        content: {
+          [schemas.bodyContentType ?? 'application/json']: { schema: bodySchema },
+        },
       }
     }
     if (schemas.response) delete operation.summary

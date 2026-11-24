@@ -1,6 +1,6 @@
 import cors from 'cors'
 import express, { type Express } from 'express'
-import { rateLimit } from 'express-rate-limit'
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit'
 import helmet from 'helmet'
 import type { Logger } from 'pino'
 import { loadConfig, type ApiConfig } from './config.js'
@@ -72,7 +72,7 @@ export function createApp(options: AppOptions = {}): Express {
       limit: config.CHAT_RATE_LIMIT_MAX,
       standardHeaders: 'draft-7',
       legacyHeaders: false,
-      keyGenerator: (req) => req.get('Authorization') ?? req.ip ?? 'anon',
+      keyGenerator: (req) => req.get('Authorization') ?? ipKeyGenerator(req.ip ?? 'anon'),
       handler: (_req, res) => {
         res.setHeader('Retry-After', String(Math.ceil(config.CHAT_RATE_LIMIT_WINDOW_MS / 1000)))
         sendError(res, 429, 'Muitas mensagens enviadas. Tente novamente em instantes.')

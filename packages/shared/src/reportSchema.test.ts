@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateReportAttachments } from './reportSchema.js'
+import { reportSchema, resolveReportSchema, validateReportAttachments } from './reportSchema.js'
 
 describe('validateReportAttachments', () => {
   it('aceita até cinco imagens JPEG, PNG ou WebP de até 5 MB', () => {
@@ -22,5 +22,31 @@ describe('validateReportAttachments', () => {
 
     expect(validateReportAttachments(tooMany)).toBe('Você pode anexar no máximo 5 imagens.')
     expect(validateReportAttachments([tooLarge])).toBe('Cada imagem deve ter no máximo 5 MB.')
+  })
+})
+
+describe('schemas de denúncia', () => {
+  it('valida criação sem aceitar campos privilegiados', () => {
+    const result = reportSchema.safeParse({
+      targetType: 'PET',
+      targetId: 'pet-1',
+      category: 'ABANDONO',
+      description: 'O animal está sozinho há vários dias.',
+      reporterId: 'usuario-forjado',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('exige resolução para encerrar a denúncia', () => {
+    expect(resolveReportSchema.safeParse({ status: 'PROCEDENTE', resolution: '' }).success).toBe(
+      false,
+    )
+    expect(
+      resolveReportSchema.safeParse({
+        status: 'PROCEDENTE',
+        resolution: 'A denúncia foi confirmada pela moderação.',
+      }).success,
+    ).toBe(true)
   })
 })

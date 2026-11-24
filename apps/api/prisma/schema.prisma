@@ -22,6 +22,30 @@ enum OrganizationRole {
   VOLUNTEER
 }
 
+enum ReportTargetType {
+  USUARIO
+  ORGANIZACAO
+  ADOCAO
+  PET
+  AVALIACAO
+}
+
+enum ReportCategory {
+  MAUS_TRATOS
+  ABANDONO
+  FRAUDE
+  CONTEUDO_IMPROPRIO
+  OUTRO
+}
+
+enum ReportStatus {
+  ABERTA
+  EM_ANALISE
+  PROCEDENTE
+  IMPROCEDENTE
+  ARQUIVADA
+}
+
 enum MembershipStatus {
   ATIVO
   REMOVIDO
@@ -45,6 +69,9 @@ enum HealthConditionType {
   CRONICA
   EM_TRATAMENTO
   TRATADA
+enum ReviewDirection {
+  ADOPTER_TO_ORGANIZATION
+  ORGANIZATION_TO_ADOPTER
 }
 
 model User {
@@ -80,6 +107,10 @@ model User {
   savedFilters         SavedFilter[]
   preferences          NotificationPreference[]
   refreshTokens        RefreshToken[]
+  reportsCreated       Report[]                 @relation("ReportReporter")
+  reportsModerated     Report[]                 @relation("ReportModerator")
+  reviewsWritten       Review[]                 @relation("ReviewAuthor")
+  reviewsReceived      Review[]                 @relation("ReviewUserReviewee")
   memberships          Membership[]
   adoptionsAsAdopter   Adoption[]               @relation("Adopter")
   createdFollowUpPlans FollowUpPlan[]           @relation("FollowUpPlanCreator")
@@ -137,6 +168,8 @@ model GuardianProfile {
   city         String?
   description  String?
   acceptsTerms Boolean @default(false)
+  reputation   Float?
+  reviewCount  Int     @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -151,11 +184,14 @@ model Organization {
   phone        String  @default("")
   logoUrl      String?
   cnpj         String? @unique
+  reputation   Float?
+  reviewCount  Int     @default(0)
 
   memberships Membership[]
   invitations Invitation[]
   pets        Pet[]
   adoptions   Adoption[]
+  reviews     Review[]     @relation("ReviewOrganization")
 }
 
 /// Convite de acesso à organização. O token original nunca é persistido:
@@ -190,6 +226,51 @@ model Membership {
 
   @@unique([userId, organizationId])
   @@index([organizationId, status, role])
+}
+
+model Review {
+  id                     String          @id @default(cuid())
+  adoptionId             String
+  reviewerId             String
+  direction              ReviewDirection
+  revieweeId             String?
+  revieweeOrganizationId String?
+  rating                 Int
+  comment                String          @default("")
+  hiddenAt               DateTime?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  adoption             Adoption      @relation(fields: [adoptionId], references: [id], onDelete: Cascade)
+  reviewer             User          @relation("ReviewAuthor", fields: [reviewerId], references: [id], onDelete: Restrict)
+  reviewee             User?         @relation("ReviewUserReviewee", fields: [revieweeId], references: [id], onDelete: Restrict)
+  revieweeOrganization Organization? @relation("ReviewOrganization", fields: [revieweeOrganizationId], references: [id], onDelete: Restrict)
+
+  @@unique([adoptionId, direction])
+  @@index([revieweeId, hiddenAt, createdAt])
+  @@index([revieweeOrganizationId, hiddenAt, createdAt])
+}
+
+model Report {
+  id          String           @id @default(cuid())
+  reporterId  String
+  targetType  ReportTargetType
+  targetId    String
+  category    ReportCategory
+  description String
+  status      ReportStatus     @default(ABERTA)
+  resolution  String?
+  moderatorId String?
+  resolvedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  reporter  User  @relation("ReportReporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  moderator User? @relation("ReportModerator", fields: [moderatorId], references: [id], onDelete: SetNull)
+
+  @@index([reporterId, createdAt])
+  @@index([status, category, createdAt])
+  @@index([targetType, targetId])
 }
 
 model Pet {
@@ -374,6 +455,7 @@ model Adoption {
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   plan         FollowUpPlan?
   checkIns     CheckIn[]
+  reviews      Review[]
 
   @@index([adopterId, adoptedAt])
   @@index([organizationId, adoptedAt])
