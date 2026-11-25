@@ -6,14 +6,10 @@ import {
 } from '@adotapet/shared'
 import type { Request, Response } from 'express'
 import { prisma } from './db.js'
-import {
-  Prisma,
-  type AdoptionRequest,
-  type ChatMessage,
-  type User,
-} from './generated/prisma/client.js'
+import { type AdoptionRequest, type ChatMessage, type User } from './generated/prisma/client.js'
 import { haversineKm, isBlank, sendError } from './http.js'
 import { calculateRequestMatching } from './matching.js'
+import { derivePetHealth, petMedicalInclude, type PetWithMedicalRecord } from './medicalRecords.js'
 import {
   PROFILE_FIELDS,
   missingGuardianFields,
@@ -176,7 +172,7 @@ export const organizationPets = async (userId: string) => {
   return prisma.pet.findMany({
     where: { organizationId },
     orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
-    include: { organizationEntity: true },
+    include: petMedicalInclude,
   })
 }
 
@@ -269,7 +265,7 @@ export async function presentChatMessage(message: ChatMessage, userId: string) {
 export const withPet = async (request: AdoptionRequest) => {
   const pet = await prisma.pet.findUnique({
     where: { id: request.petId },
-    include: { organizationEntity: true },
+    include: petMedicalInclude,
   })
   return {
     ...request,
@@ -285,14 +281,15 @@ export const withPet = async (request: AdoptionRequest) => {
   }
 }
 
-export const petWithOrganization = { organizationEntity: true } as const
-export type PetWithOrganization = Prisma.PetGetPayload<{ include: typeof petWithOrganization }>
+export const petWithOrganization = petMedicalInclude
+export type PetWithOrganization = PetWithMedicalRecord
 
 /** Mantém o contrato antigo do frontend enquanto a origem vira uma FK real. */
 export function publicPet(pet: PetWithOrganization) {
-  const { organizationEntity, organizationId: _organizationId, ...row } = pet
+  const { organizationEntity, organizationId: _organizationId, medicalRecord, ...row } = pet
   return withGallery({
     ...row,
+    ...derivePetHealth(medicalRecord),
     organization: organizationEntity.name,
     organizationInitials: organizationEntity.initials,
   })

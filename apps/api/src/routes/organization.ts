@@ -27,6 +27,7 @@ import { prisma } from '../db.js'
 import { APPOINTMENT_CONFIRMED, APPOINTMENT_PROPOSED, enqueueDomainEvent } from '../events.js'
 import { Prisma } from '../generated/prisma/client.js'
 import { HttpError, list, sendError } from '../http.js'
+import { petMedicalInclude } from '../medicalRecords.js'
 import { applyTransition } from '../requestStatusMachine.js'
 import { deleteStorageObjectsForResource } from '../storage.js'
 import { validate } from '../validate.js'
@@ -104,9 +105,19 @@ organizationRouter.post('/me/organization-pets', async (req, res) => {
   // Campos validados por ORGANIZATION_PET_FIELDS (o Prisma exige todos de uma vez).
   for (const key of ORGANIZATION_PET_FIELDS) Object.assign(data, { [key]: body[key] })
 
-  const pet = await prisma.pet.create({
-    data: data as Prisma.PetUncheckedCreateInput,
-    include: { organizationEntity: true },
+  const pet = await prisma.$transaction(async (tx) => {
+    const created = await tx.pet.create({ data: data as Prisma.PetUncheckedCreateInput })
+    await tx.medicalRecord.create({
+      data: {
+        petId: created.id,
+        createdById: viewer.id,
+        updatedById: viewer.id,
+        neutering: {
+          create: { done: false, createdById: viewer.id, updatedById: viewer.id },
+        },
+      },
+    })
+    return tx.pet.findUniqueOrThrow({ where: { id: created.id }, include: petMedicalInclude })
   })
   res.status(201).json(presentOrganizationPet(pet))
 })
@@ -118,7 +129,7 @@ organizationRouter.put('/me/organization-pets/:id', async (req, res) => {
   if (!identity.organizationId) return sendError(res, 404, 'Organização não encontrada')
   const existing = await prisma.pet.findFirst({
     where: { id: req.params.id, organizationId: identity.organizationId },
-    include: { organizationEntity: true },
+    include: petMedicalInclude,
   })
   if (!existing) return sendError(res, 404, 'Pet não encontrado entre os cadastros da instituição')
 
@@ -143,7 +154,7 @@ organizationRouter.put('/me/organization-pets/:id', async (req, res) => {
   const updated = await prisma.pet.update({
     where: { id: existing.id },
     data,
-    include: { organizationEntity: true },
+    include: petMedicalInclude,
   })
   res.json(presentOrganizationPet(updated))
 })

@@ -56,9 +56,6 @@ export const ORGANIZATION_PET_FIELDS = [
   'space',
   'children',
   'otherPets',
-  'specialCare',
-  'vaccinated',
-  'neutered',
 ] as const
 
 export const digitsOnly = (value: string) => value.replace(/\D/g, '')
@@ -304,7 +301,7 @@ export function validateOrganizationPet(body: unknown): FieldError[] {
     } else if (key === 'traits') {
       if (!Array.isArray(value) || !value.length || value.some((item) => isBlank(item)))
         details.push({ field: key, message: 'Informe ao menos uma característica' })
-    } else if (['children', 'otherPets', 'specialCare', 'vaccinated', 'neutered'].includes(key)) {
+    } else if (['children', 'otherPets'].includes(key)) {
       if (typeof value !== 'boolean')
         details.push({ field: key, message: 'Informe verdadeiro ou falso' })
     } else if (isBlank(value)) details.push({ field: key, message: `${key} é obrigatório` })

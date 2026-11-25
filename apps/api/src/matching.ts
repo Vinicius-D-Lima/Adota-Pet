@@ -1,7 +1,13 @@
 import type { MatchingCheck, MatchingLevel, MatchingScore } from '@adotapet/shared'
-import type { Pet } from './generated/prisma/client.js'
 
-type MatchingPet = Pick<Pet, 'name' | 'energy' | 'space' | 'children' | 'otherPets' | 'specialCare'>
+type MatchingPet = {
+  name: string
+  energy: string
+  space: string
+  children: boolean
+  otherPets: boolean
+  specialCare: boolean
+}
 
 /**
  * Campos do perfil do adotante usados nos 7 critérios (#19). O perfil da

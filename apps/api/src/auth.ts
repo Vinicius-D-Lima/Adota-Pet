@@ -189,3 +189,20 @@ export async function requireAuth(req: Request, _res: Response, next: (error?: u
     next(new HttpError(401, 'Autenticação necessária'))
   }
 }
+
+/** Autenticação opcional para rotas públicas com uma visão ampliada para usuários autorizados. */
+export async function optionalAuth(req: Request, _res: Response, next: (error?: unknown) => void) {
+  const match = /^Bearer\s+(.+)$/i.exec(req.get('Authorization') ?? '')
+  if (!match) return next()
+  try {
+    const identity = await verifyAccessToken(match[1])
+    const user = await prisma.user.findUnique({ where: { id: identity.userId } })
+    if (user) {
+      req.auth = identity
+      req.user = user
+    }
+  } catch {
+    // Token ausente ou inválido mantém a visão pública; não revela detalhes.
+  }
+  next()
+}

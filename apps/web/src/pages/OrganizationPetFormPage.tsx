@@ -39,9 +39,6 @@ const emptyForm: OrganizationPetFormData = {
   space: '',
   children: '',
   otherPets: '',
-  specialCare: '',
-  vaccinated: '',
-  neutered: '',
 }
 
 export function OrganizationPetFormPage() {
@@ -79,9 +76,6 @@ export function OrganizationPetFormPage() {
       space: pet.space,
       children: String(pet.children),
       otherPets: String(pet.otherPets),
-      specialCare: String(pet.specialCare),
-      vaccinated: String(pet.vaccinated),
-      neutered: String(pet.neutered),
     })
   }, [pet, reset])
 
@@ -216,21 +210,6 @@ export function OrganizationPetFormPage() {
               label="Convive com outros pets?"
               error={errors.otherPets?.message}
               register={register('otherPets')}
-            />
-            <BooleanChoice
-              label="Exige cuidados especiais?"
-              error={errors.specialCare?.message}
-              register={register('specialCare')}
-            />
-            <BooleanChoice
-              label="Está vacinado?"
-              error={errors.vaccinated?.message}
-              register={register('vaccinated')}
-            />
-            <BooleanChoice
-              label="Está castrado?"
-              error={errors.neutered?.message}
-              register={register('neutered')}
             />
           </div>
           <div className="mt-7 flex justify-end">

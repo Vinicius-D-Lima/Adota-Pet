@@ -11,6 +11,7 @@ import type { User } from '../generated/prisma/client.js'
 import type { PetWithOrganization } from '../context.js'
 import { list, sendError } from '../http.js'
 import { validate } from '../validate.js'
+import { petMedicalInclude } from '../medicalRecords.js'
 
 export const favoritesRouter = Router()
 
@@ -38,8 +39,8 @@ function presentFavoritePet(pet: PetWithOrganization, refUser: User | null): Fav
     image: pet.image,
     summary: pet.summary,
     traits: pet.traits,
-    vaccinated: pet.vaccinated,
-    neutered: pet.neutered,
+    vaccinated: presented.vaccinated,
+    neutered: presented.neutered,
     organization: presented.organization,
     status,
     distanceKm,
@@ -71,7 +72,7 @@ favoritesRouter.get(
         orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
         skip: (page - 1) * limit,
         take: limit,
-        include: { pet: { include: { organizationEntity: true } } },
+        include: { pet: { include: petMedicalInclude } },
       }),
       prisma.favorite.count({ where }),
     ])

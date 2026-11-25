@@ -9,6 +9,11 @@ import {
   favoritesQuerySchema,
   favoritesResponseSchema,
   interviewApiSchema,
+  examInputSchema,
+  healthConditionInputSchema,
+  medicalRecordItemParamsSchema,
+  medicalRecordPetParamsSchema,
+  neuteringInputSchema,
   notificationPageSchema,
   notificationPreferencesResponseSchema,
   notificationPreferencesUpdateSchema,
@@ -39,6 +44,7 @@ import {
   requestChatPageSchema,
   requestStatusHistoryResponseSchema,
   requestTransitionSchema,
+  vaccinationInputSchema,
 } from '@adotapet/shared'
 import { z, type ZodType } from 'zod'
 import { checkInReviewBodySchema, checkInSubmitBodySchema } from './routes/checkIns.js'
@@ -131,6 +137,44 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'GET /health': { response: healthResponseSchema },
   'GET /api/pets': { query: petsQuerySchema, response: petsResponseSchema },
   'GET /api/pets/{id}': { params: petIdParamsSchema, response: petSchema },
+  'GET /api/pets/{petId}/medical-record': { params: medicalRecordPetParamsSchema },
+  'PUT /api/pets/{petId}/medical-record/neutering': {
+    params: medicalRecordPetParamsSchema,
+    body: neuteringInputSchema,
+  },
+  'POST /api/pets/{petId}/medical-record/vaccinations': {
+    params: medicalRecordPetParamsSchema,
+    body: vaccinationInputSchema,
+  },
+  'PUT /api/pets/{petId}/medical-record/vaccinations/{itemId}': {
+    params: medicalRecordItemParamsSchema,
+    body: vaccinationInputSchema,
+  },
+  'DELETE /api/pets/{petId}/medical-record/vaccinations/{itemId}': {
+    params: medicalRecordItemParamsSchema,
+  },
+  'POST /api/pets/{petId}/medical-record/conditions': {
+    params: medicalRecordPetParamsSchema,
+    body: healthConditionInputSchema,
+  },
+  'PUT /api/pets/{petId}/medical-record/conditions/{itemId}': {
+    params: medicalRecordItemParamsSchema,
+    body: healthConditionInputSchema,
+  },
+  'DELETE /api/pets/{petId}/medical-record/conditions/{itemId}': {
+    params: medicalRecordItemParamsSchema,
+  },
+  'POST /api/pets/{petId}/medical-record/exams': {
+    params: medicalRecordPetParamsSchema,
+    body: examInputSchema,
+  },
+  'PUT /api/pets/{petId}/medical-record/exams/{itemId}': {
+    params: medicalRecordItemParamsSchema,
+    body: examInputSchema,
+  },
+  'DELETE /api/pets/{petId}/medical-record/exams/{itemId}': {
+    params: medicalRecordItemParamsSchema,
+  },
   'PUT /api/me/account': { body: createAccountSchema, response: profileSchema },
   'GET /api/me/matches': {},
   'GET /api/me/permissions': { response: organizationPermissionsResponseSchema },
