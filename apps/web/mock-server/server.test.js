@@ -102,6 +102,49 @@ describe('GET /pets', () => {
   })
 })
 
+describe('check-ins do adotante', () => {
+  it('envia relato com foto, muda o status e reflete no progresso', async () => {
+    const submitted = await request(app)
+      .post('/check-ins/CHK-2003/submit')
+      .field('report', 'Fred se adaptou muito bem.')
+      .attach('files', Buffer.from('conteudo-png'), 'foto.png')
+
+    expect(submitted.status).toBe(200)
+    expect(submitted.body).toMatchObject({
+      id: 'CHK-2003',
+      status: 'ENVIADO',
+      report: 'Fred se adaptou muito bem.',
+    })
+    expect(submitted.body.photos).toHaveLength(1)
+
+    const adoptions = await request(app).get('/me/adoptions')
+    const checkIn = adoptions.body.data[0].checkIns.find(({ id }) => id === 'CHK-2003')
+    expect(checkIn.status).toBe('ENVIADO')
+  })
+
+  it('recusa foto fora dos formatos aceitos', async () => {
+    const res = await request(app)
+      .post('/check-ins/CHK-2003/submit')
+      .field('report', 'Relato válido')
+      .attach('files', Buffer.from('svg'), 'imagem.svg', { contentType: 'image/svg+xml' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.details).toEqual([
+      { field: 'files', message: 'Use fotos nos formatos JPEG, PNG ou WebP.' },
+    ])
+  })
+
+  it('emite URL assinada e serve a foto enviada', async () => {
+    const signed = await request(app).post('/check-ins/CHK-2002/photos/obj-chk-2002-1/url')
+    expect(signed.status).toBe(200)
+    expect(signed.body.url).toBe('/files/obj-chk-2002-1?token=mock-assinado')
+
+    const file = await request(app).get(signed.body.url)
+    expect(file.status).toBe(200)
+    expect(file.headers['content-type']).toMatch(/image\/png/)
+  })
+})
+
 describe('perfil', () => {
   it('retorna o perfil com isComplete e persiste a atualização', async () => {
     const before = await request(app).get('/me/adopter-profile')

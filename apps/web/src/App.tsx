@@ -20,6 +20,8 @@ const CompatibilityPage = named(() => import('./pages/CompatibilityPage'), 'Comp
 const QuestionnairePage = named(() => import('./pages/QuestionnairePage'), 'QuestionnairePage')
 const RequestsPage = named(() => import('./pages/RequestsPage'), 'RequestsPage')
 const RequestSuccessPage = named(() => import('./pages/RequestSuccessPage'), 'RequestSuccessPage')
+const MyAdoptionsPage = named(() => import('./pages/MyAdoptionsPage'), 'MyAdoptionsPage')
+const AdoptionDetailPage = named(() => import('./pages/AdoptionDetailPage'), 'AdoptionDetailPage')
 const ProfilePage = named(() => import('./pages/ProfilePage'), 'ProfilePage')
 const CreateAccountPage = named(() => import('./pages/CreateAccountPage'), 'CreateAccountPage')
 const LoginPage = named(() => import('./pages/LoginPage'), 'LoginPage')
@@ -193,6 +195,22 @@ export default function App() {
               element={
                 <AccountTypeRoute type="adopter">
                   <RequestSuccessPage />
+                </AccountTypeRoute>
+              }
+            />
+            <Route
+              path="/adocoes"
+              element={
+                <AccountTypeRoute type="adopter">
+                  <MyAdoptionsPage />
+                </AccountTypeRoute>
+              }
+            />
+            <Route
+              path="/adocoes/:adoptionId"
+              element={
+                <AccountTypeRoute type="adopter">
+                  <AdoptionDetailPage />
                 </AccountTypeRoute>
               }
             />

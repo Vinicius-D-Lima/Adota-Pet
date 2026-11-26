@@ -12,6 +12,9 @@ export const DB_PATH = path.join(here, 'db.json')
 const DEFAULT_DEMO_USER_ID = process.env.DEMO_USER_ID ?? 'demo'
 const DEFAULT_LIMIT = 12
 const MAX_LIMIT = 100
+const CHECK_IN_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+const CHECK_IN_MAX_PHOTOS = 5
+const CHECK_IN_MAX_PHOTO_BYTES = 5 * 1024 * 1024
 const ACTIVE_STATUSES = ['Enviada', 'Em análise', 'Aprovada']
 const CANCELLABLE_STATUSES = ['Enviada', 'Em análise']
 const FINAL_REQUEST_STATUSES = ['Aprovada', 'Recusada', 'Cancelada']
@@ -171,11 +174,19 @@ function parseMultipart(req) {
       return
     }
     const fields = {}
+    const files = []
     let file = null
+    let finished = false
+    let pendingFiles = 0
+    let readFiles = 0
+    const maybeResolve = () => {
+      if (finished && readFiles === pendingFiles) resolve({ fields, file, files })
+    }
     parser.on('field', (name, value) => {
       fields[name] = value
     })
     parser.on('file', (name, stream, info) => {
+      pendingFiles += 1
       const chunks = []
       stream.on('data', (chunk) => chunks.push(chunk))
       stream.on('end', () => {
@@ -185,10 +196,16 @@ function parseMultipart(req) {
           contentType: info.mimeType || 'application/octet-stream',
           buffer: Buffer.concat(chunks),
         }
+        files.push(file)
+        readFiles += 1
+        maybeResolve()
       })
     })
     parser.on('error', reject)
-    parser.on('finish', () => resolve({ fields, file }))
+    parser.on('finish', () => {
+      finished = true
+      maybeResolve()
+    })
     req.pipe(parser)
   })
 }
@@ -342,6 +359,8 @@ export function createApp({
     store.set('notificationPreferences', []).write()
   if (!Array.isArray(store.get('medicalRecords').value())) store.set('medicalRecords', []).write()
   if (!Array.isArray(store.get('storageObjects').value())) store.set('storageObjects', []).write()
+  if (!Array.isArray(store.get('followUpPlans').value())) store.set('followUpPlans', []).write()
+  if (!Array.isArray(store.get('checkIns').value())) store.set('checkIns', []).write()
 
   const currentUserId = (req) => {
     const requested = req.get('X-Demo-User-Id')
@@ -1634,8 +1653,9 @@ export function createApp({
       .map((request) => {
         const adopter = demoUser(request.userId) ?? {}
         const profile = getProfile(request.userId)
+        const adoptionId = `ADO-${request.id}`
         return {
-          id: `ADO-${request.id}`,
+          id: adoptionId,
           adoptedAt: request.date,
           adopterId: request.userId,
           adopter: {
@@ -1644,11 +1664,139 @@ export function createApp({
             email: profile.email || adopter.email || '',
           },
           pet: findPet(request.petId),
-          plan: null,
-          checkIns: [],
+          plan: store.get('followUpPlans').find({ adoptionId }).value() ?? null,
+          checkIns: store
+            .get('checkIns')
+            .filter({ adoptionId })
+            .value()
+            .sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
         }
       })
     res.json(list(data))
+  })
+
+  server.post('/check-ins/:id/submit', async (req, res) => {
+    const checkIn = store.get('checkIns').find({ id: req.params.id }).value()
+    if (!checkIn) return sendError(res, 404, 'Check-in não encontrado')
+
+    const adoption = store
+      .get('requests')
+      .value()
+      .find((request) => `ADO-${request.id}` === checkIn.adoptionId)
+    if (!adoption || adoption.userId !== currentUserId(req)) {
+      return sendError(res, 403, 'Somente o adotante pode enviar este check-in')
+    }
+    if (!['PENDENTE', 'ATRASADO'].includes(checkIn.status)) {
+      return sendError(res, 409, 'Este check-in não pode ser enviado neste estado')
+    }
+
+    let fields
+    let files
+    try {
+      ;({ fields, files } = await parseMultipart(req))
+    } catch {
+      return sendError(res, 400, 'Upload inválido')
+    }
+
+    const report = typeof fields.report === 'string' ? fields.report.trim() : ''
+    if (!report) {
+      return sendError(res, 400, 'Informe o relato do check-in', [
+        { field: 'report', message: 'Escreva um relato sobre o acompanhamento.' },
+      ])
+    }
+
+    const photos = (files ?? []).filter(({ field }) => field === 'files')
+    if (photos.length > CHECK_IN_MAX_PHOTOS) {
+      return sendError(res, 400, 'Upload inválido', [
+        { field: 'files', message: 'Escolha no máximo 5 fotos.' },
+      ])
+    }
+    const invalidType = photos.find((file) => !CHECK_IN_PHOTO_TYPES.includes(file.contentType))
+    if (invalidType) {
+      return sendError(res, 400, 'Upload inválido', [
+        { field: 'files', message: 'Use fotos nos formatos JPEG, PNG ou WebP.' },
+      ])
+    }
+    const tooLarge = photos.find((file) => file.buffer.length > CHECK_IN_MAX_PHOTO_BYTES)
+    if (tooLarge) {
+      return sendError(res, 400, 'Upload inválido', [
+        { field: 'files', message: 'Cada foto deve ter no máximo 5 MB.' },
+      ])
+    }
+
+    const photoIds = photos.map((file, index) => {
+      const object = {
+        id: `obj-${checkIn.id}-${Date.now()}-${index}`,
+        key: `check-ins/${checkIn.id}/${file.filename}`,
+        contentType: file.contentType,
+        sizeBytes: file.buffer.length,
+        resourceType: 'CHECK_IN',
+        resourceId: checkIn.id,
+        ownerId: adoption.userId,
+        createdAt: new Date().toISOString(),
+        // O mock não tem bucket: guarda os bytes para a URL assinada simulada.
+        dataUrl: `data:${file.contentType};base64,${file.buffer.toString('base64')}`,
+      }
+      store.get('storageObjects').push(object).write()
+      return object.id
+    })
+
+    const updated = {
+      ...checkIn,
+      status: 'ENVIADO',
+      submittedAt: new Date().toISOString(),
+      report,
+      photos: photoIds,
+      reviewerComment: null,
+      reviewedAt: null,
+    }
+    store.get('checkIns').find({ id: checkIn.id }).assign(updated).write()
+    res.json(updated)
+  })
+
+  server.post('/check-ins/:id/photos/:photoId/url', (req, res) => {
+    const checkIn = store.get('checkIns').find({ id: req.params.id }).value()
+    if (!checkIn) return sendError(res, 404, 'Check-in não encontrado')
+
+    const adoption = store
+      .get('requests')
+      .value()
+      .find((request) => `ADO-${request.id}` === checkIn.adoptionId)
+    const userId = currentUserId(req)
+    const isAdopter = adoption?.userId === userId
+    const isMember = !isAdopter && organizationsForUser(userId).length > 0
+    if (!isAdopter && !isMember) {
+      return sendError(res, 403, 'Sem acesso às fotos deste check-in')
+    }
+    if (!checkIn.photos.includes(req.params.photoId)) {
+      return sendError(res, 404, 'Foto não encontrada')
+    }
+    const object = store
+      .get('storageObjects')
+      .find({
+        id: req.params.photoId,
+        resourceType: 'CHECK_IN',
+        resourceId: checkIn.id,
+      })
+      .value()
+    if (!object) return sendError(res, 404, 'Foto não encontrada')
+
+    res.json({
+      url: `/files/${encodeURIComponent(object.id)}?token=mock-assinado`,
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    })
+  })
+
+  server.get('/files/:id', (req, res) => {
+    if (typeof req.query.token !== 'string' || !req.query.token) {
+      return sendError(res, 403, 'Sem acesso ao arquivo')
+    }
+    const object = store.get('storageObjects').find({ id: req.params.id }).value()
+    if (!object || typeof object.dataUrl !== 'string') {
+      return sendError(res, 404, 'Arquivo não encontrado')
+    }
+    const encoded = object.dataUrl.split(',')[1] ?? ''
+    res.type(object.contentType || 'application/octet-stream').send(Buffer.from(encoded, 'base64'))
   })
 
   server.get('/me/received-requests', (req, res) => {

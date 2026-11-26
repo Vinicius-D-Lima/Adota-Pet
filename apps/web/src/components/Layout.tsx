@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useMyAdoptions } from '../hooks/useAdoptions'
 import { useAdoptionRequests } from '../hooks/useAdoptionRequests'
 import { useDemoAccount } from '../hooks/useDemoAccount'
 import { useFavoriteIds } from '../hooks/useFavorites'
@@ -79,6 +80,8 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
   const requestsQuery = useAdoptionRequests(account.status !== 'loading')
   const requestCount =
     requestsQuery.data?.filter((item) => isActiveRequest(item.status)).length ?? 0
+  const adoptionsQuery = useMyAdoptions(account.isAuthenticated && !isGuardian)
+  const hasAdoptions = (adoptionsQuery.data?.length ?? 0) > 0
   const [open, setOpen] = useState(false)
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
   const accountMenuRef = useRef<HTMLDivElement>(null)
@@ -115,6 +118,7 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
                 ['/favoritos', 'Favoritos'],
                 ['/minhas-buscas', 'Buscas salvas'],
                 ['/solicitacoes', 'Minhas solicitações'],
+                ...(hasAdoptions ? ([['/adocoes', 'Minhas adoções']] as [string, string][]) : []),
                 [profilePath, 'Meu perfil'],
               ] as [string, string][])
             : []),

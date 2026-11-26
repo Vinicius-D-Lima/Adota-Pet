@@ -617,6 +617,91 @@
       "exams": []
     }
   ],
+  "followUpPlans": [
+    {
+      "id": "PLAN-SOL-1039",
+      "adoptionId": "ADO-SOL-1039",
+      "durationDays": 90,
+      "intervalDays": 15,
+      "createdBy": "demo-organization",
+      "createdAt": "2026-08-21T10:00:00.000Z",
+      "completedAt": null
+    }
+  ],
+  "checkIns": [
+    {
+      "id": "CHK-2001",
+      "adoptionId": "ADO-SOL-1039",
+      "dueDate": "2026-11-10T12:00:00.000Z",
+      "status": "ATRASADO",
+      "submittedAt": null,
+      "report": null,
+      "photos": [],
+      "reviewerComment": null,
+      "reviewedAt": null,
+      "createdAt": "2026-08-21T10:00:00.000Z"
+    },
+    {
+      "id": "CHK-2002",
+      "adoptionId": "ADO-SOL-1039",
+      "dueDate": "2026-11-20T12:00:00.000Z",
+      "status": "ENVIADO",
+      "submittedAt": "2026-11-19T18:30:00.000Z",
+      "report": "Fred já brinca com os vizinhos e dorme tranquilo à noite.",
+      "photos": ["obj-chk-2002-1", "obj-chk-2002-2"],
+      "reviewerComment": null,
+      "reviewedAt": null,
+      "createdAt": "2026-08-21T10:00:00.000Z"
+    },
+    {
+      "id": "CHK-2003",
+      "adoptionId": "ADO-SOL-1039",
+      "dueDate": "2026-11-27T12:00:00.000Z",
+      "status": "PENDENTE",
+      "submittedAt": null,
+      "report": null,
+      "photos": [],
+      "reviewerComment": null,
+      "reviewedAt": null,
+      "createdAt": "2026-08-21T10:00:00.000Z"
+    },
+    {
+      "id": "CHK-2004",
+      "adoptionId": "ADO-SOL-1039",
+      "dueDate": "2026-12-12T12:00:00.000Z",
+      "status": "PENDENTE",
+      "submittedAt": null,
+      "report": "Precisamos ver como ele reage ao novo brinquedo.",
+      "photos": [],
+      "reviewerComment": "Envie também uma foto do Fred com o brinquedo novo.",
+      "reviewedAt": null,
+      "createdAt": "2026-08-21T10:00:00.000Z"
+    },
+    {
+      "id": "CHK-2005",
+      "adoptionId": "ADO-SOL-1039",
+      "dueDate": "2026-12-27T12:00:00.000Z",
+      "status": "REVISADO",
+      "submittedAt": "2026-12-26T09:00:00.000Z",
+      "report": "Tudo ótimo, ele ganhou confiança rapidamente.",
+      "photos": [],
+      "reviewerComment": "Que bom! Continue com os passeios curtos e frequentes.",
+      "reviewedAt": "2026-12-26T15:00:00.000Z",
+      "createdAt": "2026-08-21T10:00:00.000Z"
+    },
+    {
+      "id": "CHK-2006",
+      "adoptionId": "ADO-SOL-1039",
+      "dueDate": "2027-01-11T12:00:00.000Z",
+      "status": "PENDENTE",
+      "submittedAt": null,
+      "report": null,
+      "photos": [],
+      "reviewerComment": null,
+      "reviewedAt": null,
+      "createdAt": "2026-08-21T10:00:00.000Z"
+    }
+  ],
   "storageObjects": [
     {
       "id": "obj-luna-1",
@@ -627,6 +712,28 @@
       "resourceId": "exam-luna-1",
       "ownerId": "demo-organization",
       "createdAt": "2026-02-10T10:00:00.000Z"
+    },
+    {
+      "id": "obj-chk-2002-1",
+      "key": "check-ins/CHK-2002/brincando.png",
+      "contentType": "image/png",
+      "sizeBytes": 70,
+      "resourceType": "CHECK_IN",
+      "resourceId": "CHK-2002",
+      "ownerId": "demo",
+      "createdAt": "2026-11-19T18:30:00.000Z",
+      "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2Y9kAAAAASUVORK5CYII="
+    },
+    {
+      "id": "obj-chk-2002-2",
+      "key": "check-ins/CHK-2002/dormindo.png",
+      "contentType": "image/png",
+      "sizeBytes": 70,
+      "resourceType": "CHECK_IN",
+      "resourceId": "CHK-2002",
+      "ownerId": "demo",
+      "createdAt": "2026-11-19T18:31:00.000Z",
+      "dataUrl": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2Y9kAAAAASUVORK5CYII="
     }
   ]
 }

@@ -1,3 +1,4 @@
+import type { Adoption } from '@adotapet/shared'
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -23,14 +24,23 @@ const requestsLink = () => screen.getByRole('link', { name: /minhas solicitaçõ
 function setupApi({
   favorites = [],
   requests = [],
-}: { favorites?: string[]; requests?: AdoptionRequest[] } = {}) {
+  adoptions = [],
+}: {
+  favorites?: string[]
+  requests?: AdoptionRequest[]
+  adoptions?: Adoption[]
+} = {}) {
   fakeFavoritesApi(mocks, { initial: favorites })
   const favoritesGet = mocks.get.getMockImplementation()
-  mocks.get.mockImplementation((path: string) =>
-    path === '/me/requests'
-      ? Promise.resolve({ data: requests, total: requests.length })
-      : favoritesGet?.(path),
-  )
+  mocks.get.mockImplementation((path: string) => {
+    if (path === '/me/requests') {
+      return Promise.resolve({ data: requests, total: requests.length })
+    }
+    if (path === '/me/adoptions') {
+      return Promise.resolve({ data: adoptions, total: adoptions.length })
+    }
+    return favoritesGet?.(path)
+  })
 }
 
 beforeEach(() => {
@@ -105,5 +115,42 @@ describe('Layout - contador de solicitações', () => {
 
     await waitFor(() => expect(mocks.get).toHaveBeenCalledWith('/me/requests'))
     expect(requestsLink()).toHaveTextContent(/^Minhas solicitações$/)
+  })
+})
+
+describe('Layout - link Minhas adoções', () => {
+  it('mostra o link quando o adotante tem adoções', async () => {
+    setupApi({
+      adoptions: [
+        {
+          id: 'ADO-1',
+          adoptedAt: '2026-08-20T12:00:00.000Z',
+          pet: { id: 'fred', name: 'Fred' },
+          checkIns: [],
+        },
+      ],
+    })
+    renderWithProviders(
+      <Layout profileName="">
+        <p>conteúdo</p>
+      </Layout>,
+    )
+
+    expect(await screen.findByRole('link', { name: /minhas adoções/i })).toHaveAttribute(
+      'href',
+      '/adocoes',
+    )
+  })
+
+  it('esconde o link quando não há adoções', async () => {
+    setupApi()
+    renderWithProviders(
+      <Layout profileName="">
+        <p>conteúdo</p>
+      </Layout>,
+    )
+
+    await waitFor(() => expect(mocks.get).toHaveBeenCalledWith('/me/adoptions', expect.anything()))
+    expect(screen.queryByRole('link', { name: /minhas adoções/i })).not.toBeInTheDocument()
   })
 })

@@ -2,7 +2,12 @@
 import { readFileSync } from 'node:fs'
 import request from 'supertest'
 import { beforeEach, describe, expect, it } from 'vitest'
-import { adoptionRequestSchema, adoptionRequestsResponseSchema } from '@adotapet/shared'
+import {
+  adoptionRequestSchema,
+  adoptionRequestsResponseSchema,
+  adoptionsResponseSchema,
+  signedUrlSchema,
+} from '@adotapet/shared'
 import { SEED_PATH, createApp } from './server.js'
 
 // Garante que o que o mock devolve é aceito pelos schemas que o frontend usa para validar a API.
@@ -43,5 +48,17 @@ describe('contrato mock x schemas do frontend', () => {
       .send({ to: 'CANCELADA' })
     expect(cancelled.status).toBe(200)
     expect(adoptionRequestSchema.safeParse(cancelled.body).error).toBeUndefined()
+  })
+
+  it('GET /me/adoptions é aceito por adoptionsResponseSchema', async () => {
+    const res = await request(app).get('/me/adoptions')
+    expect(res.status).toBe(200)
+    expect(adoptionsResponseSchema.safeParse(res.body).error).toBeUndefined()
+  })
+
+  it('a URL de foto de check-in é aceita por signedUrlSchema', async () => {
+    const res = await request(app).post('/check-ins/CHK-2002/photos/obj-chk-2002-1/url')
+    expect(res.status).toBe(200)
+    expect(signedUrlSchema.safeParse(res.body).error).toBeUndefined()
   })
 })

@@ -1,6 +1,7 @@
 /** Contrato de dados compartilhado entre @adotapet/web e @adotapet/api. */
 export * from './apiSchemas.js'
 export * from './authSchemas.js'
+export * from './checkInSchema.js'
 export * from './createAccountSchema.js'
 export * from './favoriteSchema.js'
 export * from './guardianProfileSchema.js'

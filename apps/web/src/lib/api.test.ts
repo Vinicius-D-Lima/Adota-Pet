@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { api, buildUrl } from './api'
+import { api, buildUrl, resolveApiUrl } from './api'
 import { ApiError } from './ApiError'
 import { shouldRetry } from './queryClient'
 
@@ -33,6 +33,18 @@ describe('buildUrl', () => {
   it('respeita VITE_API_URL', () => {
     vi.stubEnv('VITE_API_URL', 'https://api.exemplo.com/v1/')
     expect(buildUrl('pets')).toBe('https://api.exemplo.com/v1/pets')
+  })
+})
+
+describe('resolveApiUrl', () => {
+  it('prefixa URLs assinadas relativas com a base da API', () => {
+    expect(resolveApiUrl('/files/obj-1?token=abc')).toBe('/api/files/obj-1?token=abc')
+  })
+
+  it('mantém URLs absolutas', () => {
+    expect(resolveApiUrl('https://cdn.exemplo.com/foto.jpg')).toBe(
+      'https://cdn.exemplo.com/foto.jpg',
+    )
   })
 })
 
@@ -103,6 +115,71 @@ describe('api', () => {
   it('tolera erro sem corpo JSON', async () => {
     mockFetch(() => Promise.resolve(new Response('oops', { status: 500, statusText: 'Boom' })))
     await expect(api.get('/x')).rejects.toMatchObject({ statusCode: 500, message: 'Boom' })
+  })
+})
+
+describe('api com progresso de upload', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('usa XHR, envia headers e reporta o percentual', async () => {
+    const instances: Array<{
+      opened: [string, string]
+      headers: Map<string, string>
+      body?: FormData
+    }> = []
+
+    class FakeXhr {
+      status = 200
+      statusText = 'OK'
+      responseText = JSON.stringify({ ok: true })
+      withCredentials = false
+      headers = new Map<string, string>()
+      opened: [string, string] = ['', '']
+      body?: FormData
+      upload = { onprogress: null as ((event: unknown) => void) | null }
+      onload: (() => void) | null = null
+      onerror: (() => void) | null = null
+      onabort: (() => void) | null = null
+
+      constructor() {
+        instances.push(this as unknown as (typeof instances)[number])
+      }
+
+      open(method: string, url: string) {
+        this.opened = [method, url]
+      }
+
+      setRequestHeader(key: string, value: string) {
+        this.headers.set(key, value)
+      }
+
+      send(body: FormData) {
+        this.body = body
+        this.upload.onprogress?.({ lengthComputable: true, loaded: 5, total: 10 })
+        this.onload?.()
+      }
+
+      abort() {
+        this.onabort?.()
+      }
+    }
+
+    vi.stubGlobal('XMLHttpRequest', FakeXhr)
+    const fetchMock = mockFetch(() => Promise.resolve(json(200, {})))
+    const form = new FormData()
+    form.append('files', new Blob(['x']), 'foto.png')
+    const progress: number[] = []
+
+    await expect(
+      api.post('/check-ins/1/submit', form, { onUploadProgress: (value) => progress.push(value) }),
+    ).resolves.toEqual({ ok: true })
+
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(progress).toEqual([50, 100])
+    expect(instances[0].opened).toEqual(['POST', '/api/check-ins/1/submit'])
+    // Headers.forEach entrega chaves minúsculas; o Map do fake não é case-insensitive.
+    expect(instances[0].headers.get('accept')).toBe('application/json')
+    expect(instances[0].body).toBe(form)
   })
 })
 
