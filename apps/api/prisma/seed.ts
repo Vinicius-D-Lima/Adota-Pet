@@ -95,6 +95,7 @@ async function main() {
     prisma.notificationPreference.deleteMany(),
     prisma.notification.deleteMany(),
     prisma.chatMessage.deleteMany(),
+    prisma.appointment.deleteMany(),
     prisma.adoptionRequest.deleteMany(),
     prisma.favorite.deleteMany(),
     prisma.pet.deleteMany(),

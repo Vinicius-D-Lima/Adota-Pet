@@ -301,7 +301,7 @@ databaseSuite('área da instituição: RBAC, fila e compatibilidade (#26/#28)', 
     expect(response.body).toMatchObject({ total: 0, data: [] })
   })
 
-  it('[AGD-01] Zod bloqueia horário passado e tipo inválido no backend', async () => {
+  it('[AGD-LEGADO-01] Zod bloqueia horário passado e tipo inválido no backend', async () => {
     const { headers } = await makeGuardian('org-agd-01')
     await makeAdopter('adopter-agd-01')
     await makePet('pet-agd-01')
@@ -329,7 +329,7 @@ databaseSuite('área da instituição: RBAC, fila e compatibilidade (#26/#28)', 
     )
   })
 
-  it('[AGD-02] aceita de 1 a 3 horários futuros e rejeita 4', async () => {
+  it('[AGD-LEGADO-02] aceita de 1 a 3 horários futuros e rejeita 4', async () => {
     const { headers } = await makeGuardian('org-agd-02')
     await makeAdopter('adopter-agd-02')
     await makePet('pet-agd-02')

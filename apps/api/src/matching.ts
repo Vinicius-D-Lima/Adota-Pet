@@ -1,6 +1,6 @@
 import type { MatchingCheck, MatchingLevel, MatchingScore } from '@adotapet/shared'
 
-type MatchingPet = {
+export type MatchingPet = {
   name: string
   energy: string
   space: string
@@ -24,17 +24,63 @@ export interface MatchingAdopter {
   experience?: unknown
 }
 
+/** Pesos dos 7 critérios (MATCH-03/07). Padrão: pesos iguais, como no frontend. */
+export interface MatchingWeights {
+  energy: number
+  space: number
+  children: number
+  otherPets: number
+  specialCare: number
+  experience: number
+  dailyTime: number
+}
+
+export interface MatchingThresholds {
+  high: number
+  medium: number
+}
+
+/** Estratégia injetável: trocar o cálculo não exige mudar controllers (MATCH-07). */
+export interface MatchingStrategy {
+  calculate(pet: MatchingPet | null, adopter: MatchingAdopter): MatchingScore | null
+}
+
+const CHECK_KEYS: Array<keyof MatchingWeights> = [
+  'energy',
+  'space',
+  'children',
+  'otherPets',
+  'specialCare',
+  'experience',
+  'dailyTime',
+]
+
+export const DEFAULT_MATCHING_WEIGHTS: MatchingWeights = {
+  energy: 1,
+  space: 1,
+  children: 1,
+  otherPets: 1,
+  specialCare: 1,
+  experience: 1,
+  dailyTime: 1,
+}
+
+export const DEFAULT_MATCHING_THRESHOLDS: MatchingThresholds = { high: 80, medium: 55 }
+
+/** Níveis e limites do contrato: alta a partir de 80, média a partir de 55. */
+export function matchingLevelForScore(
+  score: number,
+  thresholds: MatchingThresholds = DEFAULT_MATCHING_THRESHOLDS,
+): MatchingLevel {
+  return score >= thresholds.high ? 'Alta' : score >= thresholds.medium ? 'Média' : 'Baixa'
+}
+
 /**
  * Compatibilidade pet × adotante (#19). Porta os critérios usados pela tela de
  * compatibilidade do adotante para que a instituição veja o mesmo resultado,
  * calculado no servidor e persistível no contrato da solicitação.
  */
-export function calculateRequestMatching(
-  pet: MatchingPet | null,
-  adopter: MatchingAdopter,
-): MatchingScore | null {
-  if (!pet) return null
-
+function buildChecks(pet: MatchingPet, adopter: MatchingAdopter): MatchingCheck[] {
   const text = (value: unknown, fallback: string) =>
     typeof value === 'string' && value ? value : fallback
   const activityLevel = text(adopter.activityLevel, 'Moderado')
@@ -45,7 +91,7 @@ export function calculateRequestMatching(
   const hasOtherPets = adopter.hasOtherPets === true
   const acceptsSpecialCare = adopter.acceptsSpecialCare === true
 
-  const checks: MatchingCheck[] = [
+  return [
     {
       ok: pet.energy !== 'Alta' || activityLevel === 'Ativo',
       good: `Sua rotina ${activityLevel.toLowerCase()} combina com o nível de energia de ${pet.name}.`,
@@ -84,15 +130,47 @@ export function calculateRequestMatching(
       attention: `${pet.name} tem energia alta e pode precisar de mais tempo do que ${dailyTime.toLowerCase()} por dia.`,
     },
   ]
+}
 
-  const matched = checks.filter((item) => item.ok).length
-  const score = Math.round((matched / checks.length) * 100)
-  const level: MatchingLevel = score >= 80 ? 'Alta' : score >= 55 ? 'Média' : 'Baixa'
+/** Cria a estratégia padrão (ou uma variante com pesos/limites diferentes). */
+export function createMatchingStrategy(
+  options: {
+    weights?: Partial<MatchingWeights>
+    thresholds?: Partial<MatchingThresholds>
+  } = {},
+): MatchingStrategy {
+  const weights: MatchingWeights = { ...DEFAULT_MATCHING_WEIGHTS, ...options.weights }
+  const thresholds: MatchingThresholds = {
+    ...DEFAULT_MATCHING_THRESHOLDS,
+    ...options.thresholds,
+  }
+  const totalWeight = CHECK_KEYS.reduce((sum, key) => sum + weights[key], 0)
 
   return {
-    score,
-    level,
-    good: checks.filter((item) => item.ok),
-    attention: checks.filter((item) => !item.ok),
+    calculate(pet, adopter) {
+      if (!pet) return null
+      const checks = buildChecks(pet, adopter)
+      const matchedWeight = checks.reduce(
+        (sum, check, index) => sum + (check.ok ? weights[CHECK_KEYS[index]] : 0),
+        0,
+      )
+      const score = Math.round((matchedWeight / totalWeight) * 100)
+      return {
+        score,
+        level: matchingLevelForScore(score, thresholds),
+        good: checks.filter((item) => item.ok),
+        attention: checks.filter((item) => !item.ok),
+      }
+    },
   }
+}
+
+export const defaultMatchingStrategy = createMatchingStrategy()
+
+/** Compatibilidade usada pelo detalhe da solicitação (#19/#20). */
+export function calculateRequestMatching(
+  pet: MatchingPet | null,
+  adopter: MatchingAdopter,
+): MatchingScore | null {
+  return defaultMatchingStrategy.calculate(pet, adopter)
 }

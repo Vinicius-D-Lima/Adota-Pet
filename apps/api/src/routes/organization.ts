@@ -10,10 +10,13 @@ import {
   type ReceivedRequestsQuery,
   type RequestStatusCode,
 } from '@adotapet/shared'
-import type { Request } from 'express'
+import type { Request, Response } from 'express'
 import { Router } from 'express'
+import { z } from 'zod'
 import {
+  currentUser,
   demoRole,
+  isChatParticipant,
   organizationIdentity,
   organizationPets,
   permissionsForRole,
@@ -24,8 +27,13 @@ import {
   type PetWithOrganization,
 } from '../context.js'
 import { prisma } from '../db.js'
-import { APPOINTMENT_CONFIRMED, APPOINTMENT_PROPOSED, enqueueDomainEvent } from '../events.js'
-import { Prisma } from '../generated/prisma/client.js'
+import {
+  APPOINTMENT_CONFIRMED,
+  APPOINTMENT_PROPOSED,
+  APPOINTMENT_RESCHEDULE_REQUESTED,
+  enqueueDomainEvent,
+} from '../events.js'
+import { Prisma, type Appointment } from '../generated/prisma/client.js'
 import { HttpError, list, sendError } from '../http.js'
 import { petMedicalInclude } from '../medicalRecords.js'
 import { applyTransition } from '../requestStatusMachine.js'
@@ -51,6 +59,150 @@ const presentOrganizationPet = (pet: PetWithOrganization) => ({
 
 const petNameOf = async (petId: string) =>
   (await prisma.pet.findUnique({ where: { id: petId }, select: { name: true } }))?.name ?? 'pet'
+
+/*
+ * Agendamento de entrevista/visita (#21). Os valores gravados no banco são
+ * Strings; o contrato abaio é a fonte única de validação das rotas e da OpenAPI.
+ */
+const APPOINTMENT_TYPES = ['ENTREVISTA', 'VISITA_DOMICILIAR'] as const
+const APPOINTMENT_STATUSES = [
+  'PROPOSTO',
+  'CONFIRMADO',
+  'REMARCACAO_SOLICITADA',
+  'CANCELADO',
+  'REALIZADO',
+] as const
+
+type AppointmentType = (typeof APPOINTMENT_TYPES)[number]
+type AppointmentProposeBody = {
+  type: AppointmentType
+  proposedSlots: string[]
+  location?: string
+  notes?: string
+}
+type AppointmentRescheduleBody = { proposedSlots?: string[]; notes?: string }
+
+/** ISO 8601 com data válida. A normalização para UTC acontece no handler. */
+const isoUtc = z
+  .string()
+  .trim()
+  .min(1, 'Informe o horário.')
+  .refine((value) => !Number.isNaN(new Date(value).getTime()), 'Informe uma data ISO 8601 válida.')
+const futureIsoSlot = isoUtc.refine(
+  (value) => new Date(value).getTime() > Date.now(),
+  'Todos os horários precisam ser datas futuras.',
+)
+/** ISO 8601 em UTC: o formato gravado no banco e devolvido na API (#21/AGD-08). */
+const asUtc = (value: string) => new Date(value).toISOString()
+const proposedSlotsSchema = z
+  .array(futureIsoSlot)
+  .min(1, 'Proponha de 1 a 3 horários.')
+  .max(3, 'Proponha no máximo 3 horários.')
+
+export const appointmentProposeBodySchema = z.strictObject({
+  type: z.enum(APPOINTMENT_TYPES),
+  proposedSlots: proposedSlotsSchema,
+  location: z.string().trim().max(200).optional(),
+  notes: z.string().trim().max(1000).optional(),
+})
+export const appointmentConfirmBodySchema = z.strictObject({ confirmedAt: isoUtc })
+export const appointmentRescheduleBodySchema = z.strictObject({
+  proposedSlots: proposedSlotsSchema.optional(),
+  notes: z.string().trim().max(1000).optional(),
+})
+const requestIdParamsSchema = z.strictObject({ id: z.string().min(1) })
+export const appointmentParamsSchema = z.strictObject({
+  id: z.string().min(1),
+  appointmentId: z.string().min(1),
+})
+export const appointmentSchema = z.strictObject({
+  id: z.string().min(1),
+  requestId: z.string().min(1),
+  type: z.enum(APPOINTMENT_TYPES),
+  proposedSlots: z.array(z.string()),
+  confirmedAt: z.string().nullable(),
+  location: z.string().nullable(),
+  notes: z.string().nullable(),
+  status: z.enum(APPOINTMENT_STATUSES),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export const appointmentListSchema = z.strictObject({
+  data: z.array(appointmentSchema),
+  total: z.number().int().nonnegative(),
+})
+
+/** Relógio injetável: AGD-04 testa a realização antes da data confirmada. */
+export const appointmentClock = { now: () => new Date() }
+
+const presentAppointment = (appointment: Appointment) =>
+  appointmentSchema.parse({
+    id: appointment.id,
+    requestId: appointment.requestId,
+    type: appointment.type,
+    proposedSlots: appointment.proposedSlots,
+    confirmedAt: appointment.confirmedAt?.toISOString() ?? null,
+    location: appointment.location ?? null,
+    notes: appointment.notes ?? null,
+    status: appointment.status,
+    createdAt: appointment.createdAt.toISOString(),
+    updatedAt: appointment.updatedAt.toISOString(),
+  })
+
+const petForAppointment = async (petId: string) => {
+  const pet = await prisma.pet.findUnique({
+    where: { id: petId },
+    select: { name: true, organizationEntity: { select: { name: true } } },
+  })
+  return { name: pet?.name ?? 'pet', organization: pet?.organizationEntity.name ?? 'Instituição' }
+}
+
+/** ENTREVISTA pode sair de ANALISE_QUESTIONARIO; VISITA só da sua própria etapa. */
+const appointmentAllowed = (status: string | undefined, type: AppointmentType) => {
+  if (type === 'ENTREVISTA') {
+    return status === 'ANALISE_QUESTIONARIO' || status === 'ENTREVISTA'
+  }
+  return status === 'VISITA_DOMICILIAR'
+}
+
+async function managedRequestOrError(req: Request, res: Response, viewerId: string) {
+  const request = await receivedRequestOf(req, viewerId)
+  if (request) return request
+  const exists = await prisma.adoptionRequest.findUnique({
+    where: { id: String(req.params.id) },
+    select: { id: true },
+  })
+  sendError(
+    res,
+    exists ? 403 : 404,
+    exists ? 'Você não tem acesso a esta solicitação' : 'Solicitação não encontrada',
+  )
+  return null
+}
+
+async function participantRequestOrError(req: Request, res: Response, viewerId: string) {
+  const request = await prisma.adoptionRequest.findUnique({ where: { id: String(req.params.id) } })
+  if (!request) {
+    sendError(res, 404, 'Solicitação não encontrada')
+    return null
+  }
+  if (!(await isChatParticipant(request, viewerId))) {
+    sendError(res, 403, 'Você não tem acesso a esta solicitação')
+    return null
+  }
+  return request
+}
+
+async function appointmentOrError(req: Request, res: Response, requestId: string) {
+  const appointment = await prisma.appointment.findFirst({
+    where: { id: String(req.params.appointmentId), requestId },
+  })
+  if (!appointment) {
+    sendError(res, 404, 'Agendamento não encontrado')
+    return null
+  }
+  return appointment
+}
 
 /** Solicitação dos pets da instituição ou `null` (com 404 já enviado). */
 async function receivedRequestOf(req: Request, viewerId: string) {
@@ -328,6 +480,229 @@ organizationRouter.post('/me/received-requests/:id/interview/complete', async (r
   })
   res.json(await withReceivedRequest(updated, viewer.id))
 })
+
+organizationRouter.post(
+  '/me/received-requests/:id/appointments',
+  validate({ params: requestIdParamsSchema, body: appointmentProposeBodySchema }),
+  async (req, res) => {
+    const viewer = await requireGuardian(req, res)
+    if (!viewer) return
+    if (!requirePermission(req, res, 'requests:review')) return
+    const request = await managedRequestOrError(req, res, viewer.id)
+    if (!request) return
+
+    const { type, proposedSlots, location, notes } = req.body as AppointmentProposeBody
+    const slots = proposedSlots.map(asUtc)
+    if (!appointmentAllowed(requestStatusCodeOf(request.status), type)) {
+      return sendError(
+        res,
+        409,
+        type === 'ENTREVISTA'
+          ? 'Só é possível propor uma entrevista com a solicitação em análise ou entrevista.'
+          : 'Só é possível propor uma visita com a solicitação em visita domiciliar.',
+      )
+    }
+
+    const pet = await petForAppointment(request.petId)
+    const appointment = await prisma.$transaction(async (tx) => {
+      const created = await tx.appointment.create({
+        data: {
+          requestId: request.id,
+          type,
+          proposedSlots: slots,
+          location,
+          notes,
+          status: 'PROPOSTO',
+        },
+      })
+      await enqueueDomainEvent(tx, APPOINTMENT_PROPOSED, {
+        requestId: request.id,
+        adopterId: request.userId,
+        petName: pet.name,
+        type,
+        slotCount: slots.length,
+      })
+      return created
+    })
+    res.status(201).json(presentAppointment(appointment))
+  },
+)
+
+organizationRouter.get(
+  '/requests/:id/appointments',
+  validate({ params: requestIdParamsSchema }),
+  async (req, res) => {
+    const { id: viewerId } = await currentUser(req)
+    const request = await participantRequestOrError(req, res, viewerId)
+    if (!request) return
+    const appointments = await prisma.appointment.findMany({
+      where: { requestId: request.id },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    })
+    res.json(list(appointments.map(presentAppointment)))
+  },
+)
+
+organizationRouter.post(
+  '/requests/:id/appointments/:appointmentId/confirm',
+  validate({ params: appointmentParamsSchema, body: appointmentConfirmBodySchema }),
+  async (req, res) => {
+    const { id: viewerId } = await currentUser(req)
+    const request = await participantRequestOrError(req, res, viewerId)
+    if (!request) return
+    if (request.userId !== viewerId) {
+      return sendError(res, 403, 'Somente o adotante pode confirmar um agendamento')
+    }
+    const appointment = await appointmentOrError(req, res, request.id)
+    if (!appointment) return
+    if (appointment.status !== 'PROPOSTO') {
+      return sendError(res, 409, 'Este agendamento não está aguardando confirmação')
+    }
+
+    const confirmedAt = asUtc(req.body.confirmedAt)
+    if (!appointment.proposedSlots.includes(confirmedAt)) {
+      return sendError(res, 400, 'O horário confirmado deve ser um dos horários propostos', [
+        { field: 'confirmedAt', message: 'Escolha um dos horários propostos' },
+      ])
+    }
+
+    const pet = await petForAppointment(request.petId)
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.appointment.update({
+        where: { id: appointment.id },
+        data: { status: 'CONFIRMADO', confirmedAt: new Date(confirmedAt) },
+      })
+      await enqueueDomainEvent(tx, APPOINTMENT_CONFIRMED, {
+        requestId: request.id,
+        adopterId: request.userId,
+        petName: pet.name,
+        completedAt: confirmedAt,
+      })
+      return row
+    })
+    res.json(presentAppointment(updated))
+  },
+)
+
+organizationRouter.post(
+  '/requests/:id/appointments/:appointmentId/reschedule',
+  validate({ params: appointmentParamsSchema, body: appointmentRescheduleBodySchema }),
+  async (req, res) => {
+    const { id: viewerId } = await currentUser(req)
+    const request = await participantRequestOrError(req, res, viewerId)
+    if (!request) return
+    const appointment = await appointmentOrError(req, res, request.id)
+    if (!appointment) return
+
+    const body = req.body as AppointmentRescheduleBody
+    const slots = body.proposedSlots?.map(asUtc)
+    const isAdopter = request.userId === viewerId
+    if (!isAdopter && !requirePermission(req, res, 'requests:review')) return
+    if (isAdopter && body.proposedSlots) {
+      return sendError(res, 403, 'Somente o responsável pode propor novos horários')
+    }
+    if (!isAdopter && !body.proposedSlots) {
+      return sendError(res, 400, 'Informe de 1 a 3 novos horários', [
+        { field: 'proposedSlots', message: 'Proponha de 1 a 3 horários' },
+      ])
+    }
+    if (appointment.status === 'REALIZADO' || appointment.status === 'CANCELADO') {
+      return sendError(res, 409, 'Este agendamento já foi encerrado')
+    }
+    if (isAdopter && appointment.status !== 'CONFIRMADO') {
+      return sendError(res, 409, 'Só é possível pedir remarcação de um agendamento confirmado')
+    }
+
+    const pet = await petForAppointment(request.petId)
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.appointment.update({
+        where: { id: appointment.id },
+        data: isAdopter
+          ? {
+              status: 'REMARCACAO_SOLICITADA',
+              confirmedAt: null,
+              notes: body.notes ?? appointment.notes,
+            }
+          : {
+              status: 'PROPOSTO',
+              proposedSlots: slots ?? appointment.proposedSlots,
+              confirmedAt: null,
+              notes: body.notes ?? appointment.notes,
+            },
+      })
+      if (isAdopter) {
+        await enqueueDomainEvent(tx, APPOINTMENT_RESCHEDULE_REQUESTED, {
+          requestId: request.id,
+          adopterId: request.userId,
+          petName: pet.name,
+          organization: pet.organization,
+          type: appointment.type,
+        })
+      } else {
+        await enqueueDomainEvent(tx, APPOINTMENT_PROPOSED, {
+          requestId: request.id,
+          adopterId: request.userId,
+          petName: pet.name,
+          type: appointment.type,
+          slotCount: (slots ?? appointment.proposedSlots).length,
+        })
+      }
+      return row
+    })
+    res.json(presentAppointment(updated))
+  },
+)
+
+organizationRouter.post(
+  '/me/received-requests/:id/appointments/:appointmentId/complete',
+  validate({ params: appointmentParamsSchema }),
+  async (req, res) => {
+    const viewer = await requireGuardian(req, res)
+    if (!viewer) return
+    if (!requirePermission(req, res, 'requests:review')) return
+    const request = await managedRequestOrError(req, res, viewer.id)
+    if (!request) return
+    const appointment = await appointmentOrError(req, res, request.id)
+    if (!appointment) return
+    if (appointment.status !== 'CONFIRMADO' || !appointment.confirmedAt) {
+      return sendError(res, 409, 'O agendamento precisa estar confirmado para ser realizado')
+    }
+
+    const now = appointmentClock.now()
+    if (now.getTime() < appointment.confirmedAt.getTime()) {
+      return sendError(res, 400, 'A data confirmada ainda não chegou', [
+        { field: 'confirmedAt', message: 'Não é possível marcar como realizado antes da data' },
+      ])
+    }
+    const completedAt = now.toISOString()
+    const interview = {
+      ...(asRecord(request.interview) ?? {}),
+      type: appointment.type === 'ENTREVISTA' ? 'Entrevista online' : 'Visita presencial',
+      proposedSlots: appointment.proposedSlots,
+      status: 'REALIZADA',
+      completed: true,
+      scheduledAt: appointment.confirmedAt.toISOString(),
+      completedAt,
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.appointment.update({
+        where: { id: appointment.id },
+        data: { status: 'REALIZADO' },
+      })
+      // FSM #20: a máquina lê `request.interview`, não a tabela de agendamentos.
+      await tx.adoptionRequest.update({ where: { id: request.id }, data: { interview } })
+      await enqueueDomainEvent(tx, APPOINTMENT_CONFIRMED, {
+        requestId: request.id,
+        adopterId: request.userId,
+        petName: await petNameOf(request.petId),
+        completedAt,
+      })
+      return row
+    })
+    res.json(presentAppointment(updated))
+  },
+)
 
 organizationRouter.post(
   '/me/received-requests/:id/transitions',

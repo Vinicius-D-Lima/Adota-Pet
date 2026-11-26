@@ -202,6 +202,12 @@ Registro curto das escolhas que moldaram o projeto: o contexto, a decisão e a c
 - **Decisão:** a transição passa a ter uma entrada única, `POST /requests/:id/transitions`, com corpo `{ to, reason? }` validado por schema compartilhado. A tabela `requestTransitionTable` (em `@adotapet/shared`) define origem, destino, papel e guardas; o atalho legado `ANALISE_QUESTIONARIO → APROVADA` e a rota antiga da instituição viram adapters da mesma tabela. Os códigos controlados (`ENVIADA` … `CANCELADA`) são gravados no banco, enquanto a API continua devolvendo os rótulos legados para não quebrar o frontend. Cada transição grava `RequestStatusHistory`, enriquece `RequestStatusChanged` com `from`/`to`/`actorId`/`reason` e usa `version` + `updateMany` condicional para que só uma transição simultânea vença. Avançar de `ENTREVISTA` exige entrevista online realizada; avançar de `VISITA_DOMICILIAR` exige visita presencial realizada.
 - **Consequência:** os 11 testes `FSM` rodam com Vitest + supertest no Postgres de teste da nuvem, sem Docker. HTML no motivo é gravado como texto puro; erros de papel retornam 403, transições fora da tabela 409 com `transição inválida de X para Y`, e motivo ausente na recusa 400.
 
+## 38. Agendamento com tabela própria e espelho no JSON da entrevista (#21)
+
+- **Contexto:** entrevista e visita domiciliar eram só um JSON `interview` na solicitação, sem controle de horários confirmados, remarcação ou permissões por parte. A FSM (#20) continua lendo esse JSON para autorizar a saída da etapa.
+- **Decisão:** a tabela `Appointment` guarda tipo, horários propostos em ISO UTC, horário confirmado e status (`PROPOSTO`…`REALIZADO`); as rotas novas separam quem propõe/marca realizado (instituição) de quem confirma/pede remarcação (adotante), com `isChatParticipant` para leitura. Ao marcar como realizado, o JSON `interview` é espelhado com `status: REALIZADA` e `completed: true`. Proposta, confirmação e pedido de remarcação entram no outbox na mesma transação; o novo evento `AppointmentRescheduleRequested` notifica os responsáveis.
+- **Consequência:** as rotas antigas `/interview` seguem funcionando e os testes `AGD-01`…`AGD-09` cobrem o fluxo novo sem quebrar a máquina de estados. Os dois testes antigos com IDs `AGD` passaram a usar `AGD-LEGADO-*`.
+
 ## Decisão pendente: acessibilidade
 
 O trabalho de acessibilidade (#57) foi mesclado e depois **revertido** (PR #82). Ele não está na `dev`. Veja [Histórico](historico.md#o-revert-da-acessibilidade-81-e-82) e [Roadmap](roadmap.md#acessibilidade-57).

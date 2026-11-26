@@ -57,6 +57,16 @@ export const appointmentConfirmedEventSchema = z.strictObject({
   completedAt: z.string().min(1),
 })
 
+/** #21: o adotante pede novos horários; o responsável é notificado. */
+export const APPOINTMENT_RESCHEDULE_REQUESTED = 'AppointmentRescheduleRequested'
+export const appointmentRescheduleRequestedEventSchema = z.strictObject({
+  requestId: stringId,
+  adopterId: stringId,
+  petName: z.string().min(1).max(200),
+  organization: z.string().min(1).max(200),
+  type: z.string().min(1).max(80),
+})
+
 export const MESSAGE_RECEIVED = 'MessageReceived'
 export const messageReceivedEventSchema = z.strictObject({
   requestId: stringId,
@@ -103,6 +113,7 @@ export const domainEventSchemas = {
   [REQUEST_STATUS_CHANGED]: requestStatusChangedEventSchema,
   [APPOINTMENT_PROPOSED]: appointmentProposedEventSchema,
   [APPOINTMENT_CONFIRMED]: appointmentConfirmedEventSchema,
+  [APPOINTMENT_RESCHEDULE_REQUESTED]: appointmentRescheduleRequestedEventSchema,
   [MESSAGE_RECEIVED]: messageReceivedEventSchema,
   [CHECK_IN_DUE]: checkInDueEventSchema,
   [CHECK_IN_OVERDUE]: checkInOverdueEventSchema,

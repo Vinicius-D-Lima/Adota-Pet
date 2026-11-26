@@ -6,10 +6,11 @@ import type { Logger } from 'pino'
 import { loadConfig, type ApiConfig } from './config.js'
 import { errorHandler, sendError } from './http.js'
 import { logger as defaultLogger, requestDetailsLogger, requestLogger } from './logger.js'
+import type { MatchingStrategy } from './matching.js'
 import { mountDocs } from './openapi.js'
 import { createAuthRouter, meRouter } from './routes/auth.js'
 import { createHealthRouter } from './routes/health.js'
-import { apiRouter } from './routes/index.js'
+import { createApiRouter } from './routes/index.js'
 import { fileRouter } from './routes/storage.js'
 
 export interface AppOptions {
@@ -18,6 +19,8 @@ export interface AppOptions {
   logger?: Logger
   /** Injetável para testar 200/503 do health sem derrubar o banco. */
   checkDatabase?: () => Promise<boolean>
+  /** Estratégia de compatibilidade (MATCH-07). */
+  matchingStrategy?: MatchingStrategy
 }
 
 /** Composição da aplicação (#47): segurança → observabilidade → rotas → erros. */
@@ -82,7 +85,7 @@ export function createApp(options: AppOptions = {}): Express {
 
   app.use('/me', meRouter)
   app.use(fileRouter)
-  app.use('/api', apiRouter)
+  app.use('/api', createApiRouter(options))
   mountDocs(app)
 
   // Deve ser o último middleware: captura erros de parser, validação e handlers.

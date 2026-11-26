@@ -31,6 +31,7 @@ export const QUEUES = {
   requestStatus: 'RequestStatusChanged',
   appointmentProposed: 'AppointmentProposed',
   appointmentConfirmed: 'AppointmentConfirmed',
+  appointmentRescheduleRequested: 'AppointmentRescheduleRequested',
   messageReceived: 'MessageReceived',
   checkInDue: 'CheckInDue',
   checkInOverdueEvent: 'CheckInOverdue',

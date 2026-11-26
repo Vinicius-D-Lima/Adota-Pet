@@ -423,7 +423,28 @@ model AdoptionRequest {
   pet           Pet                    @relation(fields: [petId], references: [id], onDelete: Restrict)
   messages      ChatMessage[]
   statusHistory RequestStatusHistory[]
+  appointments  Appointment[]
   adoption      Adoption?
+}
+
+/// Agendamento de entrevista/visita (#21). Tipos e status são Strings para
+/// facilitar a migração; o contrato é validado por Zod nas rotas.
+model Appointment {
+  id            String    @id @default(cuid())
+  requestId     String
+  type          String
+  /// ISO 8601 em UTC, de 1 a 3 horários.
+  proposedSlots String[]
+  confirmedAt   DateTime?
+  location      String?
+  notes         String?
+  status        String    @default("PROPOSTO")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  request AdoptionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
 }
 
 /// Auditoria do fluxo (#20): de, para, quem, quando e motivo.

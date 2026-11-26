@@ -12,7 +12,7 @@ Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest c
 
 | ID         | Tipo                      | O que verifica                               | Como é testado                                                                        |
 | ---------- | ------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `MATCH-01` | Funcional                 | Regressão contra o cálculo atual             | Mesmo perfil e mesmos pets dão os mesmos scores que `calculateCompatibility`.         |
+| `MATCH-01` | Funcional                 | Regressão contra o cálculo atual             | Perfil de referência + pet de energia alta devolvem 57% (`Média`), como no frontend.  |
 | `MATCH-02` | Funcional                 | Critério novo de tempo disponível            | Pet de energia alta com perfil de até 1 hora vira ponto de atenção.                   |
 | `MATCH-03` | Funcional                 | Níveis e limites                             | Alta a partir de 80%, média a partir de 55%, baixa abaixo disso; testa 79/80 e 54/55. |
 | `MATCH-04` | Funcional                 | Ranking decrescente com filtros              | `species` e `size` filtram e a lista vem do maior para o menor score.                 |

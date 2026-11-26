@@ -8,6 +8,8 @@ Garante o fluxo de proposta, confirmação, remarcação e realização, com per
 
 Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest contra o Postgres de teste. O nome do teste no código começa com o ID entre colchetes, por exemplo `it('[AGD-01] ...')`, para que este documento, a issue e o código se encontrem pelo mesmo identificador.
 
+Os nove testes `AGD-01`…`AGD-09` ficam em `apps/api/src/appointments.test.ts` e cobrem a tabela `Appointment` e as rotas `/appointments`. Os dois testes antigos de validação Zod do endpoint legado `/interview` continuaram em `organization.test.ts`, mas foram renomeados para `AGD-LEGADO-01`/`AGD-LEGADO-02` para não duplicar os IDs do catálogo.
+
 ## Testes
 
 | ID       | Tipo                               | O que verifica                           | Como é testado                                                                                                    |

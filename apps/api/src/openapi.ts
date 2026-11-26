@@ -48,6 +48,14 @@ import {
 } from '@adotapet/shared'
 import { z, type ZodType } from 'zod'
 import { checkInReviewBodySchema, checkInSubmitBodySchema } from './routes/checkIns.js'
+import {
+  appointmentConfirmBodySchema,
+  appointmentListSchema,
+  appointmentParamsSchema,
+  appointmentProposeBodySchema,
+  appointmentRescheduleBodySchema,
+  appointmentSchema,
+} from './routes/organization.js'
 
 /** Documentação viva (#47 / INF-10): gerada a partir dos schemas Zod compartilhados. */
 const healthResponseSchema = z.object({
@@ -210,6 +218,30 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
     response: receivedRequestSchema,
   },
   'POST /api/me/received-requests/{id}/interview/complete': { response: receivedRequestSchema },
+  // Agendamento de entrevista e visita domiciliar (#21).
+  'POST /api/me/received-requests/{id}/appointments': {
+    params: requestIdParamsSchema,
+    body: appointmentProposeBodySchema,
+    response: appointmentSchema,
+  },
+  'POST /api/me/received-requests/{id}/appointments/{appointmentId}/complete': {
+    params: appointmentParamsSchema,
+    response: appointmentSchema,
+  },
+  'GET /api/requests/{id}/appointments': {
+    params: requestIdParamsSchema,
+    response: appointmentListSchema,
+  },
+  'POST /api/requests/{id}/appointments/{appointmentId}/confirm': {
+    params: appointmentParamsSchema,
+    body: appointmentConfirmBodySchema,
+    response: appointmentSchema,
+  },
+  'POST /api/requests/{id}/appointments/{appointmentId}/reschedule': {
+    params: appointmentParamsSchema,
+    body: appointmentRescheduleBodySchema,
+    response: appointmentSchema,
+  },
   'POST /api/me/received-requests/{id}/transitions': {
     body: organizationTransitionSchema,
     response: receivedRequestSchema,

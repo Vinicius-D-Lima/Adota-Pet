@@ -9,6 +9,7 @@ import type { Prisma } from './generated/prisma/client.js'
 import {
   APPOINTMENT_CONFIRMED,
   APPOINTMENT_PROPOSED,
+  APPOINTMENT_RESCHEDULE_REQUESTED,
   CHECK_IN_DUE,
   CHECK_IN_OVERDUE,
   CHECK_IN_REVIEWED,
@@ -248,6 +249,25 @@ const handlers: { [K in DomainEventType]: Handler<K> } = {
       },
       enqueueEmail,
     ),
+
+  [APPOINTMENT_RESCHEDULE_REQUESTED]: async (payload, enqueueEmail) => {
+    const members = await organizationMemberIds(payload.organization, payload.adopterId)
+    return Promise.all(
+      members.map((userId) =>
+        deliver(
+          {
+            userId,
+            type: APPOINTMENT_RESCHEDULE_REQUESTED,
+            key: `${APPOINTMENT_RESCHEDULE_REQUESTED}:${payload.requestId}:${userId}`,
+            title: 'Pedido de remarcação de agendamento',
+            body: `O adotante pediu novos horários de ${payload.type} para ${payload.petName}.`,
+            link: `/organizacao/solicitacoes/${payload.requestId}`,
+          },
+          enqueueEmail,
+        ),
+      ),
+    )
+  },
 
   [MESSAGE_RECEIVED]: async (payload, enqueueEmail) =>
     deliver(

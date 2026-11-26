@@ -1,4 +1,8 @@
-import { notificationPageSchema, notificationPreferencesResponseSchema } from '@adotapet/shared'
+import {
+  notificationPageSchema,
+  notificationPreferencesResponseSchema,
+  notificationTypes,
+} from '@adotapet/shared'
 import type { Express } from 'express'
 import { SMTPServer } from 'smtp-server'
 import request from 'supertest'
@@ -207,7 +211,10 @@ databaseSuite('notificações (#30)', () => {
           ).token,
         ),
       )
-    expect(notificationPreferencesResponseSchema.parse(preferences.body).data).toHaveLength(9)
+    // A lista acompanha o catálogo compartilhado (inclui remarcação da #21).
+    expect(notificationPreferencesResponseSchema.parse(preferences.body).data).toHaveLength(
+      notificationTypes.length,
+    )
 
     const disabled = preferences.body.data.map(
       (item: { type: string; inApp: boolean; email: boolean }) =>

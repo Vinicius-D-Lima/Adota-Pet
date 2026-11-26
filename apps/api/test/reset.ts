@@ -7,7 +7,7 @@ export async function resetTestDatabase() {
       "RefreshToken", "NotificationPreference", "Notification", "EventOutbox", "JobEffect",
       "SavedFilter", "StorageObject", "Report", "Review", "CheckIn", "FollowUpPlan", "Adoption", "Membership","Invitation",
       "Organization",
-      "ChatMessage", "RequestStatusHistory", "AdoptionRequest", "Favorite",
+      "ChatMessage", "RequestStatusHistory", "Appointment", "AdoptionRequest", "Favorite",
       "Exam", "HealthCondition", "Neutering", "Vaccination", "MedicalRecord", "Pet",
       "GuardianProfile", "AdopterProfile", "User"
     RESTART IDENTITY CASCADE
