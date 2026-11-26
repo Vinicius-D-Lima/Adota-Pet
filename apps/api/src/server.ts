@@ -3,9 +3,10 @@ import { ConfigError, loadConfig } from './config.js'
 import { logger } from './logger.js'
 import { prisma } from './db.js'
 import { processCheckInDeadlines } from './checkIns.js'
-import { QUEUES, registerJobHandler, startJobs, stopJobs } from './jobs.js'
+import { processDailyDigest, QUEUES, registerJobHandler, startJobs, stopJobs } from './jobs.js'
 
 registerJobHandler(QUEUES.checkInOverdue, () => processCheckInDeadlines())
+registerJobHandler(QUEUES.dailyDigest, () => processDailyDigest())
 
 async function main() {
   // INF-01: sem variável obrigatória, morre aqui — antes de abrir a porta.

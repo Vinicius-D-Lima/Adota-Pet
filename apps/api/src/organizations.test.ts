@@ -291,4 +291,104 @@ databaseSuite('organizações, membros e convites (#27)', () => {
       7 * 24 * 60 * 60 * 1_000,
     )
   })
+
+  it('[ORG-41-01] /me/organizations lista só vínculos ativos com o papel', async () => {
+    const user = await makeUser('org41-01-user')
+    const active = await createOrganization(app, user.headers, '41a')
+    const removed = await createOrganization(app, user.headers, '41b')
+    await prisma.membership.update({
+      where: {
+        userId_organizationId: { userId: user.user.id, organizationId: removed.id },
+      },
+      data: { status: 'REMOVIDO' },
+    })
+
+    const response = await request(app).get('/api/me/organizations').set(user.headers)
+
+    expect(response.status).toBe(200)
+    expect(response.body.data).toHaveLength(1)
+    expect(response.body.data[0]).toMatchObject({
+      id: active.id,
+      name: active.name,
+      initials: 'O41',
+      role: 'ADMIN',
+    })
+  })
+
+  it('[ORG-41-02] ADMIN lista convites com acceptUrl e a prévia é pública', async () => {
+    const admin = await makeUser('org41-02-admin')
+    const invited = await makeUser('org41-02-invited')
+    const organization = await createOrganization(app, admin.headers, '41c')
+    expect((await invite(app, admin.headers, organization.id, invited.user.email)).status).toBe(201)
+
+    const list = await request(app)
+      .get(`/api/organizations/${organization.id}/invitations`)
+      .set(admin.headers)
+    expect(list.status).toBe(200)
+    expect(list.body.data).toHaveLength(1)
+    expect(list.body.data[0]).toMatchObject({
+      email: invited.user.email,
+      role: 'VOLUNTEER',
+      status: 'PENDENTE',
+    })
+    expect(list.body.data[0].acceptUrl).toContain('/api/invitations/')
+
+    const preview = await request(app).get(
+      (list.body.data[0].acceptUrl as string).replace(/\/accept$/, ''),
+    )
+    expect(preview.status).toBe(200)
+    expect(preview.body).toMatchObject({
+      organization: { id: organization.id, name: organization.name },
+      role: 'VOLUNTEER',
+      email: invited.user.email,
+      status: 'PENDENTE',
+    })
+    expect((await request(app).get('/api/invitations/token-invalido')).status).toBe(400)
+  })
+
+  it('[ORG-41-03] ADMIN edita os dados da ONG; voluntário não', async () => {
+    const admin = await makeUser('org41-03-admin')
+    const volunteer = await makeUser('org41-03-volunteer')
+    const organization = await createOrganization(app, admin.headers, '41d')
+    await prisma.membership.create({
+      data: {
+        userId: volunteer.user.id,
+        organizationId: organization.id,
+        role: 'VOLUNTEER',
+        status: 'ATIVO',
+      },
+    })
+
+    const denied = await request(app)
+      .put(`/api/organizations/${organization.id}`)
+      .set(volunteer.headers)
+      .send({ displayName: 'ONG sem permissão' })
+    expect(denied.status).toBe(403)
+
+    const updated = await request(app)
+      .put(`/api/organizations/${organization.id}`)
+      .set(admin.headers)
+      .send({
+        displayName: 'ONG Atualizada',
+        initials: 'OA',
+        document: '12345678901234',
+        email: 'novo-contato@exemplo.com',
+        phone: '11988887777',
+        address: 'Rua das Flores, 123',
+        city: 'Campinas, SP',
+        description: 'Organização atualizada para atender animais resgatados.',
+        logoUrl: 'https://example.com/logo.png',
+      })
+
+    expect(updated.status).toBe(200)
+    expect(updated.body).toMatchObject({
+      name: 'ONG Atualizada',
+      initials: 'OA',
+      cnpj: '12345678901234',
+      contactEmail: 'novo-contato@exemplo.com',
+      phone: '11988887777',
+      city: 'Campinas, SP',
+      logoUrl: 'https://example.com/logo.png',
+    })
+  })
 })

@@ -61,6 +61,11 @@ export const adminPermissions: PermissionsResponse = {
   canApprove: true,
   permissions: ['requests:view', 'requests:review', 'requests:approve', 'requests:reject'],
   organization: { id: 'demo-organization', name: 'Instituto Patinhas', initials: 'IP' },
+  organizations: [
+    { id: 'demo-organization', name: 'Instituto Patinhas', initials: 'IP', role: 'ADMIN' },
+    { id: 'lar-animal', name: 'Lar Animal', initials: 'LA', role: 'VOLUNTEER' },
+  ],
+  rules: [{ action: 'manage', subject: 'all' }],
 }
 
 export const volunteerPermissions: PermissionsResponse = {
@@ -68,4 +73,58 @@ export const volunteerPermissions: PermissionsResponse = {
   canApprove: false,
   permissions: ['requests:view', 'requests:review', 'requests:reject'],
   organization: { id: 'demo-organization', name: 'Instituto Patinhas', initials: 'IP' },
+  organizations: [
+    { id: 'demo-organization', name: 'Instituto Patinhas', initials: 'IP', role: 'VOLUNTEER' },
+  ],
+  rules: [
+    { action: ['read', 'review', 'reject'], subject: 'Request' },
+    { action: 'read', subject: ['Pet', 'Organization', 'Adoption'] },
+  ],
+}
+
+export const organizationMembers = [
+  {
+    id: 'membership-admin',
+    userId: 'demo-organization',
+    name: 'Instituto Patinhas',
+    email: 'contato@institutopatinhas.org',
+    role: 'ADMIN' as const,
+    status: 'ATIVO' as const,
+    joinedAt: '2026-01-10T12:00:00.000Z',
+  },
+  {
+    id: 'membership-mariana',
+    userId: 'mariana',
+    name: 'Mariana Souza',
+    email: 'mariana@adotapet.local',
+    role: 'VOLUNTEER' as const,
+    status: 'ATIVO' as const,
+    joinedAt: '2026-04-18T12:00:00.000Z',
+  },
+]
+
+export const organizationInvitations = [
+  {
+    id: 'convite-1',
+    email: 'ana@adotapet.local',
+    role: 'VOLUNTEER' as const,
+    status: 'PENDENTE' as const,
+    expiresAt: '2026-12-10T12:00:00.000Z',
+    acceptUrl: '/api/invitations/token-com-mais-de-vinte-caracteres/accept',
+  },
+]
+
+export const organizationDetails = {
+  id: 'demo-organization',
+  name: 'Instituto Patinhas',
+  displayName: 'Instituto Patinhas',
+  initials: 'IP',
+  cnpj: '11222333000181',
+  document: '11222333000181',
+  phone: '11955554444',
+  email: 'contato@institutopatinhas.org',
+  contactEmail: 'contato@institutopatinhas.org',
+  address: 'Avenida Paulista, 1000 - Bela Vista',
+  city: 'São Paulo, SP',
+  description: 'Organização dedicada ao resgate, cuidado e adoção responsável de cães e gatos.',
 }

@@ -97,6 +97,35 @@ export const organizationCreateSchema = z
   })
   .strict()
 
+/**
+ * Edição de dados da ONG (#41). Aceita os aliases enviados pelo formulário;
+ * o servidor escolhe o nome canônico e ignora qualquer chave fora da whitelist.
+ */
+const optionalDocument = z
+  .string()
+  .trim()
+  .refine((value) => value === '' || (value.length >= 14 && value.length <= 18), {
+    message: 'Informe um CNPJ com 14 dígitos.',
+  })
+
+export const organizationUpdateSchema = z
+  .object({
+    name: z.string().trim().min(2).max(160).optional(),
+    displayName: z.string().trim().min(2).max(160).optional(),
+    initials: z.string().trim().min(1).max(10).optional(),
+    cnpj: optionalDocument.optional(),
+    document: optionalDocument.optional(),
+    phone: z.string().trim().min(8).max(30).optional(),
+    contactEmail: z.email().trim().toLowerCase().optional(),
+    email: z.email().trim().toLowerCase().optional(),
+    address: z.string().trim().max(200).optional(),
+    city: z.string().trim().min(2).max(160).optional(),
+    description: z.string().trim().min(1).max(2_000).optional(),
+    logoUrl: z.url().optional(),
+  })
+  .strict()
+export type OrganizationUpdatePayload = z.infer<typeof organizationUpdateSchema>
+
 export const organizationIdParamsSchema = z.object({ organizationId: z.string().min(1) }).strict()
 export const organizationMemberParamsSchema = organizationIdParamsSchema.extend({
   userId: z.string().min(1),
@@ -168,13 +197,53 @@ export const permissionsForOrganizationRole = (role: OrganizationRole): Organiza
     ? [...organizationPermissions]
     : ['requests:view', 'requests:review', 'requests:reject']
 
+export const organizationSummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  initials: z.string(),
+  role: organizationRoleSchema.optional(),
+})
+export type OrganizationSummary = z.infer<typeof organizationSummarySchema>
+
+/** Regra no estilo CASL devolvida ao frontend (#41/#RBAC). */
+export const permissionRuleSchema = z.object({
+  action: z.union([z.string(), z.array(z.string())]),
+  subject: z.union([z.string(), z.array(z.string())]),
+  conditions: z.record(z.string(), z.unknown()).optional(),
+})
+export type PermissionRule = z.infer<typeof permissionRuleSchema>
+
 export const organizationPermissionsResponseSchema = z.object({
   role: organizationRoleSchema,
   canApprove: z.boolean(),
   permissions: z.array(organizationPermissionSchema),
   organization: z.object({ id: z.string(), name: z.string(), initials: z.string() }).nullable(),
+  organizations: z.array(organizationSummarySchema).optional(),
+  rules: z.array(permissionRuleSchema).optional(),
 })
 export type OrganizationPermissionsResponse = z.infer<typeof organizationPermissionsResponseSchema>
+
+export const organizationListResponseSchema = z.object({
+  data: z.array(organizationSummarySchema),
+  total: z.number().int().nonnegative(),
+})
+
+export const invitationPreviewSchema = z.object({
+  organization: z.object({
+    id: z.string(),
+    name: z.string(),
+    initials: z.string(),
+  }),
+  role: organizationRoleSchema,
+  email: z.string(),
+  expiresAt: z.string(),
+  status: z.enum(['PENDENTE', 'ACEITO', 'EXPIRADO', 'REVOGADO']),
+})
+
+export const invitationListResponseSchema = z.object({
+  data: z.array(organizationInvitationResponseSchema),
+  total: z.number().int().nonnegative(),
+})
 
 /** Etapas da fila da instituição — mesma origem para API, web e mock. */
 export const organizationRequestStages = [
@@ -215,6 +284,8 @@ export function organizationRequestStageOf(request: StageSource): RequestStage {
 export const receivedRequestsQuerySchema = z.object({
   stage: organizationRequestStageSchema.optional().default('all'),
   petId: z.string().min(1).optional(),
+  /** Seletor de organização do frontend (#41); precisa sobreviver ao `validate()`. */
+  organizationId: z.string().min(1).optional(),
 })
 export type ReceivedRequestsQuery = z.infer<typeof receivedRequestsQuerySchema>
 

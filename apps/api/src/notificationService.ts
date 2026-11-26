@@ -15,6 +15,7 @@ import {
   CHECK_IN_REVIEWED,
   MESSAGE_RECEIVED,
   NEW_MATCHING_PET,
+  newMatchingPetKey,
   NEW_REQUEST_FOR_ORGANIZATION,
   REQUEST_STATUS_CHANGED,
   type DomainEventPayload,
@@ -326,7 +327,7 @@ const handlers: { [K in DomainEventType]: Handler<K> } = {
       {
         userId: payload.userId,
         type: NEW_MATCHING_PET,
-        key: `${NEW_MATCHING_PET}:${payload.petId}:${payload.userId}`,
+        key: newMatchingPetKey(payload.petId, payload.userId),
         title: 'Um pet compatível chegou',
         body: `${payload.petName} corresponde a uma das suas buscas salvas.`,
         link: `/pets/${payload.petId}`,
@@ -378,3 +379,98 @@ export async function sendNotificationEmail(payload: NotificationEmailJob) {
   })
   return { sent: true }
 }
+
+const DAY_IN_MILLISECONDS = 24 * 60 * 60 * 1000
+
+function utcDayStart(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+}
+
+export interface DailyDigestResult {
+  /** Usuários com alertas não lidos no dia (inclusive sem e-mail cadastrado). */
+  users: number
+  /** Notificações consideradas (já deduplicadas na origem pelo produtor). */
+  notifications: number
+  emailsSent: number
+}
+
+/**
+ * #31/FIL-09: resumo diário dos alertas `NewMatchingPet` não lidos. Cada
+ * usuário recebe UM e-mail com todos os pets do dia — o resumo é um canal
+ * separado, independente da preferência de e-mail do evento individual.
+ *
+ * O ledger `jobEffect` impede que uma redelivery do cron reenvie o mesmo dia;
+ * se o SMTP falhar, a linha é removida para a próxima tentativa poder repetir.
+ */
+export async function sendDailyDigest(now = new Date()): Promise<DailyDigestResult> {
+  if (!Number.isFinite(now.getTime())) throw new RangeError('Data de referência inválida')
+
+  const start = utcDayStart(now)
+  const end = new Date(start.getTime() + DAY_IN_MILLISECONDS)
+  const notifications = await prisma.notification.findMany({
+    where: {
+      type: NEW_MATCHING_PET,
+      readAt: null,
+      createdAt: { gte: start, lt: end },
+    },
+    orderBy: { createdAt: 'asc' },
+    select: { userId: true, body: true, link: true },
+  })
+
+  const byUser = new Map<string, Array<{ body: string; link: string }>>()
+  for (const notification of notifications) {
+    const items = byUser.get(notification.userId) ?? []
+    // O produtor já deduplica por pet; aqui repetimos a segurança no resumo.
+    if (!items.some((item) => item.link === notification.link)) {
+      items.push({ body: notification.body, link: notification.link })
+    }
+    byUser.set(notification.userId, items)
+  }
+
+  if (!byUser.size) return { users: 0, notifications: notifications.length, emailsSent: 0 }
+
+  const config = loadConfig()
+  let mailer: Pick<Transporter, 'sendMail'> | undefined
+  const dayKey = start.toISOString().slice(0, 10)
+  let emailsSent = 0
+
+  for (const [userId, items] of byUser) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    })
+    if (!user?.email) continue
+
+    const eventId = `daily-digest:${dayKey}:${userId}`
+    const effect = await prisma.jobEffect.createMany({
+      data: [{ eventId, type: 'daily-digest-email' }],
+      skipDuplicates: true,
+    })
+    if (effect.count === 0) continue
+
+    const subject = `Resumo diário: ${items.length} pet(s) compatível(is)`
+    const text = [
+      'Olá!',
+      `Você tem ${items.length} novo(s) pet(s) compatível(is) com suas buscas salvas:`,
+      ...items.map((item) => `- ${plainText(item.body, 300)} (${item.link})`),
+      '',
+      'Acesse /notificacoes para ver os detalhes.',
+      'Se não foi você, ignore este e-mail.',
+    ].join('\n')
+
+    mailer ??= transportOverride ?? createEmailTransport(config)
+    try {
+      await mailer.sendMail({ from: config.SMTP_FROM, to: user.email, subject, text })
+      emailsSent += 1
+    } catch (error) {
+      await prisma.jobEffect.deleteMany({ where: { eventId } })
+      logger.warn({ err: error, userId }, 'não foi possível enviar o resumo diário')
+      throw error
+    }
+  }
+
+  return { users: byUser.size, notifications: notifications.length, emailsSent }
+}
+
+/** Handler do job agendado (o pg-boss chama sem payload). */
+export const dailyDigestHandler = (now = new Date()) => sendDailyDigest(now)

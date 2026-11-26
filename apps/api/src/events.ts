@@ -99,6 +99,13 @@ export const checkInReviewedEventSchema = z.strictObject({
   status: z.string().min(1).max(60),
 })
 
+/**
+ * #31/FIL-03: publicado quando um pet entra (ou volta) na lista de disponíveis
+ * e bate com uma busca salva ativa. O produtor (`savedFilterAlerts.ts`) agrupa
+ * por usuário antes de enfileirar; o consumidor de notificações usa a mesma
+ * chave determinística abaixo, o que fecha a deduplicação FIL-05 ponta a ponta.
+ * O `filterId` é apenas rastreabilidade — nunca vai para o corpo do e-mail.
+ */
 export const NEW_MATCHING_PET = 'NewMatchingPet'
 export const newMatchingPetEventSchema = z.strictObject({
   userId: stringId,
@@ -106,6 +113,10 @@ export const newMatchingPetEventSchema = z.strictObject({
   petName: z.string().min(1).max(200),
   filterId: stringId.optional(),
 })
+
+/** Chave estável do alerta: um pet gera no máximo uma notificação por usuário. */
+export const newMatchingPetKey = (petId: string, userId: string) =>
+  `${NEW_MATCHING_PET}:${petId}:${userId}`
 
 /** Schemas conhecidos pelo despachante do outbox, indexados pelo tipo do evento. */
 export const domainEventSchemas = {

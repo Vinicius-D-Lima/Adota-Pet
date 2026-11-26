@@ -50,6 +50,30 @@ const OrganizationRequestDetailPage = named(
   () => import('./pages/OrganizationRequestDetailPage'),
   'OrganizationRequestDetailPage',
 )
+const OrganizationAdoptionsPage = named(
+  () => import('./pages/OrganizationAdoptionsPage'),
+  'OrganizationAdoptionsPage',
+)
+const OrganizationMembersPage = named(
+  () => import('./pages/OrganizationMembersPage'),
+  'OrganizationMembersPage',
+)
+const OrganizationInvitationsPage = named(
+  () => import('./pages/OrganizationInvitationsPage'),
+  'OrganizationInvitationsPage',
+)
+const OrganizationSettingsPage = named(
+  () => import('./pages/OrganizationSettingsPage'),
+  'OrganizationSettingsPage',
+)
+const OrganizationMedicalRecordPage = named(
+  () => import('./pages/OrganizationMedicalRecordPage'),
+  'OrganizationMedicalRecordPage',
+)
+const InvitationAcceptPage = named(
+  () => import('./pages/InvitationAcceptPage'),
+  'InvitationAcceptPage',
+)
 const NotFoundPage = named(() => import('./pages/NotFoundPage'), 'NotFoundPage')
 
 /** Não redireciona enquanto o refresh inicial está em voo (#4/#5: sem "piscar"). */
@@ -206,7 +230,32 @@ export default function App() {
                 path="/organizacao/solicitacoes/:requestId"
                 element={<OrganizationRequestDetailPage />}
               />
+              <Route path="/organizacao/adocoes" element={<OrganizationAdoptionsPage />} />
+              <Route
+                path="/organizacao/pets/:petId/prontuario"
+                element={<OrganizationMedicalRecordPage />}
+              />
+              <Route
+                element={
+                  <OrganizacaoGuard permission="read" subject="Member">
+                    <Outlet />
+                  </OrganizacaoGuard>
+                }
+              >
+                <Route path="/organizacao/membros" element={<OrganizationMembersPage />} />
+                <Route path="/organizacao/convites" element={<OrganizationInvitationsPage />} />
+              </Route>
+              <Route
+                element={
+                  <OrganizacaoGuard permission="update" subject="Organization">
+                    <Outlet />
+                  </OrganizacaoGuard>
+                }
+              >
+                <Route path="/organizacao/dados" element={<OrganizationSettingsPage />} />
+              </Route>
             </Route>
+            <Route path="/convite/:token" element={<InvitationAcceptPage />} />
             <Route
               path="/cadastro"
               element={

@@ -495,5 +495,138 @@
     }
   ],
   "notificationPreferences": [],
-  "savedFilters": []
+  "savedFilters": [],
+  "medicalRecords": [
+    {
+      "id": "mr-luna",
+      "petId": "luna",
+      "createdAt": "2026-01-10T10:00:00.000Z",
+      "createdById": "demo-organization",
+      "updatedAt": "2026-02-10T10:00:00.000Z",
+      "updatedById": "demo-organization",
+      "vaccinations": [
+        {
+          "id": "vac-luna-1",
+          "name": "V10",
+          "appliedAt": "2025-04-01T10:00:00.000Z",
+          "nextDoseAt": "2099-04-01T10:00:00.000Z",
+          "batch": "LOTE-10",
+          "veterinarian": "Dra. Ana",
+          "createdAt": "2025-04-01T10:00:00.000Z",
+          "createdById": "demo-organization",
+          "updatedAt": "2025-04-01T10:00:00.000Z",
+          "updatedById": "demo-organization"
+        },
+        {
+          "id": "vac-luna-2",
+          "name": "Antirábica",
+          "appliedAt": "2024-08-10T10:00:00.000Z",
+          "nextDoseAt": "2099-08-10T10:00:00.000Z",
+          "batch": "LOTE-07",
+          "veterinarian": "Dr. Paulo",
+          "createdAt": "2024-08-10T10:00:00.000Z",
+          "createdById": "demo-organization",
+          "updatedAt": "2024-08-10T10:00:00.000Z",
+          "updatedById": "demo-organization"
+        }
+      ],
+      "neutering": {
+        "done": true,
+        "date": "2025-06-01T10:00:00.000Z",
+        "createdAt": "2025-06-01T10:00:00.000Z",
+        "createdById": "demo-organization",
+        "updatedAt": "2025-06-01T10:00:00.000Z",
+        "updatedById": "demo-organization"
+      },
+      "healthConditions": [
+        {
+          "id": "cond-luna-1",
+          "name": "Alergia alimentar",
+          "type": "EM_TRATAMENTO",
+          "notes": "Dieta hipoalergênica; retorno em 30 dias.",
+          "careRequired": true,
+          "createdAt": "2026-01-10T10:00:00.000Z",
+          "createdById": "demo-organization",
+          "updatedAt": "2026-02-10T10:00:00.000Z",
+          "updatedById": "demo-organization"
+        }
+      ],
+      "exams": [
+        {
+          "id": "exam-luna-1",
+          "type": "Hemograma",
+          "date": "2026-02-01T10:00:00.000Z",
+          "result": "Sem alterações relevantes.",
+          "attachment": "obj-luna-1",
+          "createdAt": "2026-02-01T10:00:00.000Z",
+          "createdById": "demo-organization",
+          "updatedAt": "2026-02-10T10:00:00.000Z",
+          "updatedById": "demo-organization"
+        }
+      ]
+    },
+    {
+      "id": "mr-mimi",
+      "petId": "mimi",
+      "createdAt": "2026-03-01T10:00:00.000Z",
+      "createdById": "demo-organization",
+      "updatedAt": "2026-03-01T10:00:00.000Z",
+      "updatedById": "demo-organization",
+      "vaccinations": [
+        {
+          "id": "vac-mimi-1",
+          "name": "V4",
+          "appliedAt": "2025-11-01T10:00:00.000Z",
+          "nextDoseAt": "2099-11-01T10:00:00.000Z",
+          "batch": null,
+          "veterinarian": null,
+          "createdAt": "2025-11-01T10:00:00.000Z",
+          "createdById": "demo-organization",
+          "updatedAt": "2025-11-01T10:00:00.000Z",
+          "updatedById": "demo-organization"
+        }
+      ],
+      "neutering": {
+        "done": false,
+        "date": null,
+        "createdAt": "2026-03-01T10:00:00.000Z",
+        "createdById": "demo-organization",
+        "updatedAt": "2026-03-01T10:00:00.000Z",
+        "updatedById": "demo-organization"
+      },
+      "healthConditions": [],
+      "exams": []
+    },
+    {
+      "id": "mr-tobias",
+      "petId": "tobias",
+      "createdAt": "2026-03-05T10:00:00.000Z",
+      "createdById": "demo-organization",
+      "updatedAt": "2026-03-05T10:00:00.000Z",
+      "updatedById": "demo-organization",
+      "vaccinations": [],
+      "neutering": {
+        "done": false,
+        "date": null,
+        "createdAt": "2026-03-05T10:00:00.000Z",
+        "createdById": "demo-organization",
+        "updatedAt": "2026-03-05T10:00:00.000Z",
+        "updatedById": "demo-organization"
+      },
+      "healthConditions": [],
+      "exams": []
+    }
+  ],
+  "storageObjects": [
+    {
+      "id": "obj-luna-1",
+      "key": "medical-exams/exam-luna-1/hemograma.pdf",
+      "contentType": "application/pdf",
+      "sizeBytes": 1024,
+      "resourceType": "MEDICAL_EXAM",
+      "resourceId": "exam-luna-1",
+      "ownerId": "demo-organization",
+      "createdAt": "2026-02-10T10:00:00.000Z"
+    }
+  ]
 }

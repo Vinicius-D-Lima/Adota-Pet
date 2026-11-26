@@ -25,4 +25,15 @@ Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest c
 | `PET-11` | Funcional                          | Arquivar em vez de apagar                          | Solicitações e adoções do pet continuam consultáveis.                                               |
 | `PET-12` | Funcional                          | Ordem das fotos e capa                             | Reordenar e escolher a capa se refletem em `GET /pets/:id`.                                         |
 
+## Contrato implementado
+
+- `GET /api/pets` aceita `size` repetido (`?size=Pequeno&size=Médio`) e `lat`/`lng` com
+  `sort=distance`; a listagem considera apenas `DISPONIVEL`, enquanto `GET /api/pets/:id`
+  continua respondendo para adotados e arquivados.
+- Escrita autenticada: `POST /pets`, `PUT /pets/:id`, `POST /pets/:id/archive`,
+  `PUT /pets/:id/gallery` e `POST /pets/:id/photos`. Toda escrita exige membership ativa
+  na organização dona do pet; `organizationId` e `status` do corpo são ignorados.
+- Publicar (`POST /pets`) ou reabrir (`PUT /pets/:id` com `status: DISPONIVEL`) enfileira
+  `NewMatchingPet` na mesma transação da busca salva compatível (#31/FIL-03).
+
 Voltar ao [índice dos testes](README.md).

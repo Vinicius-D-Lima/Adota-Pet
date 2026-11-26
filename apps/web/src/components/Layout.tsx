@@ -1,13 +1,32 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Heart, LogOut, Menu, PawPrint, ShieldAlert, UserRound, X } from 'lucide-react'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import {
+  ChevronDown,
+  ClipboardList,
+  Heart,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  PawPrint,
+  ShieldAlert,
+  UserRound,
+  UsersRound,
+  X,
+} from 'lucide-react'
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { useAdoptionRequests } from '../hooks/useAdoptionRequests'
 import { useDemoAccount } from '../hooks/useDemoAccount'
 import { useFavoriteIds } from '../hooks/useFavorites'
+import {
+  useOrganizations,
+  useSelectedOrganizationId,
+  useSwitchOrganization,
+} from '../hooks/useOrganizations'
 import { useReceivedRequests } from '../hooks/useOrganization'
+import { usePermissions, type OrganizationMembership } from '../lib/permissions'
 import { getInitials } from '../utils/getInitials'
 import { isActiveRequest } from '../utils/requestStatus'
+import { Can } from './Can'
 import { FavoriteNotice } from './FavoriteNotice'
 import { NotificationBell } from './NotificationBell'
 import { Container, cx } from './ui'
@@ -40,9 +59,23 @@ function Brand({ light = false, markSize = 21 }: { light?: boolean; markSize?: n
 
 export function Layout({ children, profileName, profilePath = '/perfil' }: LayoutProps) {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const account = useDemoAccount()
+  // O acesso à área vem de /me/permissions, nunca do caminho do perfil (#41).
+  const selectedOrganizationId = useSelectedOrganizationId()
+  const permissions = usePermissions({
+    enabled: account.isAuthenticated,
+    organizationId: selectedOrganizationId,
+  })
+  const isMember = Boolean(permissions.data?.organization)
   const isGuardian = account.profilePath === '/perfil?tipo=responsavel'
+  const organizationsQuery = useOrganizations({
+    enabled: account.isAuthenticated && isMember,
+    organizationId: selectedOrganizationId,
+  })
+  const switchOrganization = useSwitchOrganization()
+  const organizations = useMemo(() => organizationsQuery.data ?? [], [organizationsQuery.data])
   const requestsQuery = useAdoptionRequests(account.status !== 'loading')
   const requestCount =
     requestsQuery.data?.filter((item) => isActiveRequest(item.status)).length ?? 0
@@ -51,15 +84,23 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
   const accountMenuRef = useRef<HTMLDivElement>(null)
   const favoriteCount = useFavoriteIds(account.status !== 'loading').data?.length ?? 0
   const receivedRequestCount =
-    useReceivedRequests(account.isAuthenticated && isGuardian).data?.data.filter((item) =>
+    useReceivedRequests(account.isAuthenticated && isMember).data?.data.filter((item) =>
       ['Enviada', 'Em análise'].includes(item.status),
     ).length ?? 0
   const savedName = profileName.trim()
   const initials = savedName ? getInitials(savedName) : ''
   const firstName = savedName.split(/\s+/)[0]
+  const showOrganizationNav = isMember && location.pathname.startsWith('/organizacao')
+
+  useEffect(() => {
+    if (!organizations.length) return
+    if (!organizations.some(({ id }) => id === selectedOrganizationId)) {
+      switchOrganization(organizations[0].id)
+    }
+  }, [organizations, selectedOrganizationId, switchOrganization])
 
   const nav: [string, string][] =
-    account.isAuthenticated && isGuardian
+    account.isAuthenticated && isMember
       ? [
           ['/organizacao', 'Painel'],
           ['/organizacao/pets', 'Meus pets'],
@@ -268,7 +309,17 @@ export function Layout({ children, profileName, profilePath = '/perfil' }: Layou
           )}
         </Container>
       </header>
-      <main className="flex-1">{children}</main>
+      <div className="flex flex-1 flex-col lg:flex-row">
+        {showOrganizationNav && (
+          <OrganizationSidebar
+            organizations={organizations}
+            selectedOrganizationId={selectedOrganizationId}
+            onSelect={switchOrganization}
+            onNavigate={() => setOpen(false)}
+          />
+        )}
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
       <FavoriteNotice />
       <footer className="bg-[#17382c] py-[45px] text-[#cbd8d1]">
         <Container className="flex flex-col items-start gap-[30px] md:flex-row md:items-center md:justify-between">
@@ -293,5 +344,88 @@ function NavCount({ value }: { value: number }) {
     <span className="ml-[5px] inline-grid size-[18px] place-items-center rounded-full bg-coral text-[10px] text-white">
       {value}
     </span>
+  )
+}
+
+interface OrganizationSidebarProps {
+  organizations: OrganizationMembership[]
+  selectedOrganizationId: string
+  onSelect: (organizationId: string) => void
+  onNavigate: () => void
+}
+
+/** Menu lateral da área `/organizacao/*`, com seletor quando há mais de uma ONG. */
+function OrganizationSidebar({
+  organizations,
+  selectedOrganizationId,
+  onSelect,
+  onNavigate,
+}: OrganizationSidebarProps) {
+  const current = organizations.find(({ id }) => id === selectedOrganizationId)
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    cx(
+      'flex shrink-0 items-center gap-2 rounded-[10px] px-3 py-2.5 text-[13px] font-semibold text-muted hover:bg-forest-50 hover:text-forest-800',
+      isActive && 'bg-forest-100 text-forest-800',
+    )
+
+  return (
+    <aside
+      aria-label="Menu da organização"
+      className="border-b border-line bg-white/70 px-3 py-3 lg:w-[224px] lg:shrink-0 lg:border-b-0 lg:border-r lg:px-4 lg:py-7"
+    >
+      <div className="mb-3 flex items-center justify-between gap-2 px-1 lg:block">
+        <p className="m-0 text-[10px] font-bold uppercase tracking-[.12em] text-coral">
+          Área da organização
+        </p>
+        {organizations.length > 1 ? (
+          <label className="mt-2 flex min-w-0 flex-col gap-1 text-[11px] font-semibold text-muted">
+            Organização ativa
+            <select
+              aria-label="Organização ativa"
+              className="w-full min-w-0 rounded-[9px] border border-line bg-white px-2 py-1.5 text-xs font-bold text-forest-800"
+              value={selectedOrganizationId}
+              onChange={(event) => onSelect(event.target.value)}
+            >
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>
+                  {organization.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <p className="m-0 mt-1 truncate text-xs font-bold text-forest-800">
+            {current?.name ?? organizations[0]?.name ?? ''}
+          </p>
+        )}
+      </div>
+      <nav className="flex gap-1 overflow-x-auto pb-1 lg:grid lg:gap-1.5 lg:overflow-visible lg:pb-0">
+        <NavLink to="/organizacao" onClick={onNavigate} className={linkClass}>
+          <LayoutDashboard size={16} /> Painel
+        </NavLink>
+        <NavLink to="/organizacao/solicitacoes" onClick={onNavigate} className={linkClass}>
+          <ClipboardList size={16} /> Solicitações
+        </NavLink>
+        <NavLink to="/organizacao/pets" onClick={onNavigate} className={linkClass}>
+          <PawPrint size={16} /> Pets
+        </NavLink>
+        <NavLink to="/organizacao/adocoes" onClick={onNavigate} className={linkClass}>
+          <Heart size={16} /> Adoções
+        </NavLink>
+        <Can do="read" on="Member" organizationId={selectedOrganizationId}>
+          <NavLink to="/organizacao/membros" onClick={onNavigate} className={linkClass}>
+            <UsersRound size={16} /> Membros
+          </NavLink>
+          <NavLink to="/organizacao/convites" onClick={onNavigate} className={linkClass}>
+            <UserRound size={16} /> Convites
+          </NavLink>
+        </Can>
+        <Can do="update" on="Organization" organizationId={selectedOrganizationId}>
+          <NavLink to="/organizacao/dados" onClick={onNavigate} className={linkClass}>
+            <ShieldAlert size={16} /> Dados da ONG
+          </NavLink>
+        </Can>
+      </nav>
+    </aside>
   )
 }

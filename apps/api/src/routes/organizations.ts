@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 import {
   invitationTokenParamsSchema,
   organizationCreateSchema,
@@ -7,12 +7,17 @@ import {
   organizationInvitationParamsSchema,
   organizationMemberParamsSchema,
   organizationMemberRoleSchema,
+  organizationUpdateSchema,
   type OrganizationCreatePayload,
   type OrganizationInvitationCreatePayload,
   type OrganizationMemberRolePayload,
+  type OrganizationUpdatePayload,
 } from '@adotapet/shared'
 import { Router } from 'express'
 import type { Request } from 'express'
+import { abilitySubject, accessibleBy, createAbility } from '../ability.js'
+import { loadConfig } from '../config.js'
+import { activeMemberships } from '../context.js'
 import { prisma } from '../db.js'
 import { Prisma } from '../generated/prisma/client.js'
 import { HttpError, list, sendError } from '../http.js'
@@ -61,15 +66,94 @@ async function requireMember(req: Request, organizationId: string) {
   if (!membership || membership.status !== 'ATIVO') {
     throw new HttpError(403, 'Você não pertence a esta organização')
   }
+  const ability = createAbility({ role: membership.role, organizationIds: [organizationId] })
+  if (!ability.can('read', abilitySubject('Organization', organizationId))) {
+    throw new HttpError(403, 'Você não pertence a esta organização')
+  }
   return membership
 }
 
+/** Todo poder é condicionado ao `organizationId` do membro (RBAC-05). */
 async function requireAdmin(req: Request, organizationId: string) {
   const membership = await requireMember(req, organizationId)
-  if (membership.role !== 'ADMIN') {
+  const ability = createAbility({ role: membership.role, organizationIds: [organizationId] })
+  if (!ability.can('manage', abilitySubject('Membership', organizationId))) {
     throw new HttpError(403, 'Somente administradores podem realizar esta ação')
   }
   return membership
+}
+
+type InvitationView = {
+  id: string
+  organizationId: string
+  email: string
+  role: 'ADMIN' | 'VOLUNTEER'
+  expiresAt: string
+  status: 'PENDENTE' | 'ACEITO' | 'EXPIRADO' | 'REVOGADO'
+  acceptUrl: string
+}
+
+const invitationView = (invitation: {
+  id: string
+  organizationId: string
+  email: string
+  role: 'ADMIN' | 'VOLUNTEER'
+  expiresAt: Date
+  status: 'PENDENTE' | 'ACEITO' | 'EXPIRADO' | 'REVOGADO'
+  token: string
+}): InvitationView => ({
+  id: invitation.id,
+  organizationId: invitation.organizationId,
+  email: invitation.email,
+  role: invitation.role,
+  expiresAt: invitation.expiresAt.toISOString(),
+  status: invitation.status,
+  acceptUrl: `/api/invitations/${invitation.token}/accept`,
+})
+
+/**
+ * O banco guarda só o SHA-256 do token aleatório (ORG-05), então a listagem não
+ * pode reconstruí-lo. Para devolver `acceptUrl` sem persistir segredo, geramos
+ * um token assinado (HMAC) com o mesmo `JWT_SECRET`; a aceitação aceita os
+ * dois formatos. O token original do POST continua aleatório e de alta entropia.
+ */
+const SIGNED_TOKEN_PREFIX = 's.'
+const signedTokenSignature = (payload: string) =>
+  createHmac('sha256', loadConfig().JWT_SECRET).update(payload).digest('base64url')
+
+function signedInvitationToken(invitation: { id: string; expiresAt: Date }) {
+  const payload = `${invitation.id}.${invitation.expiresAt.getTime()}`
+  return `${SIGNED_TOKEN_PREFIX}${payload}.${signedTokenSignature(payload)}`
+}
+
+function invitationIdFromSignedToken(token: string): string | null {
+  if (!token.startsWith(SIGNED_TOKEN_PREFIX)) return null
+  const [id, expiresAt, signature] = token.slice(SIGNED_TOKEN_PREFIX.length).split('.')
+  if (!id || !expiresAt || !signature) return null
+  const expected = signedTokenSignature(`${id}.${expiresAt}`)
+  const actualBuffer = Buffer.from(signature)
+  const expectedBuffer = Buffer.from(expected)
+  if (
+    actualBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(actualBuffer, expectedBuffer)
+  ) {
+    return null
+  }
+  return Number.isFinite(Number(expiresAt)) ? id : null
+}
+
+async function invitationWithOrganization(token: string) {
+  const byHash = await prisma.invitation.findUnique({
+    where: { tokenHash: tokenHash(token) },
+    include: { organization: true },
+  })
+  if (byHash) return byHash
+  const signedId = invitationIdFromSignedToken(token)
+  if (!signedId) return null
+  return prisma.invitation.findUnique({
+    where: { id: signedId },
+    include: { organization: true },
+  })
 }
 
 function conflictFromUnique(error: unknown): never {
@@ -177,15 +261,88 @@ organizationsRouter.post(
         expiresAt: new Date(Date.now() + INVITATION_TTL_MS),
       },
     })
-    res.status(201).json({
-      id: invitation.id,
-      organizationId,
-      email: invitation.email,
-      role: invitation.role,
-      expiresAt: invitation.expiresAt.toISOString(),
-      status: invitation.status,
-      acceptUrl: `/api/invitations/${token}/accept`,
+    res.status(201).json(invitationView({ ...invitation, token }))
+  },
+)
+
+/** Seletor de organização do frontend (#41): só vínculos ativos. */
+organizationsRouter.get('/me/organizations', async (req, res) => {
+  const memberships = await activeMemberships(req.user!.id)
+  res.json(
+    list(
+      memberships.map((membership) => ({
+        id: membership.organizationId,
+        name: membership.organization.name,
+        initials: membership.organization.initials,
+        role: membership.role,
+      })),
+    ),
+  )
+})
+
+organizationsRouter.put(
+  '/organizations/:organizationId',
+  validate({ params: organizationIdParamsSchema, body: organizationUpdateSchema }),
+  async (req, res) => {
+    const { organizationId } = req.params as { organizationId: string }
+    const body = req.body as OrganizationUpdatePayload
+    const membership = await requireAdmin(req, organizationId)
+    const ability = createAbility({ role: membership.role, organizationIds: [organizationId] })
+    if (!ability.can('update', abilitySubject('Organization', organizationId))) {
+      throw new HttpError(403, 'Somente administradores podem editar a organização')
+    }
+
+    const data: Prisma.OrganizationUncheckedUpdateInput = {}
+    const text = (
+      value: string | undefined,
+      field: keyof Prisma.OrganizationUncheckedUpdateInput,
+    ) => {
+      if (typeof value === 'string' && value.trim()) Object.assign(data, { [field]: value })
+    }
+    text(body.name ?? body.displayName, 'name')
+    text(body.initials, 'initials')
+    text(body.phone, 'phone')
+    text(body.contactEmail ?? body.email, 'contactEmail')
+    // `address` é aceito (alias do formulário) mas não existe como coluna; os
+    // demais aliases já foram resolvidos acima para os nomes canônicos.
+    text(body.city, 'city')
+    text(body.description, 'description')
+    text(body.logoUrl, 'logoUrl')
+    const document = body.cnpj ?? body.document
+    if (document !== undefined) data.cnpj = document.trim() || null
+
+    try {
+      const organization = await prisma.$transaction(async (tx) => {
+        await tx.$queryRaw`SELECT "id" FROM "Organization" WHERE "id" = ${organizationId} FOR UPDATE`
+        return tx.organization.update({ where: { id: organizationId }, data })
+      })
+      res.json(publicOrganization(organization))
+    } catch (error) {
+      conflictFromUnique(error)
+    }
+  },
+)
+
+organizationsRouter.get(
+  '/organizations/:organizationId/invitations',
+  validate({ params: organizationIdParamsSchema }),
+  async (req, res) => {
+    const { organizationId } = req.params as { organizationId: string }
+    const membership = await requireAdmin(req, organizationId)
+    const ability = createAbility({ role: membership.role, organizationIds: [organizationId] })
+    const invitations = await prisma.invitation.findMany({
+      where: {
+        AND: [accessibleBy(ability, 'read', 'Invitation'), { organizationId }],
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     })
+    res.json(
+      list(
+        invitations.map((invitation) =>
+          invitationView({ ...invitation, token: signedInvitationToken(invitation) }),
+        ),
+      ),
+    )
   },
 )
 
@@ -217,10 +374,7 @@ organizationsRouter.post(
   validate({ params: invitationTokenParamsSchema }),
   async (req, res) => {
     const { token } = req.params as { token: string }
-    const invitation = await prisma.invitation.findUnique({
-      where: { tokenHash: tokenHash(token) },
-      include: { organization: true },
-    })
+    const invitation = await invitationWithOrganization(token)
     if (!invitation) return sendError(res, 400, 'Convite inválido')
     if (invitation.status === 'ACEITO') return sendError(res, 400, 'Este convite já foi usado')
     if (invitation.status === 'REVOGADO') return sendError(res, 410, 'Este convite foi revogado')
@@ -309,5 +463,39 @@ organizationsRouter.delete(
       await tx.membership.update({ where: { id: target.id }, data: { status: 'REMOVIDO' } })
     })
     res.status(204).end()
+  },
+)
+
+/**
+ * Prévia pública do convite: quem abre o link pode ainda não estar logado, por
+ * isso este router é montado antes do middleware de autenticação (#41).
+ */
+export const publicInvitationRouter = Router()
+
+publicInvitationRouter.get(
+  '/invitations/:token',
+  validate({ params: invitationTokenParamsSchema }),
+  async (req, res) => {
+    const { token } = req.params as { token: string }
+    const invitation = await invitationWithOrganization(token)
+    if (!invitation) return sendError(res, 400, 'Convite inválido')
+    const status =
+      invitation.status === 'PENDENTE' && invitation.expiresAt <= new Date()
+        ? 'EXPIRADO'
+        : invitation.status
+    if (status === 'EXPIRADO') return sendError(res, 410, 'Este convite expirou')
+    if (status === 'REVOGADO') return sendError(res, 410, 'Este convite foi revogado')
+    if (status === 'ACEITO') return sendError(res, 400, 'Este convite já foi usado')
+    res.json({
+      organization: {
+        id: invitation.organization.id,
+        name: invitation.organization.name,
+        initials: invitation.organization.initials,
+      },
+      role: invitation.role,
+      email: invitation.email,
+      expiresAt: invitation.expiresAt.toISOString(),
+      status,
+    })
   },
 )

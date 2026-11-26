@@ -1,8 +1,9 @@
-import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles, Syringe } from 'lucide-react'
+import { ArrowLeft, Check, Heart, Home, MapPin, ShieldCheck, Sparkles } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { ActiveRequestNotice } from '../components/ActiveRequestNotice'
 import { FlowSteps } from '../components/FlowSteps'
+import { MedicalRecordSection } from '../components/MedicalRecordSection'
 import { TraitList } from '../components/PetCard'
 import {
   BackLink,
@@ -19,6 +20,11 @@ import { RatingStars } from '../components/RatingStars'
 import { useActiveRequestForPet } from '../hooks/useAdoptionRequests'
 import { useDemoAccount } from '../hooks/useDemoAccount'
 import { useFavorite } from '../hooks/useFavorites'
+import {
+  isMedicalRecordForbidden,
+  useMedicalRecord,
+  useMedicalRecordPermission,
+} from '../hooks/useMedicalRecord'
 import { usePet } from '../hooks/usePets'
 import { ApiError } from '../lib/ApiError'
 
@@ -43,6 +49,8 @@ export function PetDetailPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const petQuery = usePet(petId)
+  const medicalRecordQuery = useMedicalRecord(petId)
+  const { isOrganizationMember } = useMedicalRecordPermission(petId)
   const activeRequest = useActiveRequestForPet(petId)
   const { isFavorite, toggle, isPending: isFavoritePending } = useFavorite(petId ?? '')
   const backTo = (location.state as { from?: string } | null)?.from ?? '/pets'
@@ -174,14 +182,19 @@ export function PetDetailPage() {
                   <Need icon={<Heart />} title="Convive com outros pets">
                     {pet.otherPets ? 'Sim' : 'Prefere ser único pet'}
                   </Need>
-                  <Need icon={<Syringe />} title="Vacinação">
-                    {pet.vaccinated ? 'Vacinado' : 'Não vacinado'}
-                  </Need>
-                  <Need icon={<ShieldCheck />} title="Castração">
-                    {pet.neutered ? 'Castrado' : 'Não castrado'}
-                  </Need>
                 </div>
               </section>
+              <MedicalRecordSection
+                petId={pet.id}
+                pet={{ vaccinated: pet.vaccinated, neutered: pet.neutered }}
+                record={medicalRecordQuery.data}
+                isLoading={medicalRecordQuery.isPending}
+                canEdit={Boolean(
+                  isOrganizationMember &&
+                  medicalRecordQuery.data?.complete === true &&
+                  !isMedicalRecordForbidden(medicalRecordQuery.error),
+                )}
+              />
             </div>
           </div>
           <aside className="rounded-[20px] border border-line bg-white p-6 shadow-soft lg:sticky lg:top-[102px]">

@@ -2,6 +2,7 @@ import { screen } from '@testing-library/react'
 import { Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fakeFavoritesApi } from '../test/fakeFavoritesApi'
+import { publicMedicalRecordFixture } from '../test/fixtures/medicalRecord'
 import { makeRequest } from '../test/fixtures/requests'
 import { petFixture } from '../test/petFixture'
 import { renderWithProviders } from '../test/renderWithProviders'
@@ -15,6 +16,8 @@ function setup(requests: AdoptionRequest[], pet: Pet = petFixture) {
   fakeFavoritesApi(mocks)
   const favoritesGet = mocks.get.getMockImplementation()
   mocks.get.mockImplementation((path: string) => {
+    if (path.includes('/medical-record')) return Promise.resolve(publicMedicalRecordFixture)
+    if (path.startsWith('/me/organization-pets')) return Promise.resolve({ data: [], total: 0 })
     if (path === `/pets/${petFixture.id}`) return Promise.resolve(pet)
     if (path === '/me/requests') return Promise.resolve({ data: requests, total: requests.length })
     return favoritesGet?.(path)

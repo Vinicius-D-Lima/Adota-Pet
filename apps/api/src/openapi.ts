@@ -11,6 +11,9 @@ import {
   interviewApiSchema,
   examInputSchema,
   healthConditionInputSchema,
+  invitationListResponseSchema,
+  invitationPreviewSchema,
+  invitationTokenParamsSchema,
   medicalRecordItemParamsSchema,
   medicalRecordPetParamsSchema,
   neuteringInputSchema,
@@ -18,6 +21,7 @@ import {
   notificationPreferencesResponseSchema,
   notificationPreferencesUpdateSchema,
   notificationsQuerySchema,
+  organizationListResponseSchema,
   organizationPermissionsResponseSchema,
   organizationCreateResponseSchema,
   organizationCreateSchema,
@@ -28,6 +32,8 @@ import {
   organizationMemberParamsSchema,
   organizationMemberRoleSchema,
   organizationTransitionSchema,
+  organizationUpdateSchema,
+  organizationSchema,
   petIdParamsSchema,
   petsQuerySchema,
   petsResponseSchema,
@@ -121,6 +127,56 @@ const notificationIdParamsSchema = z.object({ id: z.string().min(1) })
 /** Parâmetro `id` das rotas de solicitação, incluindo o chat (#22/#50). */
 const requestIdParamsSchema = z.object({ id: z.string().min(1) })
 
+/**
+ * Buscas salvas (#31): schemas Zod puros (sem `transform`/`pipe`/`coerce`) para
+ * que `createApp()` continue conseguindo converter tudo em JSON Schema.
+ */
+const savedFilterCriteriaSchema = z.strictObject({
+  search: z.string().min(1).optional(),
+  species: z.enum(['Cachorro', 'Gato']).optional(),
+  size: z
+    .array(z.enum(['Pequeno', 'Médio', 'Grande']))
+    .min(1)
+    .optional(),
+  sex: z.enum(['Fêmea', 'Macho']).optional(),
+  city: z.string().min(2).optional(),
+})
+
+const savedFilterSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  criteria: savedFilterCriteriaSchema,
+  active: z.boolean(),
+  createdAt: z.string(),
+})
+
+const savedFilterBodySchema = z.strictObject({
+  name: z.string().min(1).max(80),
+  criteria: savedFilterCriteriaSchema,
+  active: z.boolean(),
+})
+
+const savedFilterPatchSchema = z.strictObject({
+  name: z.string().min(1).max(80).optional(),
+  criteria: savedFilterCriteriaSchema.optional(),
+  active: z.boolean().optional(),
+})
+
+const savedFilterDocs: Record<string, RouteSchemas> = Object.fromEntries(
+  ['/me/saved-filters', '/api/me/saved-filters'].flatMap((base) => [
+    [
+      `GET ${base}`,
+      { response: z.object({ data: z.array(savedFilterSchema), total: z.number() }) },
+    ],
+    [`POST ${base}`, { body: savedFilterBodySchema, response: savedFilterSchema }],
+    [
+      `PATCH ${base}/{id}`,
+      { params: idParamsSchema, body: savedFilterPatchSchema, response: savedFilterSchema },
+    ],
+    [`DELETE ${base}/{id}`, { params: idParamsSchema }],
+  ]),
+)
+
 const authDocs: Record<string, RouteSchemas> = Object.fromEntries(
   ['/auth', '/api/auth'].flatMap((base) => [
     [`POST ${base}/register`, { body: registerSchema, response: authResponseSchema }],
@@ -141,6 +197,7 @@ interface RouteSchemas {
 
 const DOCUMENTED: Record<string, RouteSchemas> = {
   ...authDocs,
+  ...savedFilterDocs,
   'GET /me': { response: authUserSchema },
   'GET /health': { response: healthResponseSchema },
   'GET /api/pets': { query: petsQuerySchema, response: petsResponseSchema },
@@ -186,16 +243,26 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   'PUT /api/me/account': { body: createAccountSchema, response: profileSchema },
   'GET /api/me/matches': {},
   'GET /api/me/permissions': { response: organizationPermissionsResponseSchema },
+  'GET /api/me/organizations': { response: organizationListResponseSchema },
   'POST /api/organizations': {
     body: organizationCreateSchema,
     response: organizationCreateResponseSchema,
   },
   'GET /api/organizations/{organizationId}': { params: organizationIdParamsSchema },
+  'PUT /api/organizations/{organizationId}': {
+    params: organizationIdParamsSchema,
+    body: organizationUpdateSchema,
+    response: organizationSchema,
+  },
   'GET /api/organizations/{organizationId}/members': { params: organizationIdParamsSchema },
   'POST /api/organizations/{organizationId}/invitations': {
     params: organizationIdParamsSchema,
     body: organizationInvitationCreateSchema,
     response: organizationInvitationResponseSchema,
+  },
+  'GET /api/organizations/{organizationId}/invitations': {
+    params: organizationIdParamsSchema,
+    response: invitationListResponseSchema,
   },
   'DELETE /api/organizations/{organizationId}/invitations/{invitationId}': {
     params: organizationInvitationParamsSchema,
@@ -206,6 +273,10 @@ const DOCUMENTED: Record<string, RouteSchemas> = {
   },
   'DELETE /api/organizations/{organizationId}/members/{userId}': {
     params: organizationMemberParamsSchema,
+  },
+  'GET /api/invitations/{token}': {
+    params: invitationTokenParamsSchema,
+    response: invitationPreviewSchema,
   },
   'POST /api/invitations/{token}/accept': {},
   'GET /api/me/received-requests': {
@@ -407,8 +478,9 @@ function parametersFrom(schema: ZodType | undefined, location: 'query' | 'path')
 }
 
 /** Espelha os prefixos privados de `routes/index.ts` (#47). */
-const isPrivatePath = (path: string) =>
+const isPrivatePath = (path: string, method = '') =>
   !/^\/api\/(users|organizations)\/[^/]+\/reputation$/.test(path) &&
+  !(method === 'GET' && /^\/api\/invitations\/\{token\}$/.test(path)) &&
   (path === '/me' ||
     path.startsWith('/me/') ||
     path.startsWith('/api/me/') ||
@@ -467,7 +539,7 @@ export function buildOpenApiDocument(app: Express) {
           : {}),
         ...(method === 'GET' ? { 503: errorResponse } : {}),
         400: errorResponse,
-        ...(isPrivatePath(path) || path.includes('/auth/') ? { 401: errorResponse } : {}),
+        ...(isPrivatePath(path, method) || path.includes('/auth/') ? { 401: errorResponse } : {}),
         403: errorResponse,
         404: errorResponse,
         409: errorResponse,

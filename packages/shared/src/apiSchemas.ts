@@ -17,9 +17,15 @@ export const petsQuerySchema = z
       .optional(),
     sort: z.enum(['recent', 'name', 'distance']).optional(),
     species: z.string().trim().optional(),
-    size: z.string().trim().optional(),
+    /// O frontend repete `?size=Pequeno&size=Médio`: aceitar array evita 400 sem
+    /// transformações que não podem ser convertidas para JSON Schema (#49).
+    size: z.union([z.string(), z.array(z.string())]).optional(),
     sex: z.string().trim().optional(),
     city: z.string().trim().optional(),
+    /// Coordenadas para `sort=distance` chegam como texto na query; a conversão
+    /// acontece no router, depois da validação (#49).
+    lat: z.string().optional(),
+    lng: z.string().optional(),
     // Parâmetro desconhecido é erro no contrato da API (ver docs/arquitetura.md).
   })
   .strict()

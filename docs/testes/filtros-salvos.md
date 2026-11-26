@@ -4,6 +4,8 @@
 
 Garante validação dos critérios, limite por usuário, deduplicação de alertas e isolamento entre usuários.
 
+Os alertas são produzidos por `apps/api/src/savedFilterAlerts.ts`, na transação da publicação do pet: filtros ativos são avaliados por `search` (substring sem diferenciar maiúsculas) e pelos enums de `species`/`size`/`sex`/`city`; cada usuário recebe no máximo um `NewMatchingPet` por pet, e membros ativos da organização do pet ficam de fora. O resumo diário (`FIL-09`) é o job `daily-digest` do pg-boss, agendado para `0 7 * * *` (UTC): ele agrupa as notificações `NewMatchingPet` não lidas do dia e envia um e-mail por usuário, com transporte substituível nos testes.
+
 ## Como ler
 
 Cada linha da tabela é um teste de `apps/api`, escrito com Vitest e supertest contra o Postgres de teste. O nome do teste no código começa com o ID entre colchetes, por exemplo `it('[FIL-01] ...')`, para que este documento, a issue e o código se encontrem pelo mesmo identificador.

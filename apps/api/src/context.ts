@@ -5,6 +5,13 @@ import {
   type OrganizationRole,
 } from '@adotapet/shared'
 import type { Request, Response } from 'express'
+import {
+  abilitySubject,
+  accessibleBy,
+  createAbility,
+  type AccessRole,
+  type AppAbility,
+} from './ability.js'
 import { prisma } from './db.js'
 import { type AdoptionRequest, type ChatMessage, type User } from './generated/prisma/client.js'
 import { haversineKm, isBlank, sendError } from './http.js'
@@ -134,19 +141,50 @@ export async function requireGuardian(req: Request, res: Response): Promise<{ id
   return null
 }
 
-/** Nome/iniciais da instituição dona dos pets (perfil > usuário > fallback). */
-export async function organizationIdentity(userId: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId } })
-  const membership = await prisma.membership.findFirst({
-    where: { userId, status: 'ATIVO' },
+/** Vínculos ativos do usuário; `organizationId` restringe ao contexto escolhido. */
+export async function activeMemberships(userId: string, organizationId?: string) {
+  return prisma.membership.findMany({
+    where: { userId, status: 'ATIVO', ...(organizationId ? { organizationId } : {}) },
     orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
     include: { organization: true },
   })
+}
+
+export async function hasActiveMembership(userId: string, organizationId: string) {
+  const count = await prisma.membership.count({
+    where: { userId, organizationId, status: 'ATIVO' },
+  })
+  return count > 0
+}
+
+/** Identidade da instituição, respeitando o seletor `#41` quando informado. */
+export interface OrganizationIdentity {
+  organizationId: string | null
+  name: string
+  initials: string
+  role: AccessRole | null
+  user: User | null
+}
+
+/** Nome/iniciais da instituição dona dos pets (perfil > usuário > fallback). */
+export async function organizationIdentity(
+  userId: string,
+  selectedOrganizationId?: string,
+): Promise<OrganizationIdentity> {
+  const [user, memberships] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId } }),
+    activeMemberships(userId),
+  ])
+  // Um `organizationId` explícito nunca pode cair em outra organização.
+  const membership = selectedOrganizationId
+    ? memberships.find((item) => item.organizationId === selectedOrganizationId)
+    : memberships[0]
   if (membership) {
     return {
       organizationId: membership.organizationId,
       name: membership.organization.name,
       initials: membership.organization.initials,
+      role: membership.role,
       user,
     }
   }
@@ -163,51 +201,103 @@ export async function organizationIdentity(userId: string) {
     .slice(0, 2)
     .map((part) => part[0].toUpperCase())
     .join('')
-  return { organizationId: null, name, initials: initials || 'IN', user }
+  return {
+    organizationId: null,
+    name,
+    initials: initials || 'IN',
+    role: null,
+    user,
+  }
 }
 
-export const organizationPets = async (userId: string) => {
-  const { organizationId } = await organizationIdentity(userId)
-  if (!organizationId) return []
+/** Habilidade construída dos vínculos reais — nunca de `platformRole`. */
+export async function abilityForUser(
+  userId: string,
+  organizationIds?: string[],
+): Promise<AppAbility> {
+  const memberships = await activeMemberships(userId)
+  const scoped = organizationIds
+    ? memberships.filter((item) => organizationIds.includes(item.organizationId))
+    : memberships
+  const byRole = new Map<OrganizationRole, string[]>()
+  for (const membership of scoped) {
+    const ids = byRole.get(membership.role) ?? []
+    ids.push(membership.organizationId)
+    byRole.set(membership.role, ids)
+  }
+  return createAbility([...byRole].map(([role, ids]) => ({ role, organizationIds: ids })))
+}
+
+export const organizationPets = async (userId: string, organizationId?: string) => {
+  const { organizationId: scopeId } = await organizationIdentity(userId, organizationId)
+  if (!scopeId) return []
+  const ability = await abilityForUser(userId, [scopeId])
   return prisma.pet.findMany({
-    where: { organizationId },
+    where: {
+      AND: [accessibleBy(ability, 'read', 'Pet'), { organizationId: scopeId }],
+    },
     orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     include: petMedicalInclude,
   })
 }
 
 /**
- * Papel na instituição (#26/#28). Com JWT o cabeçalho `X-Demo-Role` é ignorado:
- * o cliente não pode decidir sua própria permissão. O papel vem do banco
- * (`User.organizationRole`); moderadores da plataforma continuam como ADMIN.
+ * Papel efetivo na instituição (#26/#28/#41). O papel vem do vínculo ativo no
+ * banco, nunca do cabeçalho demo quando há JWT e nunca de `platformRole`:
+ * `MODERADOR` da plataforma não herda permissões de organização (RBAC-06).
  */
-export function demoRole(req: Request): OrganizationRole {
-  if (req.auth) {
-    if (req.auth.platformRole === 'MODERADOR') return 'ADMIN'
-    const guardian = req.user?.roles?.includes('GUARDIAN') ?? false
-    if (!guardian) return 'VOLUNTEER'
-    return req.user?.organizationRole === 'VOLUNTEER' ? 'VOLUNTEER' : 'ADMIN'
+export async function demoRole(req: Request, organizationId?: string): Promise<AccessRole> {
+  const userId = req.user?.id ?? (await currentUser(req)).id
+  const membership = await prisma.membership.findFirst({
+    where: { userId, status: 'ATIVO', ...(organizationId ? { organizationId } : {}) },
+    orderBy: [{ joinedAt: 'asc' }, { id: 'asc' }],
+    select: { role: true },
+  })
+  if (membership) return membership.role
+  if (!req.auth) {
+    const value = String(req.headers['x-demo-role'] || req.query.role || '').toUpperCase()
+    if (value === 'VOLUNTEER') return 'VOLUNTEER'
+    if (value === 'ADMIN') return 'ADMIN'
   }
-  const value = String(req.headers['x-demo-role'] || req.query.role || '').toUpperCase()
-  return value === 'VOLUNTEER' ? 'VOLUNTEER' : 'ADMIN'
+  if (req.auth?.platformRole === 'MODERADOR') return 'MODERADOR'
+  const guardian = req.user?.roles?.includes('GUARDIAN') ?? false
+  if (!guardian) return 'ADOTANTE'
+  return req.user?.organizationRole === 'VOLUNTEER' ? 'VOLUNTEER' : 'ADMIN'
 }
 
-export const permissionsForRole = (role: OrganizationRole): OrganizationPermission[] =>
-  permissionsForOrganizationRole(role)
+export const permissionsForRole = (role: AccessRole): OrganizationPermission[] =>
+  role === 'ADMIN' || role === 'VOLUNTEER' ? permissionsForOrganizationRole(role) : []
 
 /**
  * Aplicação server-side da matriz (#28/#RBAC): esconder o botão é só UX, então
  * toda ação da área da instituição passa por aqui. Chamar depois de
  * `requireGuardian`, que garante que o usuário pertence a uma instituição.
  */
-export function requirePermission(
+export async function requirePermission(
   req: Request,
   res: Response,
   permission: OrganizationPermission,
-): boolean {
-  if (permissionsForRole(demoRole(req)).includes(permission)) return true
+  organizationId?: string,
+): Promise<boolean> {
+  if (permissionsForRole(await demoRole(req, organizationId)).includes(permission)) return true
   sendError(res, 403, 'Você não tem permissão para realizar esta ação.')
   return false
+}
+
+/** Verificação pontual via CASL, usada pelas rotas de organização. */
+export async function requireAbility(
+  userId: string,
+  organizationId: string,
+  action: Parameters<AppAbility['can']>[0],
+  model: Parameters<typeof abilitySubject>[0],
+): Promise<boolean> {
+  const membership = await prisma.membership.findUnique({
+    where: { userId_organizationId: { userId, organizationId } },
+    select: { role: true, status: true },
+  })
+  if (!membership || membership.status !== 'ATIVO') return false
+  const ability = createAbility({ role: membership.role, organizationIds: [organizationId] })
+  return ability.can(action, abilitySubject(model, organizationId))
 }
 
 export const isChatParticipant = async (

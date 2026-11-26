@@ -127,6 +127,24 @@ Os guardas do frontend controlam apenas a **navegação** — não são seguran�
 
 Contas de demonstração no banco principal (senha `Senha@123`): `demo@adotapet.local`, `contato@institutopatinhas.org`, `demo-empty@adotapet.local` e `moderador@adotapet.local`.
 
+### Matriz de permissões (CASL)
+
+Fonte: [issue #28](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/28). As regras ficam em `apps/api/src/ability.ts`; o teste `RBAC-09` lê esta tabela e compara com elas. `–` significa que a ação não se aplica ao papel.
+
+| Ação                                                    | ADMIN | VOLUNTÁRIO | ADOTANTE | MODERADOR (plataforma) |
+| ------------------------------------------------------- | :---: | :--------: | :------: | :--------------------: |
+| Gerenciar membros e convites                            |  ✅   |     ❌     |    ❌    |           ❌           |
+| Editar dados da organização                             |  ✅   |     ❌     |    ❌    |           ❌           |
+| Cadastrar e editar pets da organização                  |  ✅   |     ✅     |    ❌    |           ❌           |
+| Editar prontuário médico                                |  ✅   |     ✅     |    ❌    |           ❌           |
+| Conduzir etapas, agendar e conversar no chat            |  ✅   |     ✅     |    ❌    |           ❌           |
+| **Aprovar adoção (decisão final)**                      |  ✅   |     ❌     |    ❌    |           ❌           |
+| Recusar solicitação                                     |  ✅   |     ✅     |    ❌    |           ❌           |
+| Criar solicitação, cancelar a própria e enviar check-in |   –   |     –      |    ✅    |           –            |
+| Moderar denúncias                                       |  ❌   |     ❌     |    ❌    |           ✅           |
+
+Todas as permissões de organização valem **apenas dentro da organização** da qual o usuário é membro. Papéis da plataforma (`ADOTANTE`/`MODERADOR`) não herdam poder sobre organizações; `MODERADOR` apenas modera denúncias.
+
 ### 2) Frontend + mock-server (sem banco)
 
 ```bash

@@ -8,7 +8,7 @@ import { favoritesRouter } from './favorites.js'
 import { medicalRecordsRouter } from './medicalRecords.js'
 import { notificationsRouter } from './notifications.js'
 import { organizationRouter } from './organization.js'
-import { organizationsRouter } from './organizations.js'
+import { organizationsRouter, publicInvitationRouter } from './organizations.js'
 import { createPetsRouter } from './pets.js'
 import { profileRouter } from './profile.js'
 import { requestsRouter } from './requests.js'
@@ -29,13 +29,14 @@ export interface ApiRouterOptions {
 export function createApiRouter(options: ApiRouterOptions = {}): Router {
   const apiRouter = Router()
 
-  // A reputação é pública; monte antes da autenticação de /organizations.
+  // Rotas públicas registradas antes do middleware de autenticação (#41).
   apiRouter.use(reputationRouter)
+  apiRouter.use(publicInvitationRouter)
 
   // Os routers são montados na raiz de /api, então um `router.use(requireAuth)`
   // dentro deles também protegeria /api/pets (público). Em vez disso, exigimos JWT
   // apenas nos prefixos privados conhecidos (#4/#5). Paths desconhecidos seguem
-  // para o 404 abaixo, e /api/auth/* já é montado antes de /api em app.ts.
+  // para a negação abaixo, e /api/auth/* já é montado antes de /api em app.ts.
   const PRIVATE_PREFIXES = [
     '/me',
     '/requests',
@@ -47,11 +48,10 @@ export function createApiRouter(options: ApiRouterOptions = {}): Router {
     '/moderation',
     '/check-ins',
   ] as const
+  const isPrivatePath = (path: string) =>
+    PRIVATE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`))
   apiRouter.use((req, res, next) => {
-    const isPrivate = PRIVATE_PREFIXES.some(
-      (prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`),
-    )
-    if (isPrivate) return requireAuth(req, res, next)
+    if (isPrivatePath(req.path)) return requireAuth(req, res, next)
     return next()
   })
   apiRouter.use(checkInsRouter)
@@ -69,6 +69,15 @@ export function createApiRouter(options: ApiRouterOptions = {}): Router {
   apiRouter.use(savedFiltersRouter)
   apiRouter.use(notificationsRouter)
   apiRouter.use(storageRouter)
+
+  // RBAC-08: deny by default. Um path privado sem rota declarada não cai no
+  // 404 público — a requisição já autenticada é negada por falta de regra.
+  apiRouter.use((req, res, next) => {
+    if (isPrivatePath(req.path)) {
+      return sendError(res, 403, 'Você não tem permissão para acessar este recurso')
+    }
+    return next()
+  })
 
   // Rotas desconhecidas respondem no formato do contrato (#47).
   // Erros (Zod, parser, exceções) são tratados pelo middleware global em app.ts.

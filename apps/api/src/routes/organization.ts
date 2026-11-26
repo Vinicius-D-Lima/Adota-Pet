@@ -13,14 +13,19 @@ import {
 import type { Request, Response } from 'express'
 import { Router } from 'express'
 import { z } from 'zod'
+import { accessibleBy, publicRulesForRole } from '../ability.js'
 import {
+  abilityForUser,
+  activeMemberships,
   currentUser,
   demoRole,
+  hasActiveMembership,
   isChatParticipant,
   organizationIdentity,
   organizationPets,
   permissionsForRole,
   publicPet,
+  requireAbility,
   requireGuardian,
   requirePermission,
   withReceivedRequest,
@@ -59,6 +64,23 @@ const presentOrganizationPet = (pet: PetWithOrganization) => ({
 
 const petNameOf = async (petId: string) =>
   (await prisma.pet.findUnique({ where: { id: petId }, select: { name: true } }))?.name ?? 'pet'
+
+/** `#41`: o seletor de organização viaja na query e limita todas as listagens. */
+const selectedOrganizationId = (req: Request) => {
+  const value = req.query.organizationId
+  return typeof value === 'string' && value ? value : undefined
+}
+
+async function scopedGuardian(req: Request, res: Response) {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return null
+  const organizationId = selectedOrganizationId(req)
+  if (organizationId && !(await hasActiveMembership(viewer.id, organizationId))) {
+    sendError(res, 403, 'Você não pertence a esta organização')
+    return null
+  }
+  return viewer
+}
 
 /*
  * Agendamento de entrevista/visita (#21). Os valores gravados no banco são
@@ -206,7 +228,7 @@ async function appointmentOrError(req: Request, res: Response, requestId: string
 
 /** Solicitação dos pets da instituição ou `null` (com 404 já enviado). */
 async function receivedRequestOf(req: Request, viewerId: string) {
-  const petIds = (await organizationPets(viewerId)).map(({ id }) => id)
+  const petIds = (await organizationPets(viewerId, selectedOrganizationId(req))).map(({ id }) => id)
   const request = await prisma.adoptionRequest.findFirst({
     where: { id: String(req.params.id), petId: { in: petIds } },
   })
@@ -214,14 +236,14 @@ async function receivedRequestOf(req: Request, viewerId: string) {
 }
 
 organizationRouter.get('/me/organization-pets', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
+  const viewer = await scopedGuardian(req, res)
   if (!viewer) return
-  const pets = await organizationPets(viewer.id)
+  const pets = await organizationPets(viewer.id, selectedOrganizationId(req))
   res.json(list(pets.map(presentOrganizationPet)))
 })
 
 organizationRouter.post('/me/organization-pets', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
+  const viewer = await scopedGuardian(req, res)
   if (!viewer) return
   const details = validateOrganizationPet(req.body)
   if (details.length) return sendError(res, 400, 'Validação falhou', details)
@@ -232,8 +254,14 @@ organizationRouter.post('/me/organization-pets', async (req, res) => {
       { field: 'body', message: 'Envie um objeto JSON' },
     ])
 
-  const { organizationId, user } = await organizationIdentity(viewer.id)
+  const { organizationId, user } = await organizationIdentity(
+    viewer.id,
+    selectedOrganizationId(req),
+  )
   if (!organizationId) return sendError(res, 409, 'Crie uma organização antes de cadastrar pets')
+  if (!(await requireAbility(viewer.id, organizationId, 'create', 'Pet'))) {
+    return sendError(res, 403, 'Você não tem permissão para cadastrar pets')
+  }
   const baseId =
     String(body.name)
       .toLowerCase()
@@ -275,15 +303,22 @@ organizationRouter.post('/me/organization-pets', async (req, res) => {
 })
 
 organizationRouter.put('/me/organization-pets/:id', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
+  const viewer = await scopedGuardian(req, res)
   if (!viewer) return
-  const identity = await organizationIdentity(viewer.id)
+  const identity = await organizationIdentity(viewer.id, selectedOrganizationId(req))
   if (!identity.organizationId) return sendError(res, 404, 'Organização não encontrada')
-  const existing = await prisma.pet.findFirst({
-    where: { id: req.params.id, organizationId: identity.organizationId },
+  const existing = await prisma.pet.findUnique({
+    where: { id: req.params.id },
     include: petMedicalInclude,
   })
-  if (!existing) return sendError(res, 404, 'Pet não encontrado entre os cadastros da instituição')
+  // RBAC-03: pet de outra organização existe, mas não é editável por aqui.
+  if (!existing) return sendError(res, 404, 'Pet não encontrado')
+  if (
+    existing.organizationId !== identity.organizationId ||
+    !(await requireAbility(viewer.id, identity.organizationId, 'update', 'Pet'))
+  ) {
+    return sendError(res, 403, 'Você não tem permissão para editar este pet')
+  }
 
   const details = validateOrganizationPet(req.body)
   if (details.length) return sendError(res, 400, 'Validação falhou', details)
@@ -312,14 +347,18 @@ organizationRouter.put('/me/organization-pets/:id', async (req, res) => {
 })
 
 organizationRouter.delete('/me/organization-pets/:id', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
+  const viewer = await scopedGuardian(req, res)
   if (!viewer) return
-  const identity = await organizationIdentity(viewer.id)
+  const identity = await organizationIdentity(viewer.id, selectedOrganizationId(req))
   if (!identity.organizationId) return sendError(res, 404, 'Organização não encontrada')
-  const existing = await prisma.pet.findFirst({
-    where: { id: req.params.id, organizationId: identity.organizationId },
-  })
-  if (!existing) return sendError(res, 404, 'Pet não encontrado entre os cadastros da instituição')
+  const existing = await prisma.pet.findUnique({ where: { id: req.params.id } })
+  if (!existing) return sendError(res, 404, 'Pet não encontrado')
+  if (
+    existing.organizationId !== identity.organizationId ||
+    !(await requireAbility(viewer.id, identity.organizationId, 'delete', 'Pet'))
+  ) {
+    return sendError(res, 403, 'Você não tem permissão para remover este pet')
+  }
 
   const requests = await prisma.adoptionRequest.count({ where: { petId: existing.id } })
   if (requests > 0)
@@ -333,11 +372,13 @@ organizationRouter.delete('/me/organization-pets/:id', async (req, res) => {
 })
 
 organizationRouter.get('/me/permissions', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
+  const viewer = await scopedGuardian(req, res)
   if (!viewer) return
-  if (!requirePermission(req, res, 'requests:view')) return
-  const role = demoRole(req)
-  const identity = await organizationIdentity(viewer.id)
+  if (!(await requirePermission(req, res, 'requests:view', selectedOrganizationId(req)))) return
+  const organizationId = selectedOrganizationId(req)
+  const role = await demoRole(req, organizationId)
+  const identity = await organizationIdentity(viewer.id, organizationId)
+  const memberships = await activeMemberships(viewer.id)
   res.json({
     role,
     canApprove: role === 'ADMIN',
@@ -347,6 +388,13 @@ organizationRouter.get('/me/permissions', async (req, res) => {
       name: identity.name,
       initials: identity.initials,
     },
+    organizations: memberships.map((membership) => ({
+      id: membership.organizationId,
+      name: membership.organization.name,
+      initials: membership.organization.initials,
+      role: membership.role,
+    })),
+    rules: publicRulesForRole(role, identity.organizationId ?? undefined),
   })
 })
 
@@ -354,15 +402,22 @@ organizationRouter.get(
   '/me/received-requests',
   validate({ query: receivedRequestsQuerySchema }),
   async (req, res) => {
-    const viewer = await requireGuardian(req, res)
+    const viewer = await scopedGuardian(req, res)
     if (!viewer) return
-    if (!requirePermission(req, res, 'requests:view')) return
+    if (!(await requirePermission(req, res, 'requests:view', selectedOrganizationId(req)))) return
 
     const { stage, petId } = req.query as unknown as ReceivedRequestsQuery
-    const pets = await organizationPets(viewer.id)
-    const petIds = pets.map(({ id }) => id)
+    const organizationId = selectedOrganizationId(req)
+    const identity = await organizationIdentity(viewer.id, organizationId)
+    const pets = await organizationPets(viewer.id, identity.organizationId ?? undefined)
+    const ability = await abilityForUser(
+      viewer.id,
+      identity.organizationId ? [identity.organizationId] : [],
+    )
     const requests = await prisma.adoptionRequest.findMany({
-      where: { petId: { in: petIds } },
+      where: {
+        AND: [accessibleBy(ability, 'read', 'AdoptionRequest'), ...(petId ? [{ petId }] : [])],
+      },
       orderBy: [{ date: 'desc' }, { id: 'desc' }],
     })
 
@@ -385,9 +440,9 @@ organizationRouter.get(
 )
 
 organizationRouter.get('/me/received-requests/:id', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
+  const viewer = await scopedGuardian(req, res)
   if (!viewer) return
-  if (!requirePermission(req, res, 'requests:view')) return
+  if (!(await requirePermission(req, res, 'requests:view', selectedOrganizationId(req)))) return
   const request = await receivedRequestOf(req, viewer.id)
   if (!request) return sendError(res, 404, 'Solicitação não encontrada')
   res.json(await withReceivedRequest(request, viewer.id))
@@ -397,9 +452,9 @@ organizationRouter.post(
   '/me/received-requests/:id/interview',
   validate({ body: interviewApiSchema }),
   async (req, res) => {
-    const viewer = await requireGuardian(req, res)
+    const viewer = await scopedGuardian(req, res)
     if (!viewer) return
-    if (!requirePermission(req, res, 'requests:review')) return
+    if (!(await requirePermission(req, res, 'requests:review', selectedOrganizationId(req)))) return
     const request = await receivedRequestOf(req, viewer.id)
     if (!request) return sendError(res, 404, 'Solicitação não encontrada')
     if (requestStatusCodeOf(request.status) !== 'ANALISE_QUESTIONARIO') {
@@ -443,9 +498,9 @@ organizationRouter.post(
 )
 
 organizationRouter.post('/me/received-requests/:id/interview/complete', async (req, res) => {
-  const viewer = await requireGuardian(req, res)
+  const viewer = await scopedGuardian(req, res)
   if (!viewer) return
-  if (!requirePermission(req, res, 'requests:review')) return
+  if (!(await requirePermission(req, res, 'requests:review', selectedOrganizationId(req)))) return
   const request = await receivedRequestOf(req, viewer.id)
   if (!request) return sendError(res, 404, 'Solicitação não encontrada')
 
@@ -485,9 +540,9 @@ organizationRouter.post(
   '/me/received-requests/:id/appointments',
   validate({ params: requestIdParamsSchema, body: appointmentProposeBodySchema }),
   async (req, res) => {
-    const viewer = await requireGuardian(req, res)
+    const viewer = await scopedGuardian(req, res)
     if (!viewer) return
-    if (!requirePermission(req, res, 'requests:review')) return
+    if (!(await requirePermission(req, res, 'requests:review', selectedOrganizationId(req)))) return
     const request = await managedRequestOrError(req, res, viewer.id)
     if (!request) return
 
@@ -597,7 +652,12 @@ organizationRouter.post(
     const body = req.body as AppointmentRescheduleBody
     const slots = body.proposedSlots?.map(asUtc)
     const isAdopter = request.userId === viewerId
-    if (!isAdopter && !requirePermission(req, res, 'requests:review')) return
+    if (
+      !isAdopter &&
+      !(await requirePermission(req, res, 'requests:review', selectedOrganizationId(req)))
+    ) {
+      return
+    }
     if (isAdopter && body.proposedSlots) {
       return sendError(res, 403, 'Somente o responsável pode propor novos horários')
     }
@@ -657,9 +717,9 @@ organizationRouter.post(
   '/me/received-requests/:id/appointments/:appointmentId/complete',
   validate({ params: appointmentParamsSchema }),
   async (req, res) => {
-    const viewer = await requireGuardian(req, res)
+    const viewer = await scopedGuardian(req, res)
     if (!viewer) return
-    if (!requirePermission(req, res, 'requests:review')) return
+    if (!(await requirePermission(req, res, 'requests:review', selectedOrganizationId(req)))) return
     const request = await managedRequestOrError(req, res, viewer.id)
     if (!request) return
     const appointment = await appointmentOrError(req, res, request.id)
@@ -708,7 +768,7 @@ organizationRouter.post(
   '/me/received-requests/:id/transitions',
   validate({ body: organizationTransitionSchema }),
   async (req, res) => {
-    const viewer = await requireGuardian(req, res)
+    const viewer = await scopedGuardian(req, res)
     if (!viewer) return
     const request = await receivedRequestOf(req, viewer.id)
     if (!request) return sendError(res, 404, 'Solicitação não encontrada')
@@ -724,7 +784,7 @@ organizationRouter.post(
         : target === 'RECUSADA'
           ? 'requests:reject'
           : 'requests:review'
-    if (!requirePermission(req, res, permission)) return
+    if (!(await requirePermission(req, res, permission, selectedOrganizationId(req)))) return
 
     // #20 + #23: a rota antiga usa a tabela da FSM e, ao aprovar, formaliza a
     // adoção dentro da mesma transação da mudança de status.

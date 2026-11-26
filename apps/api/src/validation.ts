@@ -1,4 +1,5 @@
 import { profileSchema as sharedProfileSchema } from '@adotapet/shared'
+import { z } from 'zod'
 import type { FieldError } from './http.js'
 import { isBlank } from './http.js'
 import { MAX_FOLLOW_UP_DURATION_DAYS } from './adoptions.js'
@@ -287,6 +288,45 @@ export function validateFollowUpPlan(body: unknown): FieldError[] {
 
   return details
 }
+
+/**
+ * Corpo do CRUD de pets (#49). `z.object` (e não `strictObject`) descarta chaves
+ * desconhecidas: `organizationId` e `status` enviados pelo cliente são ignorados,
+ * por whitelist, em vez de virarem erro ou serem gravados (PET-08).
+ */
+export const createPetBodySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  species: z.enum(['Cachorro', 'Gato']),
+  breed: z.string().trim().min(1).max(80),
+  age: z.number().int().min(0).max(30),
+  size: z.enum(['Pequeno', 'Médio', 'Grande']),
+  sex: z.enum(['Fêmea', 'Macho']),
+  city: z.string().trim().min(1).max(120),
+  image: z.url(),
+  summary: z.string().trim().min(1).max(300),
+  description: z.string().trim().min(1).max(5000),
+  traits: z.array(z.string().trim().min(1)).min(1).max(20),
+  energy: z.string().trim().min(1).max(80),
+  space: z.string().trim().min(1).max(80),
+  children: z.boolean(),
+  otherPets: z.boolean(),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
+})
+
+/**
+ * No update, qualquer `status` diferente de `DISPONIVEL` é ignorado (#49/PET-08):
+ * só a reabertura é permitida por aqui; arquivar tem endpoint próprio (PET-11).
+ */
+export const updatePetBodySchema = createPetBodySchema.partial().extend({
+  status: z.string().optional(),
+})
+
+/** Reordenação da galeria e escolha da capa (#49/PET-12). */
+export const petGalleryBodySchema = z.object({
+  gallery: z.array(z.string().min(1)).min(1).max(20),
+  image: z.string().min(1),
+})
 
 export function validateOrganizationPet(body: unknown): FieldError[] {
   const record = asRecord(body)

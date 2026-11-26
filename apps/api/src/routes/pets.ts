@@ -1,19 +1,43 @@
 import { petIdParamsSchema, petsQuerySchema } from '@adotapet/shared'
-import { Router } from 'express'
+import type { Request, Response } from 'express'
+import { Router, type NextFunction } from 'express'
+import { Prisma } from '../generated/prisma/client.js'
+import multer from 'multer'
 import { z } from 'zod'
 import { requireAuth } from '../auth.js'
-import { currentUser, getProfile, presentPet, referenceUser } from '../context.js'
+import { currentUser, getProfile, presentPet, referenceUser, requireGuardian } from '../context.js'
+import { loadConfig } from '../config.js'
 import { prisma } from '../db.js'
+import { haversineKm, HttpError, type FieldError, positiveInt, sendError } from '../http.js'
 import { createMatchingStrategy, type MatchingAdopter, type MatchingStrategy } from '../matching.js'
-import { petMedicalInclude } from '../medicalRecords.js'
-import { positiveInt, sendError } from '../http.js'
+import { petMedicalInclude, type PetWithMedicalRecord } from '../medicalRecords.js'
+import { notifyMatchingSavedFilters } from '../savedFilterAlerts.js'
+import {
+  getStorageProvider,
+  isStorageConfigured,
+  signObjectUrl,
+  STORAGE_SCOPES,
+  validateUploadFiles,
+} from '../storage.js'
 import { validate } from '../validate.js'
+import { createPetBodySchema, petGalleryBodySchema, updatePetBodySchema } from '../validation.js'
 
 const DEFAULT_LIMIT = 12
 const MAX_LIMIT = 100
 const MAX_MATCH_LIMIT = 100
-const SORTS = ['recent', 'name', 'distance']
-const PETS_QUERY_PARAMS = ['search', 'page', 'limit', 'sort', 'species', 'size', 'sex', 'city']
+const SORTS = ['recent', 'name', 'distance'] as const
+const PETS_QUERY_PARAMS = [
+  'search',
+  'page',
+  'limit',
+  'sort',
+  'species',
+  'size',
+  'sex',
+  'city',
+  'lat',
+  'lng',
+]
 
 /** Filtros do ranking (MATCH-04/08): só pets disponíveis e limites explícitos. */
 const matchesQuerySchema = z
@@ -65,6 +89,120 @@ function requireCompleteProfile(
   return false
 }
 
+// ---------------------------------------------------------------------------
+// CRUD de pets (#49)
+// ---------------------------------------------------------------------------
+
+interface PetWriteScope {
+  userId: string
+  /** Todas as organizações às quais o usuário está vinculado (membership ativa). */
+  organizationIds: string[]
+}
+
+/**
+ * Toda escrita exige membership ativa. `requireGuardian` sozinho não basta: um
+ * usuário com papel GUARDIAN mas sem vínculo também precisa receber 403 (PET-06).
+ */
+async function requirePetWriteScope(req: Request, res: Response): Promise<PetWriteScope | null> {
+  const viewer = await requireGuardian(req, res)
+  if (!viewer) return null
+  const memberships = await prisma.membership.findMany({
+    where: { userId: viewer.id, status: 'ATIVO' },
+    select: { organizationId: true },
+  })
+  if (!memberships.length) {
+    sendError(res, 403, 'Você não pertence a uma organização')
+    return null
+  }
+  return {
+    userId: viewer.id,
+    organizationIds: memberships.map(({ organizationId }) => organizationId),
+  }
+}
+
+/** Pet inexistente é 404; pet de outra organização é 403 (PET-05/PET-07). */
+async function scopedPet(
+  req: Request,
+  res: Response,
+  scope: PetWriteScope,
+): Promise<PetWithMedicalRecord | null> {
+  const pet = await prisma.pet.findUnique({
+    where: { id: String(req.params.id) },
+    include: petMedicalInclude,
+  })
+  if (!pet) {
+    sendError(res, 404, 'Pet não encontrado')
+    return null
+  }
+  if (!scope.organizationIds.includes(pet.organizationId)) {
+    sendError(res, 403, 'Você não tem permissão para alterar este pet')
+    return null
+  }
+  return pet
+}
+
+/** Slug legível e único para o id do pet (o schema não tem default). */
+async function newPetId(name: string): Promise<string> {
+  const base =
+    name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'pet'
+  let id = base
+  let suffix = 2
+  while (await prisma.pet.findUnique({ where: { id }, select: { id: true } })) {
+    id = `${base}-${suffix++}`
+  }
+  return id
+}
+
+const coordinate = (
+  value: string | undefined,
+  field: 'lat' | 'lng',
+  min: number,
+  max: number,
+  details: FieldError[],
+): number | undefined => {
+  if (value === undefined) return undefined
+  const number = Number(value)
+  if (!value.trim() || !Number.isFinite(number) || number < min || number > max) {
+    details.push({ field, message: `${field} deve ser um número entre ${min} e ${max}` })
+    return undefined
+  }
+  return number
+}
+
+/** Distância calculada a partir das coordenadas da própria requisição (PET-03). */
+function presentWithDistance(pet: PetWithMedicalRecord, lat: number, lng: number) {
+  const base = presentPet(pet, null)
+  if (typeof pet.lat !== 'number' || typeof pet.lng !== 'number') {
+    return { ...base, distanceKm: null, distance: null }
+  }
+  const distanceKm = Math.round(haversineKm(lat, lng, pet.lat, pet.lng) * 10) / 10
+  return { ...base, distanceKm, distance: `${String(distanceKm).replace('.', ',')} km` }
+}
+
+/** Multipart com o mesmo teto do módulo de armazenamento (#94/#49). */
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { files: 10, fileSize: 10 * 1024 * 1024 },
+})
+
+function multipart(req: Request, res: Response, next: NextFunction) {
+  upload.array('files')(req, res, (error: unknown) => {
+    if (error) {
+      return next(
+        new HttpError(400, 'Upload inválido', [
+          { field: 'files', message: (error as Error).message },
+        ]),
+      )
+    }
+    next()
+  })
+}
+
 export function createPetsRouter(strategy: MatchingStrategy = createMatchingStrategy()): Router {
   const router = Router()
 
@@ -80,9 +218,9 @@ export function createPetsRouter(strategy: MatchingStrategy = createMatchingStra
       details.push({ field: 'limit', message: `limit máximo é ${MAX_MATCH_LIMIT}` })
     if (details.length) return sendError(res, 400, 'Parâmetros de consulta inválidos', details)
 
-    const where: Record<string, unknown> = { status: 'DISPONIVEL' }
-    if (species) Object.assign(where, { species: { in: [species] } })
-    if (size) Object.assign(where, { size: { in: [size] } })
+    const where: Prisma.PetWhereInput = { status: 'DISPONIVEL' }
+    if (species) where.species = { in: [species] }
+    if (size) where.size = { in: [size] }
 
     const pets = await prisma.pet.findMany({
       where,
@@ -122,53 +260,62 @@ export function createPetsRouter(strategy: MatchingStrategy = createMatchingStra
   )
 
   router.get('/pets', validate({ query: petsQuerySchema }), async (req, res) => {
-    const { search, page, limit, sort = 'recent', ...filters } = req.query
-    const details = Object.keys(req.query)
+    const query = req.query as z.infer<typeof petsQuerySchema>
+    const { search, page, limit, sort = 'recent', species, size, sex, city, lat, lng } = query
+    const details: FieldError[] = Object.keys(query)
       .filter((key) => !PETS_QUERY_PARAMS.includes(key))
       .map((field) => ({ field, message: 'Parâmetro desconhecido' }))
     const pageNumber = positiveInt(page, 'page', details, 1)
     const limitNumber = positiveInt(limit, 'limit', details, DEFAULT_LIMIT)
     if (limitNumber > MAX_LIMIT)
       details.push({ field: 'limit', message: `limit máximo é ${MAX_LIMIT}` })
-    if (!SORTS.includes(String(sort))) {
+    if (!(SORTS as readonly string[]).includes(sort)) {
       details.push({ field: 'sort', message: `sort deve ser um de: ${SORTS.join(', ')}` })
+    }
+
+    let fromLat: number | undefined
+    let fromLng: number | undefined
+    if (sort === 'distance') {
+      if (lat === undefined)
+        details.push({ field: 'lat', message: 'lat é obrigatório para sort=distance' })
+      if (lng === undefined)
+        details.push({ field: 'lng', message: 'lng é obrigatório para sort=distance' })
+      fromLat = coordinate(lat, 'lat', -90, 90, details)
+      fromLng = coordinate(lng, 'lng', -180, 180, details)
     }
     if (details.length) return sendError(res, 400, 'Parâmetros de consulta inválidos', details)
 
-    // Filtros exatos entram no banco; a busca textual e a ordenação são feitas em memória
-    // (mesma semântica do json-server, que varre todos os valores do registro).
-    const where = {}
-    Object.assign(where, { status: { not: 'ADOTADO' } })
-    for (const [key, value] of Object.entries(filters)) {
-      const values = (Array.isArray(value) ? value : [value]).map(String)
-      Object.assign(where, { [key]: { in: values } })
-    }
+    // Só disponíveis na listagem pública: adotados e arquivados continuam
+    // acessíveis pelo id (PET-04). Filtros exatos vão para o banco, de forma
+    // parametrizada; busca textual e distância são calculadas em memória.
+    const where: Prisma.PetWhereInput = { status: 'DISPONIVEL' }
+    if (species) where.species = species
+    if (sex) where.sex = sex
+    if (city) where.city = city
+    if (size) where.size = { in: Array.isArray(size) ? size : [size] }
 
     let pets = await prisma.pet.findMany({ where, include: petMedicalInclude })
-    const term = Array.isArray(search)
-      ? String(search[0] ?? '').toLowerCase()
-      : typeof search === 'string'
-        ? search.toLowerCase()
-        : ''
+    const term = search?.toLowerCase() ?? ''
     if (term) pets = pets.filter((pet) => matchesSearch(pet, term))
 
-    const refUser = await referenceUser()
-
+    const start = (pageNumber - 1) * limitNumber
     if (sort === 'distance') {
-      // A distância é calculada, não coluna: ordena depois de apresentar.
-      const matches = pets
-        .map((pet) => presentPet(pet, refUser))
-        .sort((a, b) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity))
-      const start = (pageNumber - 1) * limitNumber
-      return res.json({ data: matches.slice(start, start + limitNumber), total: matches.length })
+      if (fromLat === undefined || fromLng === undefined) {
+        return sendError(res, 400, 'Parâmetros de consulta inválidos')
+      }
+      const ranked = pets
+        .map((pet) => presentWithDistance(pet, fromLat as number, fromLng as number))
+        .sort(
+          (a, b) =>
+            (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity) || byCodeUnit(a.id, b.id),
+        )
+      return res.json({ data: ranked.slice(start, start + limitNumber), total: ranked.length })
     }
 
-    pets =
-      sort === 'name'
-        ? [...pets].sort((a, b) => byCodeUnit(a.name, b.name))
-        : [...pets].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-
-    const start = (pageNumber - 1) * limitNumber
+    pets = [...pets].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime() || byCodeUnit(a.id, b.id),
+    )
+    const refUser = await referenceUser()
     res.json({
       data: pets.slice(start, start + limitNumber).map((pet) => presentPet(pet, refUser)),
       total: pets.length,
@@ -183,6 +330,200 @@ export function createPetsRouter(strategy: MatchingStrategy = createMatchingStra
     if (!pet) return sendError(res, 404, 'Pet não encontrado')
     res.json(presentPet(pet, await referenceUser()))
   })
+
+  /** Publicação: organizationId e status vêm do servidor, nunca do corpo (PET-08). */
+  router.post('/pets', requireAuth, validate({ body: createPetBodySchema }), async (req, res) => {
+    const scope = await requirePetWriteScope(req, res)
+    if (!scope) return
+    const body = req.body as z.infer<typeof createPetBodySchema>
+    const organizationId = scope.organizationIds[0]
+    const user = await prisma.user.findUnique({
+      where: { id: scope.userId },
+      select: { lat: true, lng: true },
+    })
+    const id = await newPetId(body.name)
+    const data: Prisma.PetUncheckedCreateInput = {
+      ...body,
+      id,
+      ageLabel: `${body.age} ${body.age === 1 ? 'ano' : 'anos'}`,
+      gallery: [body.image],
+      organizationId,
+      lat: body.lat ?? user?.lat ?? null,
+      lng: body.lng ?? user?.lng ?? null,
+      status: 'DISPONIVEL',
+      createdAt: new Date(),
+    }
+
+    const created = await prisma.$transaction(async (tx) => {
+      const row = await tx.pet.create({ data })
+      await tx.medicalRecord.create({
+        data: {
+          petId: row.id,
+          createdById: scope.userId,
+          updatedById: scope.userId,
+          neutering: {
+            create: { done: false, createdById: scope.userId, updatedById: scope.userId },
+          },
+        },
+      })
+      // #31/FIL-03: o alerta entra na mesma transação da publicação.
+      await notifyMatchingSavedFilters(
+        {
+          id: row.id,
+          name: row.name,
+          species: row.species,
+          size: row.size,
+          sex: row.sex,
+          city: row.city,
+          organizationId: row.organizationId,
+        },
+        { tx },
+      )
+      return tx.pet.findUniqueOrThrow({ where: { id: row.id }, include: petMedicalInclude })
+    })
+    res.status(201).json(presentPet(created, await referenceUser()))
+  })
+
+  /** Edição e reabertura: `status: DISPONIVEL` dispara os alertas salvos (#31). */
+  router.put(
+    '/pets/:id',
+    requireAuth,
+    validate({ params: petIdParamsSchema, body: updatePetBodySchema }),
+    async (req, res) => {
+      const scope = await requirePetWriteScope(req, res)
+      if (!scope) return
+      const existing = await scopedPet(req, res, scope)
+      if (!existing) return
+
+      const { status, image, ...fields } = req.body as z.infer<typeof updatePetBodySchema>
+      const data: Prisma.PetUncheckedUpdateInput = { ...fields }
+      if (fields.age !== undefined) {
+        data.ageLabel = `${fields.age} ${fields.age === 1 ? 'ano' : 'anos'}`
+      }
+      if (image !== undefined) {
+        data.image = image
+        data.gallery = [image, ...existing.gallery.filter((item) => item !== image)]
+      }
+      const reopening = status === 'DISPONIVEL' && existing.status !== 'DISPONIVEL'
+      if (reopening) data.status = 'DISPONIVEL'
+
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.pet.update({ where: { id: existing.id }, data })
+        if (reopening) {
+          await notifyMatchingSavedFilters(
+            {
+              id: row.id,
+              name: row.name,
+              species: row.species,
+              size: row.size,
+              sex: row.sex,
+              city: row.city,
+              organizationId: row.organizationId,
+            },
+            { tx },
+          )
+        }
+        return tx.pet.findUniqueOrThrow({ where: { id: row.id }, include: petMedicalInclude })
+      })
+      res.json(presentPet(updated, await referenceUser()))
+    },
+  )
+
+  /** Arquivar preserva solicitações, adoções e favoritos (PET-11). */
+  router.post(
+    '/pets/:id/archive',
+    requireAuth,
+    validate({ params: petIdParamsSchema }),
+    async (req, res) => {
+      const scope = await requirePetWriteScope(req, res)
+      if (!scope) return
+      const pet = await scopedPet(req, res, scope)
+      if (!pet) return
+      const updated = await prisma.pet.update({
+        where: { id: pet.id },
+        data: { status: 'ARQUIVADO' },
+        include: petMedicalInclude,
+      })
+      res.json(presentPet(updated, await referenceUser()))
+    },
+  )
+
+  /** Reordena a galeria e escolhe a capa (PET-12). */
+  router.put(
+    '/pets/:id/gallery',
+    requireAuth,
+    validate({ params: petIdParamsSchema, body: petGalleryBodySchema }),
+    async (req, res) => {
+      const scope = await requirePetWriteScope(req, res)
+      if (!scope) return
+      const pet = await scopedPet(req, res, scope)
+      if (!pet) return
+      const { gallery, image } = req.body as z.infer<typeof petGalleryBodySchema>
+      if (!gallery.includes(image)) {
+        return sendError(res, 400, 'Validação falhou', [
+          { field: 'image', message: 'A capa precisa estar na galeria' },
+        ])
+      }
+      const updated = await prisma.pet.update({
+        where: { id: pet.id },
+        data: { gallery, image },
+        include: petMedicalInclude,
+      })
+      res.json(presentPet(updated, await referenceUser()))
+    },
+  )
+
+  /** Fotos do pet: validação por conteúdo/tamanho/quantidade (#49/#94). */
+  router.post(
+    '/pets/:id/photos',
+    requireAuth,
+    validate({ params: petIdParamsSchema }),
+    multipart,
+    async (req, res) => {
+      const scope = await requirePetWriteScope(req, res)
+      if (!scope) return
+      const pet = await scopedPet(req, res, scope)
+      if (!pet) return
+      const config = loadConfig()
+      if (!isStorageConfigured(config)) {
+        return sendError(res, 503, 'Armazenamento não configurado')
+      }
+
+      const files = (req.files as Express.Multer.File[] | undefined) ?? []
+      const prepared = await validateUploadFiles(files, STORAGE_SCOPES.petPhoto)
+      const provider = getStorageProvider(config)
+      await provider.ensureBucket()
+
+      const urls: string[] = []
+      for (const file of prepared) {
+        const stored = await provider.putObject(file)
+        const record = await prisma.storageObject.create({
+          data: {
+            key: stored.key,
+            contentType: stored.contentType,
+            sizeBytes: stored.sizeBytes,
+            resourceType: 'PET',
+            resourceId: pet.id,
+            ownerId: scope.userId,
+          },
+        })
+        const signed = await signObjectUrl(
+          record.id,
+          config.STORAGE_SIGNED_URL_TTL_SECONDS,
+          config.STORAGE_URL_SECRET ?? config.JWT_SECRET,
+        )
+        urls.push(signed.url)
+      }
+
+      const gallery = [...pet.gallery, ...urls]
+      const updated = await prisma.pet.update({
+        where: { id: pet.id },
+        data: { gallery, image: urls[0] ?? pet.image },
+        include: petMedicalInclude,
+      })
+      res.status(201).json(presentPet(updated, await referenceUser()))
+    },
+  )
 
   return router
 }

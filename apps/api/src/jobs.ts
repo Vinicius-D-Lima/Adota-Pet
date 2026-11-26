@@ -14,6 +14,7 @@ import { logger as defaultLogger } from './logger.js'
 import {
   notificationEmailJobSchema,
   notificationHandlerFor,
+  sendDailyDigest,
   sendNotificationEmail,
   type EnqueueEmail,
 } from './notificationService.js'
@@ -80,6 +81,20 @@ export function registerJobHandler(queue: string, handler: JobHandler): void {
 export function clearJobHandlers(): void {
   handlers.clear()
 }
+
+/**
+ * #31/FIL-09: handler do resumo diário. O agendamento `0 7 * * *` vive em
+ * `SCHEDULES`; `server.ts` registra explicitamente este handler no boot.
+ */
+export async function processDailyDigest(now = new Date()) {
+  return sendDailyDigest(now)
+}
+
+/** Alias para consumidores que tratam o job pelo nome da fila. */
+export const dailyDigestJobHandler = processDailyDigest
+
+// Registro padrão para quem usa o runner sem passar pelo `server.ts`.
+registerJobHandler(QUEUES.dailyDigest, () => processDailyDigest())
 
 /**
  * Idempotência por evento: a PK de `JobEffect` faz o `skipDuplicates` ser atômico.

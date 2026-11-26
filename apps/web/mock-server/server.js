@@ -1,6 +1,8 @@
+import { randomBytes } from 'node:crypto'
 import { copyFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import Busboy from 'busboy'
 import jsonServer from 'json-server'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -158,6 +160,39 @@ function isAdult(value) {
   return age >= 18
 }
 
+/** Lê o multipart do upload de exames sem depender do parser do json-server. */
+function parseMultipart(req) {
+  return new Promise((resolve, reject) => {
+    let parser
+    try {
+      parser = Busboy({ headers: req.headers })
+    } catch (error) {
+      reject(error)
+      return
+    }
+    const fields = {}
+    let file = null
+    parser.on('field', (name, value) => {
+      fields[name] = value
+    })
+    parser.on('file', (name, stream, info) => {
+      const chunks = []
+      stream.on('data', (chunk) => chunks.push(chunk))
+      stream.on('end', () => {
+        file = {
+          field: name,
+          filename: info.filename || 'arquivo',
+          contentType: info.mimeType || 'application/octet-stream',
+          buffer: Buffer.concat(chunks),
+        }
+      })
+    })
+    parser.on('error', reject)
+    parser.on('finish', () => resolve({ fields, file }))
+    req.pipe(parser)
+  })
+}
+
 /** Mesmas regras do profileSchema do frontend: [validação, mensagem]. */
 const PROFILE_RULES = {
   name: [(v) => v.trim().length >= 3, 'Informe seu nome completo.'],
@@ -244,6 +279,30 @@ function sendError(res, statusCode, message, details) {
 const isBlank = (value) => typeof value !== 'string' || value.trim() === ''
 const list = (data) => ({ data, total: data.length })
 
+/** Iniciais derivadas do nome — usadas ao criar organizações a partir do seed. */
+function organizationInitialsOf(name) {
+  return (
+    String(name)
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0].toUpperCase())
+      .join('') || 'IN'
+  )
+}
+
+/** Slug estável para o ID de uma organização derivada do nome de um pet. */
+function organizationSlug(name) {
+  return (
+    String(name)
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'organizacao'
+  )
+}
+
 function haversineKm(lat1, lng1, lat2, lng2) {
   const toRad = (deg) => (deg * Math.PI) / 180
   const dLat = toRad(lat2 - lat1)
@@ -281,6 +340,8 @@ export function createApp({
   if (!Array.isArray(store.get('notifications').value())) store.set('notifications', []).write()
   if (!Array.isArray(store.get('notificationPreferences').value()))
     store.set('notificationPreferences', []).write()
+  if (!Array.isArray(store.get('medicalRecords').value())) store.set('medicalRecords', []).write()
+  if (!Array.isArray(store.get('storageObjects').value())) store.set('storageObjects', []).write()
 
   const currentUserId = (req) => {
     const requested = req.get('X-Demo-User-Id')
@@ -410,8 +471,11 @@ export function createApp({
       .join('')
     return { name, initials: initials || 'IN', user }
   }
-  const organizationPets = (userId) => {
-    const { name } = organizationIdentity(userId)
+  const organizationPets = (userId, organizationId = '') => {
+    const selected = organizationId
+      ? store.get('organizations').find({ id: organizationId }).value()
+      : null
+    const name = selected?.name ?? organizationIdentity(userId).name
     return store.get('pets').filter({ organization: name }).value()
   }
   const demoRole = (req) =>
@@ -424,6 +488,189 @@ export function createApp({
     role === 'ADMIN'
       ? ['requests:view', 'requests:review', 'requests:approve', 'requests:reject']
       : ['requests:view', 'requests:review', 'requests:reject']
+
+  // --- Organizações, membros e convites (API simulada do #41) ----------------
+  // As coleções são derivadas do seed (perfil da instituição e pets) para não
+  // duplicar nomes "fixos" de ONG. db.seed.json não é alterado.
+  for (const key of ['organizations', 'memberships', 'invitations']) {
+    if (!Array.isArray(store.get(key).value())) store.set(key, []).write()
+  }
+  const guardianUserId = store.get('guardianProfile').value()?.userId || 'demo-organization'
+  if (store.get('organizations').value().length === 0) {
+    const profile = store.get('guardianProfile').value() ?? {}
+    const pets = store.get('pets').value() ?? []
+    const primaryName = profile.displayName || profile.legalName || 'Instituição'
+    const primary = {
+      id: 'demo-organization',
+      name: primaryName,
+      displayName: primaryName,
+      initials: organizationInitialsOf(primaryName),
+      description: profile.description ?? '',
+      city: profile.city ?? '',
+      contactEmail: profile.email ?? '',
+      email: profile.email ?? '',
+      phone: profile.phone ?? '',
+      address: profile.address ?? '',
+      cnpj: profile.document ?? null,
+      document: profile.document ?? null,
+      logoUrl: null,
+    }
+    const fromPets = pets
+      .filter((pet) => pet.organization && pet.organization !== primaryName)
+      .map((pet) => ({
+        id: organizationSlug(pet.organization),
+        name: pet.organization,
+        displayName: pet.organization,
+        initials: pet.organizationInitials ?? organizationInitialsOf(pet.organization),
+        description: `Protetora responsável por ${pet.name} e outros animais.`,
+        city: pet.city ?? '',
+        contactEmail: '',
+        email: '',
+        phone: '',
+        address: '',
+        cnpj: null,
+        document: null,
+        logoUrl: null,
+      }))
+    store.set('organizations', [primary, ...fromPets]).write()
+  }
+  if (store.get('memberships').value().length === 0) {
+    const organizations = store.get('organizations').value()
+    const guardian = demoUser(guardianUserId) ?? {}
+    store
+      .set('memberships', [
+        {
+          id: 'membership-admin',
+          userId: guardianUserId,
+          organizationId: organizations[0].id,
+          role: 'ADMIN',
+          status: 'ATIVO',
+          joinedAt: '2026-01-10T12:00:00.000Z',
+          user: { id: guardianUserId, name: guardian.name, email: guardian.email },
+        },
+        {
+          id: 'membership-volunteer',
+          userId: guardianUserId,
+          organizationId: organizations[1]?.id ?? organizations[0].id,
+          role: 'VOLUNTEER',
+          status: 'ATIVO',
+          joinedAt: '2026-03-04T12:00:00.000Z',
+          user: { id: guardianUserId, name: guardian.name, email: guardian.email },
+        },
+        {
+          id: 'membership-mariana',
+          userId: 'mariana',
+          organizationId: organizations[0].id,
+          role: 'VOLUNTEER',
+          status: 'ATIVO',
+          joinedAt: '2026-04-18T12:00:00.000Z',
+          user: {
+            id: 'mariana',
+            name: 'Mariana Souza',
+            email: 'mariana@adotapet.local',
+          },
+        },
+      ])
+      .write()
+  }
+
+  const organizationsForUser = (userId) =>
+    store
+      .get('memberships')
+      .value()
+      .filter((membership) => membership.userId === userId && membership.status === 'ATIVO')
+      .map((membership) =>
+        store.get('organizations').find({ id: membership.organizationId }).value(),
+      )
+      .filter(Boolean)
+  const organizationById = (id) => store.get('organizations').find({ id }).value()
+  const primaryOrganizationId = (userId) => organizationsForUser(userId)[0]?.id ?? ''
+  /** Query `?organizationId=` (ou header) escolhe a ONG; inválida cai na principal. */
+  const activeOrganizationId = (req) => {
+    const requested =
+      (typeof req.query.organizationId === 'string' && req.query.organizationId) ||
+      String(req.get('X-Organization-Id') ?? '')
+    const userId = currentUserId(req)
+    const member = store
+      .get('memberships')
+      .value()
+      .find(
+        (item) =>
+          item.userId === userId && item.organizationId === requested && item.status === 'ATIVO',
+      )
+    return member ? requested : primaryOrganizationId(userId)
+  }
+  const effectiveRole = (req, organizationId) => {
+    const membership = store
+      .get('memberships')
+      .value()
+      .find(
+        (item) =>
+          item.userId === currentUserId(req) &&
+          item.organizationId === organizationId &&
+          item.status === 'ATIVO',
+      )
+    // X-Demo-Role continua controlando a ONG principal para os testes de RBAC.
+    return organizationId === primaryOrganizationId(currentUserId(req))
+      ? demoRole(req)
+      : (membership?.role ?? 'VOLUNTEER')
+  }
+  const rulesForRole = (role) =>
+    role === 'ADMIN'
+      ? [{ action: 'manage', subject: 'all' }]
+      : [
+          { action: ['read', 'review', 'reject'], subject: 'Request' },
+          { action: 'read', subject: ['Pet', 'Organization', 'Adoption'] },
+        ]
+  const presentOrganization = (organization) => ({
+    ...organization,
+    displayName: organization.displayName ?? organization.name,
+    document: organization.document ?? organization.cnpj,
+    email: organization.email ?? organization.contactEmail,
+  })
+  const requireMembership = (req, res, organizationId, adminOnly = false) => {
+    const membership = store
+      .get('memberships')
+      .value()
+      .find(
+        (item) =>
+          item.userId === currentUserId(req) &&
+          item.organizationId === organizationId &&
+          item.status === 'ATIVO',
+      )
+    if (!membership) {
+      sendError(res, 403, 'Você não pertence a esta organização')
+      return null
+    }
+    if (adminOnly && effectiveRole(req, organizationId) !== 'ADMIN') {
+      sendError(res, 403, 'Somente administradores podem realizar esta ação')
+      return null
+    }
+    return membership
+  }
+  const presentMembership = (membership) => ({
+    id: membership.id,
+    userId: membership.userId,
+    role: membership.role,
+    status: membership.status,
+    joinedAt: membership.joinedAt,
+    user: membership.user,
+  })
+  const presentInvitation = (invitation) => ({
+    id: invitation.id,
+    organizationId: invitation.organizationId,
+    email: invitation.email,
+    role: invitation.role,
+    expiresAt: invitation.expiresAt,
+    status: invitation.expiresAt < new Date().toISOString() ? 'EXPIRADO' : invitation.status,
+    acceptUrl: `/convite/${invitation.token}`,
+  })
+  const invitationByToken = (token) =>
+    store
+      .get('invitations')
+      .value()
+      .find((invitation) => invitation.token === token)
+
   const isChatParticipant = (request, userId) =>
     request.userId === userId || organizationPets(userId).some(({ id }) => id === request.petId)
   const messagesForRequest = (requestId) =>
@@ -499,6 +746,220 @@ export function createApp({
       distanceKm,
       distance: distanceKm === null ? null : `${String(distanceKm).replace('.', ',')} km`,
     }
+  }
+
+  // --- Prontuário médico (#29/#42) -----------------------------------------
+  const MEDICAL_COLLECTIONS = {
+    vaccinations: 'vaccinations',
+    conditions: 'healthConditions',
+    exams: 'exams',
+  }
+  const HEALTH_CONDITION_TYPES = ['CRONICA', 'EM_TRATAMENTO', 'TRATADA']
+  const nowIso = () => new Date().toISOString()
+  const makeId = (prefix) =>
+    `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+  const isIsoDate = (value) =>
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}T/.test(value) &&
+    !Number.isNaN(Date.parse(value))
+  const medicalAudit = (item) => ({
+    createdAt: item?.createdAt ?? nowIso(),
+    createdById: item?.createdById ?? 'SYSTEM',
+    updatedAt: item?.updatedAt ?? nowIso(),
+    updatedById: item?.updatedById ?? 'SYSTEM',
+  })
+  const medicalRecordOf = (petId) => store.get('medicalRecords').find({ petId }).value()
+  const isMedicalMember = (req, pet) => {
+    if (!pet) return false
+    const userId = currentUserId(req)
+    return organizationsForUser(userId).some((organization) =>
+      organizationPets(userId, organization.id).some(({ id }) => id === pet.id),
+    )
+  }
+  const canViewCompleteMedicalRecord = (req, pet) =>
+    isMedicalMember(req, pet) ||
+    Boolean(
+      pet &&
+      myRequests(currentUserId(req)).some(
+        (request) => request.petId === pet.id && ACTIVE_STATUSES.includes(request.status),
+      ),
+    )
+  const deriveMedicalHealth = (record) => {
+    const vaccinations = record?.vaccinations ?? []
+    return {
+      vaccinated:
+        vaccinations.length > 0 &&
+        vaccinations.every((item) => !item.nextDoseAt || Date.parse(item.nextDoseAt) >= Date.now()),
+      neutered: Boolean(record?.neutering?.done),
+      specialCare: (record?.healthConditions ?? []).some(
+        (item) => item.careRequired && ['CRONICA', 'EM_TRATAMENTO'].includes(item.type),
+      ),
+    }
+  }
+  const publicMedicalRecord = (pet, record) => ({
+    petId: pet.id,
+    ...deriveMedicalHealth(record),
+    neutering: {
+      done: Boolean(record?.neutering?.done),
+      date: record?.neutering?.date ?? null,
+    },
+    vaccinations: (record?.vaccinations ?? []).map(
+      ({ id, name, appliedAt, nextDoseAt, batch, veterinarian }) => ({
+        id,
+        name,
+        appliedAt,
+        nextDoseAt: nextDoseAt ?? null,
+        batch: batch ?? null,
+        veterinarian: veterinarian ?? null,
+      }),
+    ),
+    healthConditions: (record?.healthConditions ?? []).map(({ id, name, type, careRequired }) => ({
+      id,
+      name,
+      type,
+      careRequired,
+    })),
+  })
+  const signedAttachment = (objectId) => {
+    if (!objectId) return null
+    const object = store.get('storageObjects').find({ id: objectId }).value()
+    if (!object) return null
+    return {
+      id: object.id,
+      url: `/files/${object.id}?token=mock-assinado`,
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+    }
+  }
+  const presentMedicalRecord = (req, pet, record) => {
+    const base = publicMedicalRecord(pet, record)
+    if (!canViewCompleteMedicalRecord(req, pet)) return base
+    return {
+      ...base,
+      complete: true,
+      neutering: { ...base.neutering, ...medicalAudit(record?.neutering) },
+      vaccinations: (record?.vaccinations ?? []).map((item) => ({
+        ...item,
+        ...medicalAudit(item),
+      })),
+      healthConditions: (record?.healthConditions ?? []).map((item) => ({
+        ...item,
+        notes: item.notes ?? '',
+        ...medicalAudit(item),
+      })),
+      exams: (record?.exams ?? []).map((item) => ({
+        id: item.id,
+        type: item.type,
+        date: item.date,
+        result: item.result,
+        attachment: signedAttachment(item.attachment),
+        ...medicalAudit(item),
+      })),
+    }
+  }
+  const ensureMedicalRecord = (petId, userId) => {
+    const existing = medicalRecordOf(petId)
+    if (existing) return existing
+    const record = {
+      id: makeId('mr'),
+      petId,
+      vaccinations: [],
+      healthConditions: [],
+      exams: [],
+      neutering: {
+        done: false,
+        date: null,
+        createdAt: nowIso(),
+        createdById: userId,
+        updatedAt: nowIso(),
+        updatedById: userId,
+      },
+      createdAt: nowIso(),
+      createdById: userId,
+      updatedAt: nowIso(),
+      updatedById: userId,
+    }
+    store.get('medicalRecords').push(record).write()
+    return record
+  }
+  const validateMedicalItem = (kind, body) => {
+    const details = []
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return [{ field: 'body', message: 'Envie um objeto JSON' }]
+    }
+    const text = (field, min, max) => {
+      if (
+        typeof body[field] !== 'string' ||
+        body[field].trim().length < min ||
+        body[field].length > max
+      )
+        details.push({ field, message: `Informe ${field} com ${min} a ${max} caracteres` })
+    }
+    if (kind === 'vaccinations') {
+      text('name', 2, 160)
+      if (!isIsoDate(body.appliedAt))
+        details.push({ field: 'appliedAt', message: 'Informe uma data de aplicação válida' })
+      if (body.nextDoseAt != null && !isIsoDate(body.nextDoseAt))
+        details.push({ field: 'nextDoseAt', message: 'Informe uma próxima dose válida' })
+      if (
+        isIsoDate(body.appliedAt) &&
+        isIsoDate(body.nextDoseAt) &&
+        Date.parse(body.nextDoseAt) < Date.parse(body.appliedAt)
+      )
+        details.push({
+          field: 'nextDoseAt',
+          message: 'A próxima dose não pode ser anterior à data de aplicação.',
+        })
+      for (const field of ['batch', 'veterinarian']) {
+        if (body[field] != null && (typeof body[field] !== 'string' || body[field].length > 300))
+          details.push({ field, message: `Informe ${field} com até 300 caracteres` })
+      }
+    } else if (kind === 'conditions') {
+      text('name', 2, 160)
+      if (!HEALTH_CONDITION_TYPES.includes(body.type))
+        details.push({ field: 'type', message: 'Escolha um tipo válido' })
+      if (body.notes != null && (typeof body.notes !== 'string' || body.notes.length > 2000))
+        details.push({ field: 'notes', message: 'Informe observações com até 2000 caracteres' })
+      if (typeof body.careRequired !== 'boolean')
+        details.push({
+          field: 'careRequired',
+          message: 'careRequired deve ser verdadeiro ou falso',
+        })
+    } else if (kind === 'exams') {
+      text('type', 2, 160)
+      if (!isIsoDate(body.date)) details.push({ field: 'date', message: 'Informe uma data válida' })
+      text('result', 1, 4000)
+    }
+    return details
+  }
+  const medicalFields = (kind, body) => {
+    if (kind === 'vaccinations')
+      return {
+        name: body.name.trim(),
+        appliedAt: body.appliedAt,
+        nextDoseAt: body.nextDoseAt ?? null,
+        batch: body.batch || null,
+        veterinarian: body.veterinarian || null,
+      }
+    if (kind === 'conditions')
+      return {
+        name: body.name.trim(),
+        type: body.type,
+        notes: body.notes ?? '',
+        careRequired: body.careRequired,
+      }
+    return { type: body.type.trim(), date: body.date, result: body.result.trim() }
+  }
+  const medicalPetOrError = (req, res) => {
+    const pet = findPet(req.params.petId)
+    if (!pet) {
+      sendError(res, 404, 'Pet não encontrado')
+      return null
+    }
+    if (!isMedicalMember(req, pet)) {
+      sendError(res, 403, 'Somente membros da organização responsável podem editar o prontuário')
+      return null
+    }
+    return pet
   }
 
   // Aceita tanto /pets quanto /api/pets (acesso direto sem o proxy do Vite).
@@ -724,7 +1185,9 @@ export function createApp({
   // --- Área da instituição --------------------------------------------------
   server.get('/me/organization-pets', (req, res) => {
     if (!requireGuardian(req, res)) return
-    const pets = organizationPets(currentUserId(req)).map(presentOrganizationPet)
+    const pets = organizationPets(currentUserId(req), activeOrganizationId(req)).map(
+      presentOrganizationPet,
+    )
     res.json(list(pets))
   })
 
@@ -829,24 +1292,369 @@ export function createApp({
   server.get('/me/permissions', (req, res) => {
     if (!requireGuardian(req, res)) return
     const userId = currentUserId(req)
-    const role = demoRole(req)
+    const organizationId = activeOrganizationId(req)
+    const organization = organizationById(organizationId)
+    const role = effectiveRole(req, organizationId)
     const identity = organizationIdentity(userId)
+    const current = organization
+      ? { id: organization.id, name: organization.name, initials: organization.initials }
+      : { id: userId, name: identity.name, initials: identity.initials }
     res.json({
       role,
       canApprove: role === 'ADMIN',
       permissions: permissionsForRole(role),
-      organization: {
-        id: userId,
-        name: identity.name,
-        initials: identity.initials,
-      },
+      organization: current,
+      organizations: organizationsForUser(userId).map((item) => ({
+        id: item.id,
+        name: item.name,
+        initials: item.initials,
+        role: effectiveRole(req, item.id),
+      })),
+      rules: rulesForRole(role),
     })
+  })
+
+  server.get('/me/organizations', (req, res) => {
+    if (!requireGuardian(req, res)) return
+    const data = organizationsForUser(currentUserId(req)).map((organization) => ({
+      ...organization,
+      role: effectiveRole(req, organization.id),
+    }))
+    res.json({ ...list(data), total: data.length })
+  })
+
+  server.get('/organizations/:id', (req, res) => {
+    if (!requireMembership(req, res, req.params.id)) return
+    const organization = organizationById(req.params.id)
+    if (!organization) return sendError(res, 404, 'Organização não encontrada')
+    res.json(presentOrganization(organization))
+  })
+
+  server.put('/organizations/:id', (req, res) => {
+    if (!requireMembership(req, res, req.params.id, true)) return
+    const organization = organizationById(req.params.id)
+    if (!organization) return sendError(res, 404, 'Organização não encontrada')
+    const body = req.body
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return sendError(res, 400, 'Corpo da requisição inválido')
+    }
+    const details = []
+    const required = {
+      displayName: 3,
+      name: 3,
+      initials: 1,
+      phone: 8,
+      address: 5,
+      city: 2,
+      description: 20,
+    }
+    const next = { ...organization }
+    for (const [key, minimum] of Object.entries(required)) {
+      const value = body[key]
+      if (typeof value !== 'string' || value.trim().length < minimum) {
+        details.push({ field: key, message: `Informe ${key} corretamente` })
+      } else {
+        next[key] = value.trim()
+      }
+    }
+    const email = body.email ?? body.contactEmail
+    if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      details.push({ field: 'email', message: 'Informe um e-mail válido' })
+    } else {
+      next.contactEmail = email.trim()
+      next.email = email.trim()
+    }
+    const document = body.cnpj ?? body.document
+    if (typeof document !== 'string' || digitsOnly(document).length !== 14) {
+      details.push({ field: 'cnpj', message: 'Informe um CNPJ com 14 dígitos' })
+    } else {
+      next.cnpj = digitsOnly(document)
+      next.document = next.cnpj
+    }
+    if (details.length) return sendError(res, 400, 'Validação falhou', details)
+
+    const previousName = organization.name
+    store
+      .get('organizations')
+      .find({ id: organization.id })
+      .assign({ ...next, name: next.name || next.displayName })
+      .write()
+    const updated = organizationById(organization.id)
+    if (organization.id === primaryOrganizationId(currentUserId(req))) {
+      const profile = store.get('guardianProfile').value() ?? {}
+      store
+        .set('guardianProfile', {
+          ...profile,
+          displayName: updated.name,
+          document: updated.cnpj,
+          email: updated.contactEmail,
+          phone: updated.phone,
+          address: updated.address,
+          city: updated.city,
+          description: updated.description,
+          userId: currentUserId(req),
+        })
+        .write()
+      if (previousName !== updated.name) {
+        store
+          .get('pets')
+          .filter({ organization: previousName })
+          .each((pet) => {
+            pet.organization = updated.name
+            pet.organizationInitials = updated.initials
+          })
+          .write()
+      }
+    }
+    res.json(presentOrganization(updated))
+  })
+
+  server.get('/organizations/:id/members', (req, res) => {
+    if (!requireMembership(req, res, req.params.id)) return
+    const data = store
+      .get('memberships')
+      .value()
+      .filter((item) => item.organizationId === req.params.id && item.status === 'ATIVO')
+      .map(presentMembership)
+    res.json(list(data))
+  })
+
+  server.patch('/organizations/:id/members/:userId', (req, res) => {
+    if (!requireMembership(req, res, req.params.id, true)) return
+    const role = String(req.body?.role ?? '').toUpperCase()
+    if (!['ADMIN', 'VOLUNTEER'].includes(role)) {
+      return sendError(res, 400, 'Papel inválido')
+    }
+    const target = store
+      .get('memberships')
+      .value()
+      .find(
+        (item) =>
+          item.organizationId === req.params.id &&
+          item.userId === req.params.userId &&
+          item.status === 'ATIVO',
+      )
+    if (!target) return sendError(res, 404, 'Membro não encontrado')
+    if (target.role === 'ADMIN' && role !== 'ADMIN') {
+      const admins = store
+        .get('memberships')
+        .value()
+        .filter(
+          (item) =>
+            item.organizationId === req.params.id &&
+            item.role === 'ADMIN' &&
+            item.status === 'ATIVO',
+        ).length
+      if (admins <= 1) return sendError(res, 409, 'A organização precisa manter ao menos um ADMIN')
+    }
+    const updated = store.get('memberships').find({ id: target.id }).assign({ role }).write()
+    res.json(presentMembership(updated))
+  })
+
+  server.delete('/organizations/:id/members/:userId', (req, res) => {
+    if (!requireMembership(req, res, req.params.id, true)) return
+    const target = store
+      .get('memberships')
+      .value()
+      .find(
+        (item) =>
+          item.organizationId === req.params.id &&
+          item.userId === req.params.userId &&
+          item.status === 'ATIVO',
+      )
+    if (!target) return sendError(res, 404, 'Membro não encontrado')
+    if (target.role === 'ADMIN') {
+      const admins = store
+        .get('memberships')
+        .value()
+        .filter(
+          (item) =>
+            item.organizationId === req.params.id &&
+            item.role === 'ADMIN' &&
+            item.status === 'ATIVO',
+        ).length
+      if (admins <= 1) return sendError(res, 409, 'A organização precisa manter ao menos um ADMIN')
+    }
+    store.get('memberships').find({ id: target.id }).assign({ status: 'REMOVIDO' }).write()
+    res.status(204).end()
+  })
+
+  server.get('/organizations/:id/invitations', (req, res) => {
+    if (!requireMembership(req, res, req.params.id)) return
+    const data = store
+      .get('invitations')
+      .value()
+      .filter((item) => item.organizationId === req.params.id)
+      .map(presentInvitation)
+    res.json(list(data))
+  })
+
+  server.post('/organizations/:id/invitations', (req, res) => {
+    if (!requireMembership(req, res, req.params.id, true)) return
+    const email = String(req.body?.email ?? '')
+      .trim()
+      .toLowerCase()
+    const role = String(req.body?.role ?? '').toUpperCase()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !['ADMIN', 'VOLUNTEER'].includes(role)) {
+      return sendError(res, 400, 'Informe um e-mail e um papel válidos')
+    }
+    const existingUser = store
+      .get('users')
+      .value()
+      .find((user) => user.email === email)
+    if (
+      existingUser &&
+      store
+        .get('memberships')
+        .value()
+        .some(
+          (item) =>
+            item.userId === existingUser.id &&
+            item.organizationId === req.params.id &&
+            item.status === 'ATIVO',
+        )
+    ) {
+      return sendError(res, 409, 'Este usuário já pertence à organização')
+    }
+    if (
+      store
+        .get('invitations')
+        .value()
+        .some(
+          (item) =>
+            item.organizationId === req.params.id &&
+            item.email === email &&
+            item.status === 'PENDENTE' &&
+            item.expiresAt >= new Date().toISOString(),
+        )
+    ) {
+      return sendError(res, 409, 'Já existe um convite pendente para este e-mail')
+    }
+    const invitation = {
+      id: `convite-${randomBytes(4).toString('hex')}`,
+      organizationId: req.params.id,
+      email,
+      role,
+      status: 'PENDENTE',
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      token: randomBytes(32).toString('base64url'),
+    }
+    store.get('invitations').push(invitation).write()
+    res.status(201).json(presentInvitation(invitation))
+  })
+
+  server.delete('/organizations/:id/invitations/:invitationId', (req, res) => {
+    if (!requireMembership(req, res, req.params.id, true)) return
+    const invitation = store
+      .get('invitations')
+      .value()
+      .find((item) => item.id === req.params.invitationId && item.organizationId === req.params.id)
+    if (!invitation) return sendError(res, 404, 'Convite não encontrado')
+    if (invitation.status === 'ACEITO') return sendError(res, 400, 'Este convite já foi usado')
+    if (invitation.expiresAt < new Date().toISOString()) {
+      store.get('invitations').find({ id: invitation.id }).assign({ status: 'EXPIRADO' }).write()
+      return sendError(res, 410, 'Este convite expirou')
+    }
+    store.get('invitations').find({ id: invitation.id }).assign({ status: 'REVOGADO' }).write()
+    res.status(204).end()
+  })
+
+  server.get('/invitations/:token', (req, res) => {
+    const invitation = invitationByToken(req.params.token)
+    if (!invitation) return sendError(res, 400, 'Convite inválido')
+    if (invitation.status === 'REVOGADO') return sendError(res, 410, 'Este convite foi revogado')
+    if (invitation.status === 'ACEITO') return sendError(res, 400, 'Este convite já foi usado')
+    if (invitation.expiresAt < new Date().toISOString()) {
+      store.get('invitations').find({ id: invitation.id }).assign({ status: 'EXPIRADO' }).write()
+      return sendError(res, 410, 'Este convite expirou')
+    }
+    const organization = organizationById(invitation.organizationId)
+    res.json({
+      email: invitation.email,
+      role: invitation.role,
+      status: invitation.status,
+      expiresAt: invitation.expiresAt,
+      organization: organization
+        ? { id: organization.id, name: organization.name, initials: organization.initials }
+        : null,
+      organizationName: organization?.name,
+    })
+  })
+
+  server.post('/invitations/:token/accept', (req, res) => {
+    const invitation = invitationByToken(req.params.token)
+    if (!invitation) return sendError(res, 400, 'Convite inválido')
+    if (invitation.status === 'ACEITO') return sendError(res, 400, 'Este convite já foi usado')
+    if (invitation.status === 'REVOGADO') return sendError(res, 410, 'Este convite foi revogado')
+    if (invitation.expiresAt < new Date().toISOString()) {
+      store.get('invitations').find({ id: invitation.id }).assign({ status: 'EXPIRADO' }).write()
+      return sendError(res, 410, 'Este convite expirou')
+    }
+    const userId = currentUserId(req)
+    const user = demoUser(userId)
+    if (!user || user.email.trim().toLowerCase() !== invitation.email) {
+      return sendError(res, 403, 'Este convite pertence a outra conta')
+    }
+    const membership = {
+      id: `membership-${invitation.id}`,
+      userId,
+      organizationId: invitation.organizationId,
+      role: invitation.role,
+      status: 'ATIVO',
+      joinedAt: new Date().toISOString(),
+      user: { id: userId, name: user.name, email: user.email },
+    }
+    const existing = store
+      .get('memberships')
+      .value()
+      .find((item) => item.userId === userId && item.organizationId === invitation.organizationId)
+    if (existing) {
+      store
+        .get('memberships')
+        .find({ id: existing.id })
+        .assign({ role: invitation.role, status: 'ATIVO', joinedAt: membership.joinedAt })
+        .write()
+    } else {
+      store.get('memberships').push(membership).write()
+    }
+    store.get('invitations').find({ id: invitation.id }).assign({ status: 'ACEITO' }).write()
+    const roles = Array.from(new Set([...(user.roles ?? ['ADOPTER']), 'GUARDIAN']))
+    store.get('users').find({ id: userId }).assign({ roles }).write()
+    res.json({ organization: organizationById(invitation.organizationId), membership })
+  })
+
+  server.get('/me/adoptions', (req, res) => {
+    const userId = currentUserId(req)
+    const ownedPetIds = new Set(organizationPets(userId).map(({ id }) => id))
+    const data = store
+      .get('requests')
+      .value()
+      .filter((request) => request.status === 'Aprovada')
+      .filter((request) => request.userId === userId || ownedPetIds.has(request.petId))
+      .map((request) => {
+        const adopter = demoUser(request.userId) ?? {}
+        const profile = getProfile(request.userId)
+        return {
+          id: `ADO-${request.id}`,
+          adoptedAt: request.date,
+          adopterId: request.userId,
+          adopter: {
+            id: request.userId,
+            name: profile.name || adopter.name || 'Adotante',
+            email: profile.email || adopter.email || '',
+          },
+          pet: findPet(request.petId),
+          plan: null,
+          checkIns: [],
+        }
+      })
+    res.json(list(data))
   })
 
   server.get('/me/received-requests', (req, res) => {
     if (!requireGuardian(req, res)) return
     const userId = currentUserId(req)
-    const ownedPets = organizationPets(userId)
+    const ownedPets = organizationPets(userId, activeOrganizationId(req))
     const petIds = new Set(ownedPets.map(({ id }) => id))
     const requestedPet = typeof req.query.petId === 'string' ? req.query.petId : ''
     const requestedStage = typeof req.query.stage === 'string' ? req.query.stage : 'all'
@@ -1571,6 +2379,155 @@ export function createApp({
       .push(...stored)
       .write()
     res.json({ data: body })
+  })
+
+  // --- Prontuário médico: leitura, CRUD e upload de anexos ----------------------
+  server.get('/pets/:petId/medical-record', (req, res) => {
+    const pet = findPet(req.params.petId)
+    if (!pet) return sendError(res, 404, 'Pet não encontrado')
+    return res.json(presentMedicalRecord(req, pet, medicalRecordOf(pet.id)))
+  })
+
+  server.put('/pets/:petId/medical-record/neutering', (req, res) => {
+    const pet = medicalPetOrError(req, res)
+    if (!pet) return
+    const body = req.body ?? {}
+    const details = []
+    if (typeof body.done !== 'boolean')
+      details.push({ field: 'done', message: 'done deve ser booleano' })
+    if (body.done && !isIsoDate(body.date))
+      details.push({ field: 'date', message: 'Informe a data da castração.' })
+    if (!body.done && body.date)
+      details.push({
+        field: 'date',
+        message: 'A data só pode ser informada quando a castração foi realizada.',
+      })
+    if (details.length) return sendError(res, 400, 'Validação falhou', details)
+    const userId = currentUserId(req)
+    const record = ensureMedicalRecord(pet.id, userId)
+    record.neutering = {
+      ...record.neutering,
+      done: body.done,
+      date: body.done ? body.date : null,
+      updatedAt: nowIso(),
+      updatedById: userId,
+    }
+    record.updatedAt = nowIso()
+    record.updatedById = userId
+    store.get('medicalRecords').write()
+    return res.json(record.neutering)
+  })
+
+  for (const [routeKind, collectionKey] of Object.entries(MEDICAL_COLLECTIONS)) {
+    const base = `/pets/:petId/medical-record/${routeKind}`
+
+    server.post(base, (req, res) => {
+      const pet = medicalPetOrError(req, res)
+      if (!pet) return
+      const details = validateMedicalItem(collectionKey, req.body)
+      if (details.length) return sendError(res, 400, 'Validação falhou', details)
+      const userId = currentUserId(req)
+      const record = ensureMedicalRecord(pet.id, userId)
+      const timestamp = nowIso()
+      const item = {
+        id: makeId(routeKind.slice(0, 3)),
+        ...medicalFields(collectionKey, req.body),
+        createdAt: timestamp,
+        createdById: userId,
+        updatedAt: timestamp,
+        updatedById: userId,
+      }
+      record[collectionKey].push(item)
+      record.updatedAt = timestamp
+      record.updatedById = userId
+      store.get('medicalRecords').write()
+      return res.status(201).json(item)
+    })
+
+    server.put(`${base}/:itemId`, (req, res) => {
+      const pet = medicalPetOrError(req, res)
+      if (!pet) return
+      const details = validateMedicalItem(collectionKey, req.body)
+      if (details.length) return sendError(res, 400, 'Validação falhou', details)
+      const record = medicalRecordOf(pet.id)
+      const index = record?.[collectionKey].findIndex(({ id }) => id === req.params.itemId) ?? -1
+      if (index < 0) return sendError(res, 404, 'Item não encontrado neste prontuário')
+      const userId = currentUserId(req)
+      const timestamp = nowIso()
+      const item = {
+        ...record[collectionKey][index],
+        ...medicalFields(collectionKey, req.body),
+        updatedAt: timestamp,
+        updatedById: userId,
+      }
+      record[collectionKey][index] = item
+      record.updatedAt = timestamp
+      record.updatedById = userId
+      store.get('medicalRecords').write()
+      return res.json(item)
+    })
+
+    server.delete(`${base}/:itemId`, (req, res) => {
+      const pet = medicalPetOrError(req, res)
+      if (!pet) return
+      const record = medicalRecordOf(pet.id)
+      const key = collectionKey
+      const removed = record?.[key].find(({ id }) => id === req.params.itemId)
+      if (!record || !removed) return sendError(res, 404, 'Item não encontrado neste prontuário')
+      if (key === 'exams' && removed.attachment) {
+        store.get('storageObjects').remove({ id: removed.attachment }).write()
+      }
+      record[key] = record[key].filter(({ id }) => id !== req.params.itemId)
+      store.get('medicalRecords').write()
+      return res.status(204).end()
+    })
+  }
+
+  server.post('/storage/objects', async (req, res) => {
+    const userId = currentUserId(req)
+    let fields
+    let file
+    try {
+      ;({ fields, file } = await parseMultipart(req))
+    } catch {
+      return sendError(res, 400, 'Upload inválido')
+    }
+    if (fields.scope !== 'medicalExam' || fields.resourceType !== 'MEDICAL_EXAM') {
+      return sendError(res, 403, 'Sem permissão para anexar arquivos a este exame')
+    }
+    const record = store
+      .get('medicalRecords')
+      .value()
+      .find((item) => (item.exams ?? []).some((exam) => exam.id === fields.resourceId))
+    const pet = record ? findPet(record.petId) : null
+    if (!isMedicalMember(req, pet)) {
+      return sendError(res, 403, 'Sem permissão para anexar arquivos a este exame')
+    }
+    if (!file) return sendError(res, 400, 'Nenhum arquivo enviado')
+    const object = {
+      id: makeId('obj'),
+      key: `medical-exams/${fields.resourceId}/${file.filename}`,
+      contentType: file.contentType,
+      sizeBytes: file.buffer.length,
+      resourceType: 'MEDICAL_EXAM',
+      resourceId: fields.resourceId,
+      ownerId: userId,
+      createdAt: nowIso(),
+    }
+    store.get('storageObjects').push(object).write()
+    const exam = record.exams.find(({ id }) => id === fields.resourceId)
+    exam.attachment = object.id
+    store.get('medicalRecords').write()
+    return res.status(201).json({
+      data: [
+        {
+          ...object,
+          url: `/files/${object.id}?token=mock-assinado`,
+          expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+        },
+      ],
+      total: 1,
+    })
   })
 
   // --- Respostas do json-server no formato do contrato --------------------------

@@ -2,7 +2,7 @@
 
 > Issue [#28](https://github.com/Vinicius-D-Lima/Adota-Pet/issues/28) · prefixo `RBAC` · **9 testes** (1 funcionais, 8 de segurança, 0 de integração)
 
-Garante a matriz de permissões inteira, com negação por padrão e filtros de consulta pelo `@casl/prisma`.
+Garante a matriz de permissões inteira, com negação por padrão e filtros de consulta pelo `@casl/prisma`. A matriz documentada fica no [README da raiz](../../README.md#matriz-de-permissões-casl) e é a fonte comparada pelo `RBAC-09`; as regras executáveis ficam em `apps/api/src/ability.ts`.
 
 ## Como ler
 
